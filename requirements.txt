@@ -1,0 +1,15 @@
+fastapi
+langchain
+uvicorn
+Pillow
+pytesseract
+easyocr
+validators
+PyPDF2
+pdf2image
+aiofiles
+asyncio
+pypdfium2
+python-multipart
+pyzbar
+pandas
