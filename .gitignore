@@ -135,3 +135,30 @@ cython_debug/
 
 # FastAPI specific
 *.db
+pyvenv.cfg
+.vscode/settings.json
+Include/site/python3.10/greenlet/greenlet.h
+Scripts/activate
+Scripts/activate.bat
+Scripts/Activate.ps1
+Scripts/cmark.exe
+Scripts/deactivate.bat
+Scripts/f2py.exe
+Scripts/httpx.exe
+Scripts/langchain-server.exe
+Scripts/markdown_py.exe
+Scripts/msg_parser.exe
+Scripts/nltk.exe
+Scripts/normalizer.exe
+Scripts/pip.exe
+Scripts/pip3.10.exe
+Scripts/pip3.exe
+Scripts/publish.py
+Scripts/pygmentize.exe
+Scripts/python.exe
+Scripts/pythonw.exe
+Scripts/tqdm.exe
+Scripts/unstructured-ingest-script.py
+Scripts/unstructured-ingest.exe
+Scripts/uvicorn.exe
+Scripts/vba_extract.py
