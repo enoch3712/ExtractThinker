@@ -3,6 +3,8 @@
 ## Introduction
 This project aims to tackle the challenges of data extraction and processing using OCR and LLM. It is inspired by JP Morgan's DocLLM but is fully open-source and offers a larger context window size. The project is divided into two parts: the OCR and LLM layer.
 
+![image](https://github.com/enoch3712/Open-DocLLM/assets/9283394/2612cc9e-fc66-401e-912d-3acaef42d9cc)
+
 ## OCR Layer
 The OCR layer is responsible for reading all the content from a document. It involves the following steps:
 
