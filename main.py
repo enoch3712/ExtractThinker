@@ -1,9 +1,13 @@
+import base64
 from http.client import HTTPException
 import os
+import anthropic
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 import validators
 from uvicorn import run
+from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
+from Antropic.AnthropicsApiService import AnthropicsApiService
 from CustomException import CustomException
 from PyPDF2 import PdfReader
 from io import BytesIO
@@ -35,7 +39,10 @@ import requests
 import json
 from typing import Dict
 from Payload import Message, Payload
-from config import API_KEY
+from config import API_KEY, API_KEY_ANTROPIC
+from fastapi import UploadFile, File
+from openpyxl import load_workbook
+import io
 
 # local path to tesseract
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
@@ -84,6 +91,29 @@ async def extract_text(file: UploadFile = File(...)):
     temp_file.close()
 
     return JSONResponse(content=result)
+    
+@app.post("/extract_image")
+async def extract_text(file: UploadFile = File(...)):
+
+    # Create a temporary file and save the uploaded file to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfileobj(file.file, temp_file)
+    file_path = temp_file.name
+    
+    # Convert PDF to images
+    images = convert_pdf_to_images(file_path)
+
+    # Convert images to base64 and collect them in a list
+    base64_images = []
+    for image in images:
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        base64_images.append(img_str)
+
+    # Return the base64 images in a JSON response
+    return JSONResponse(content={"images": base64_images})
+    
 
 @app.post("/extract_text_from_url")
 async def extract_text_from_url(url: str):
@@ -139,6 +169,78 @@ async def extract_text(file: UploadFile = File(...), extraction_contract: str = 
     temp_file.close()
 
     return content
+
+@app.post("/extractClaude")
+async def process_image_with_claude(file: UploadFile = File(...), extraction_contract: str = Form(...)):
+
+    # Create a temporary file and save the uploaded file to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfileobj(file.file, temp_file)
+    file_path = temp_file.name
+
+    # Convert the file to base64
+    with open(file_path, "rb") as f:
+        base64_encoded_image = base64.b64encode(f.read()).decode()
+
+    # Create an instance of AnthropicsApiService
+    api_service = AnthropicsApiService(API_KEY_ANTROPIC) 
+
+    # Prepare the prompt
+    prompt = f"###Contract\n{extraction_contract}"
+
+    # Build the messages
+    messages = [Message(role="user", content=prompt)]
+
+    # Set the model
+    model = "claude-3-haiku-20240307"
+
+    # Create an instance of AnthropicsApiRequest
+    api_request = AnthropicsApiRequest(
+        model=model,
+        max_tokens=2000,
+        messages=messages,
+        system="You are a server API that receives an image and returns a JSON object with the content of the contract supplied"
+    )
+
+    # Send the data to the Anthropics service and get the response
+    response = api_service.send_image_message(api_request, base64_encoded_image)
+
+    # Return the response
+    return {"Content": response}
+
+@app.post("/extractExcel")
+async def process_excel_file(file: UploadFile = File(...), extraction_contract: str = Form(...)):
+
+    df = pd.read_excel(io.BytesIO(await file.read()))
+
+    # Convert the DataFrame to a string
+    data = df.to_string(index=False)
+
+    # Create an instance of AnthropicsApiService
+    api_service = AnthropicsApiService(API_KEY_ANTROPIC) 
+
+    # Prepare the prompt
+    prompt = f"##Content\r\n{data}\r\n##contract\r\n{extraction_contract}\r\n\n##Result in JSON"
+
+    # Build the messages
+    messages = [Message(role="user", content=prompt)]
+
+    # Set the model
+    model = "claude-3-sonnet-20240229"
+
+    # Create an instance of AnthropicsApiRequest
+    api_request = AnthropicsApiRequest(
+        model=model,
+        max_tokens=4000,
+        messages=messages,
+        system="You are a server API that receives an image and returns a JSON object with the content of the contract supplied"
+    )
+
+    # Send the data to the Anthropics service and get the response
+    response = api_service.send_message(api_request)
+
+    # Return the response
+    return {"Content": response}
 
 def send_request_to_mistral(content: str) -> str:
     url = "https://api.mistral.ai/v1/chat/completions"

@@ -32,7 +32,3 @@ The integration of OCR and LLM technologies in this project marks a pivotal adva
 ## References & Documents 
 1. [DOCLLM: A LAYOUT-AWARE GENERATIVE LANGUAGE MODEL FOR MULTIMODAL DOCUMENT UNDERSTANDING](https://arxiv.org/pdf/2401.00908.pdf)
 2. [YaRN: Efficient Context Window Extension of Large Language Models](https://arxiv.org/pdf/2309.00071.pdf)
-
-## Contributors
-- Jorge Santos
-- Sérgio Magalhães

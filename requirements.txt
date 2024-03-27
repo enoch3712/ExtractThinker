@@ -13,3 +13,5 @@ pypdfium2
 python-multipart
 pyzbar
 pandas
+anthropic
+openpyxl
