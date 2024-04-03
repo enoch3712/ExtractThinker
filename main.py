@@ -1,51 +1,40 @@
+import asyncio
 import base64
-from http.client import HTTPException
+import concurrent.futures
+import imghdr
+import io
+import json
 import os
-import anthropic
-from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+import re
+import shutil
+import tempfile
+import time
+import urllib.request
+from http.client import HTTPException
+from io import BytesIO
+from pathlib import Path
+
+import PyPDF2
+import pandas as pd
+import pypdfium2 as pdfium
+import pytesseract
+from pytesseract import image_to_string
+import requests
 import validators
-from uvicorn import run
+from PIL import Image
+from easyocr import Reader
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
+
 from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
 from Antropic.AnthropicsApiService import AnthropicsApiService
 from CustomException import CustomException
-from PyPDF2 import PdfReader
-from io import BytesIO
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-import shutil
-from pathlib import Path
-import tempfile
-from langchain.document_loaders.image import UnstructuredImageLoader
-from langchain.document_loaders import UnstructuredFileLoader
-import PyPDF2
-from easyocr import Reader
-import pytesseract
-from pytesseract import image_to_string
-import pypdfium2 as pdf2img
-import pypdfium2 as pdfium
-from PIL import Image
-import aiofiles
-import os
-import asyncio
-import time
-import concurrent.futures
-import imghdr
-import urllib.request
-import io
-from pyzbar.pyzbar import decode
-import pandas as pd
-import requests
-import json
-from typing import Dict
 from Payload import Message, Payload
 from config import API_KEY, API_KEY_ANTROPIC
-from fastapi import UploadFile, File
-from openpyxl import load_workbook
-import io
 
 # local path to tesseract
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+# docker path to tesseract
 #os.environ.get('TESSERACT_PATH', 'tesseract')
 
 systemMessage = "You are a server API that receives document information and returns specific document fields as a JSON object."
@@ -270,10 +259,25 @@ def send_request_to_mistral(content: str) -> str:
     # Extract the JSON substring from the content
     json_content = extractJsonSubstring(jsonContentStarter, content)
 
-    # deserialize the JSON string
-    json_content = json.loads(json_content)
+    json_content = extract_json(json_content)
 
     return json_content
+
+def extract_json(text):
+    # Find the JSON string in the text
+    match = re.search(r'\{.*?\}', text, re.DOTALL)
+    if match:
+        json_str = match.group()
+        try:
+            # Try to load the JSON string
+            json_obj = json.loads(json_str)
+            return json_obj
+        except json.JSONDecodeError:
+            print("Invalid JSON")
+            return None
+    else:
+        print("No JSON found")
+        return None
 
 def extractJsonSubstring(str1, str2):
     # Concatenate the two strings
@@ -367,17 +371,6 @@ def extract_text_with_easyocr(images):
         for result in results:
             text += result[1] + ' '
     return text
-
-def extract_text_with_langchain_image(images):
-    text = ''
-    for img in images:
-        loader = UnstructuredImageLoader(img)
-        text += loader.load()
-    return text
-
-def extract_text_with_langchain_pdf(pdf_file):
-    loader = UnstructuredFileLoader(pdf_file)
-    return loader.text
 
 def extract_text_with_pyPDF(PDF_File):
     with open(PDF_File, 'rb') as file:

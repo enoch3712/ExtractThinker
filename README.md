@@ -20,8 +20,39 @@ The LLM layer is responsible for extracting specific content from the document i
 ## Running Locally
 You can run the models on-premises using LLM studio or Ollama. This project uses LlamaIndex and Ollama.
 
-## Testing
+## Running the Code
 The repo includes a FastAPI app with one endpoint for testing. Make sure to point to the proper Tesseract executable and change the key in the config.py file.
+
+1. Install Tessaract 
+https://github.com/tesseract-ocr/tesseract
+
+2. Install the required Python packages.
+```sh
+pip install -r requirements.txt
+```
+
+3. Run fast api
+```sh
+uvicorn main:app --reload
+```
+
+4. go to the Swgger page: 
+http://localhost:8000/docs
+
+## Running with Docker
+1. Build the Docker image.
+```sh
+docker build -t your-image-name .
+```
+
+2. Run the Docker container.
+```sh
+docker run -p 8000:8000 your-image-name
+```
+
+3. go to the Swgger page: 
+http://localhost:8000/docs
+
 
 ## Advanced Cases: 1 Million token context
 The project also explores advanced cases like a 1 million token context using LLM Lingua and Mistral Yarn 128k context window.
