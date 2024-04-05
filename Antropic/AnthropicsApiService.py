@@ -4,6 +4,7 @@ from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
 from Antropic.Message import Message
 import time
 
+
 class AnthropicsApiService:
     def __init__(self, api_key: str):
         self.client = anthropic.Anthropic(api_key=api_key)
@@ -26,7 +27,8 @@ class AnthropicsApiService:
                 continue
 
             if hasattr(message, 'error') and message.error:
-                raise Exception(f"API request failed: {message.error['message']}")
+                raise Exception(
+                    f"API request failed: {message.error['message']}")
 
             final_response = message
 
@@ -41,18 +43,46 @@ class AnthropicsApiService:
             if final_response.stop_reason != "end_turn":
                 last_message = content
                 if last_message:
-                    request.messages.append(Message(role="assistant", content=last_message))
-                    request.messages.append(Message(role="user", content="##continue JSON"))
+                    request.messages.append(
+                        Message(role="assistant", content=last_message))
+                    request.messages.append(
+                        Message(role="user", content="##continue JSON"))
 
             if final_response.stop_reason == "end_turn":
                 break
 
         return "".join(sb)
-    
-    def send_image_message(self, initial_request: AnthropicsApiRequest, base64_image: str) -> str:
+
+    def send_image_message(self, initial_request: AnthropicsApiRequest, base64_image: str, extracted_text: str, addOcr: bool = False) -> str:
         final_response = None
         request = initial_request
         sb = []
+
+        messagesContent = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64_image
+                }
+            },
+        ]
+
+        if addOcr:
+            messagesContent.append(
+                {
+                    "type": "text",
+                    "text": "###OCR content of the image above, for precision\n\n"+extracted_text
+                }
+            )
+
+        messagesContent.append(
+            {
+                "type": "text",
+                "text": request.messages[0].content
+            }
+        )
 
         while True:
             start_time = time.time()
@@ -65,20 +95,7 @@ class AnthropicsApiService:
                 messages=[
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": base64_image
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": request.messages[0].content
-                            }
-                        ]
+                        "content": messagesContent
                     }
                 ]
             )
@@ -90,7 +107,8 @@ class AnthropicsApiService:
                 continue
 
             if hasattr(message, 'error') and message.error:
-                raise Exception(f"API request failed: {message.error['message']}")
+                raise Exception(
+                    f"API request failed: {message.error['message']}")
 
             final_response = message
 
@@ -105,7 +123,7 @@ class AnthropicsApiService:
                 break
 
         return "".join(sb)
-    
+
     @staticmethod
     def remove_json_format(json_string: str) -> str:
         replace = json_string.replace("```json", "")

@@ -192,7 +192,48 @@ async def process_image_with_claude(file: UploadFile = File(...), extraction_con
     )
 
     # Send the data to the Anthropics service and get the response
-    response = api_service.send_image_message(api_request, base64_encoded_image)
+    response = api_service.send_image_message(api_request, base64_encoded_image, "", addOcr=False)
+
+    # Return the response
+    return {"Content": response}
+
+@app.post("/extractClaudeWithOcr")
+async def process_image_with_claude(file: UploadFile = File(...), extraction_contract: str = Form(...)):
+
+    # Create a temporary file and save the uploaded file to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfileobj(file.file, temp_file)
+    file_path = temp_file.name
+
+    # Convert the file to base64
+    with open(file_path, "rb") as f:
+        fileStream = f.read()
+        base64_encoded_image = base64.b64encode(fileStream).decode()
+        # Extract text using different methods
+        extracted_text = extract_text_with_pytesseract([{0: fileStream}])
+
+    # Create an instance of AnthropicsApiService
+    api_service = AnthropicsApiService(API_KEY_ANTROPIC) 
+
+    # Prepare the prompt
+    prompt = f"###Contract\n{extraction_contract}"
+
+    # Build the messages
+    messages = [Message(role="user", content=prompt)]
+
+    # Set the model
+    model = "claude-3-haiku-20240307"
+
+    # Create an instance of AnthropicsApiRequest
+    api_request = AnthropicsApiRequest(
+        model=model,
+        max_tokens=2000,
+        messages=messages,
+        system="You are a server API that receives an image and returns a JSON object with the content of the contract supplied"
+    )
+
+    # Send the data to the Anthropics service and get the response
+    response = api_service.send_image_message(api_request, base64_encoded_image, extracted_text[0], addOcr=True)
 
     # Return the response
     return {"Content": response}
