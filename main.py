@@ -321,6 +321,13 @@ def extract_json(text):
         return None
 
 def extractJsonSubstring(str1, str2):
+    # if str2 is valid JSON, return it
+    try:
+        json.loads(str2)
+        return str2
+    except:
+        pass
+
     # Concatenate the two strings
     combined_str = str1 + str2
     
