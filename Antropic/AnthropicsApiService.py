@@ -3,8 +3,8 @@ import anthropic
 from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
 from Antropic.Message import Message
 import time
-
-
+from utils import remove_json_format, remove_last_element
+    
 class AnthropicsApiService:
     def __init__(self, api_key: str):
         self.client = anthropic.Anthropic(api_key=api_key)
@@ -112,10 +112,10 @@ class AnthropicsApiService:
 
             final_response = message
 
-            content = self.remove_json_format(final_response.content[0].text)
+            content = remove_json_format(final_response.content[0].text)
 
             if final_response.stop_reason != "end_turn":
-                content = self.removeLastElement(content)
+                content = remove_last_element(content)
 
             sb.append(content)
 
@@ -123,26 +123,3 @@ class AnthropicsApiService:
                 break
 
         return "".join(sb)
-
-    @staticmethod
-    def remove_json_format(json_string: str) -> str:
-        replace = json_string.replace("```json", "")
-        replace = replace.replace("```", "")
-        return replace.strip()
-
-    @staticmethod
-    def removeLastElement(json_string: str) -> str:
-        try:
-            json.loads(json_string)
-            return json_string
-        except json.JSONDecodeError:
-            pass
-
-        last_index = json_string.rfind("},")
-
-        if last_index == -1:
-            return json_string
-
-        trimmed_string = json_string[:last_index + 1]
-        trimmed_string += ","
-        return trimmed_string

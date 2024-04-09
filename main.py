@@ -9,6 +9,7 @@ import re
 import shutil
 import tempfile
 import time
+from typing import List
 import urllib.request
 from http.client import HTTPException
 from io import BytesIO
@@ -28,9 +29,16 @@ from fastapi.responses import JSONResponse
 
 from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
 from Antropic.AnthropicsApiService import AnthropicsApiService
+from Classification.Cascade import Cascade
+from Classification.Classification import Classification
+from Classification.Model35 import Model35
+from Classification.Model4 import Model4
+from Classification.LogProbEval import LogProbEval
+from Classification.ModelDecorator import ModelDecorator
 from CustomException import CustomException
 from Payload import Message, Payload
 from config import API_KEY, API_KEY_ANTROPIC
+from utils import remove_json_format
 
 # local path to tesseract
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
@@ -102,7 +110,6 @@ async def extract_text(file: UploadFile = File(...)):
 
     # Return the base64 images in a JSON response
     return JSONResponse(content={"images": base64_images})
-    
 
 @app.post("/extract_text_from_url")
 async def extract_text_from_url(url: str):
@@ -271,6 +278,69 @@ async def process_excel_file(file: UploadFile = File(...), extraction_contract: 
 
     # Return the response
     return {"Content": response}
+
+
+@app.post("/classify")
+async def classify(file: UploadFile = File(...), classifications: str = Form(...)):
+    classifications_list = verify_classifications(classifications)
+
+    # Process the file to get the input data
+    extracted_text = process_file(file)
+
+    # Wrap the models with ModelDecorator
+    model1 = Model35()
+    model2 = Model4()
+
+    # Create an evaluator with a threshold of 0.15
+    evaluator = LogProbEval(0.99)
+
+    # Create a cascade with the models and evaluator
+    cascade = Cascade([model1, model2], evaluator)
+
+    # Test the cascade with some input data
+    input_data = f"##Content\n{extracted_text[0]}\n##Classifications\n" + "\n".join([f"{c['name']}: {c['description']}" for c in classifications_list]) + "\n\n##JSON Output\n"
+    
+    result = cascade.process(input_data)
+
+    content = remove_json_format(result)
+
+    return json.loads(content)
+
+def process_file(file):
+    # Create a temporary file and save the uploaded file to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfileobj(file.file, temp_file)
+    file_path = temp_file.name
+
+    # Check the file type
+    file_type = imghdr.what(file_path)
+    if file_type is None:
+        # If the file is not an image, assume it's a PDF and extract the text from it
+        images = convert_pdf_to_images(file_path)
+        extracted_text = extract_text_with_pytesseract(images)
+        input_data = "\n new page --- \n".join(extracted_text)
+    else:
+        # If the file is an image or text, read it directly
+        with open(file_path, 'r') as f:
+            input_data = f.read()
+    
+    return input_data
+
+def verify_classifications(classifications: str) -> List[dict]:
+    try:
+        # Attempt to deserialize the classifications string into a list of dictionaries
+        classifications_list = json.loads(classifications)
+    except json.JSONDecodeError:
+        # If deserialization fails, return a 400 error
+        raise HTTPException(status_code=400, detail="Invalid classifications format")
+
+    # Check that each classification has a 'name' and 'description'
+    for classification in classifications_list:
+        if 'name' not in classification or 'description' not in classification:
+            # If a classification doesn't have a 'name' or 'description', return a 401 error
+            raise HTTPException(status_code=400, detail="Invalid classification format")
+
+    return classifications_list
 
 def send_request_to_mistral(content: str) -> str:
     url = "https://api.mistral.ai/v1/chat/completions"
