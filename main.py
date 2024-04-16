@@ -26,6 +26,7 @@ from PIL import Image
 from easyocr import Reader
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from groq import Groq
 
 from Antropic.AnthropicsApiRequest import AnthropicsApiRequest
 from Antropic.AnthropicsApiService import AnthropicsApiService
@@ -37,7 +38,7 @@ from Classification.LogProbEval import LogProbEval
 from Classification.ModelDecorator import ModelDecorator
 from CustomException import CustomException
 from Payload import Message, Payload
-from config import API_KEY, API_KEY_ANTROPIC
+from config import API_KEY, API_KEY_ANTROPIC, API_KEY_GROQ
 from utils import remove_json_format
 
 # local path to tesseract
@@ -159,12 +160,10 @@ async def extract_text(file: UploadFile = File(...), extraction_contract: str = 
     # Send the extracted text and extraction contract to the Mistral API
     content = send_request_to_mistral(extracted_text)
 
-    # 
-
     # Close and remove the temporary file
     temp_file.close()
 
-    return content
+    return {"Content": json.loads(content)}
 
 @app.post("/extractClaude")
 async def process_image_with_claude(file: UploadFile = File(...), extraction_contract: str = Form(...)):
@@ -202,7 +201,7 @@ async def process_image_with_claude(file: UploadFile = File(...), extraction_con
     response = api_service.send_image_message(api_request, base64_encoded_image, "", addOcr=False)
 
     # Return the response
-    return {"Content": response}
+    return {"Content": json.loads(response)}
 
 @app.post("/extractClaudeWithOcr")
 async def process_image_with_claude(file: UploadFile = File(...), extraction_contract: str = Form(...)):
@@ -304,7 +303,43 @@ async def classify(file: UploadFile = File(...), classifications: str = Form(...
 
     content = remove_json_format(result)
 
-    return json.loads(content)
+    return {"Content": json.loads(content)}
+
+@app.post("/extract_fast")
+async def extract_text(file: UploadFile = File(...), extraction_contract: str = Form(...)):
+
+    # Create a temporary file and save the uploaded file to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfileobj(file.file, temp_file)
+    file_path = temp_file.name
+    
+    # Convert PDF to images
+    images = convert_pdf_to_images(file_path)
+    
+    # Extract text using different methods
+    extracted_text = extract_text_with_pytesseract(images)
+
+    # Join the extracted text into a single string
+    extracted_text = "\n new page --- \n".join(extracted_text)
+
+    # add system message to the extracted text
+    extracted_text = systemMessage + "\n####Content\n\n" + extracted_text
+
+    # add contract to the extracted text
+    extracted_text = extracted_text + "\n####Structure of the JSON output file\n\n" + extraction_contract
+
+    # add response section
+    extracted_text = extracted_text + "\n#### JSON Response\n\n" + jsonContentStarter
+
+    # Send the extracted text and extraction contract to the Mistral API
+    content = send_request_to_groq(extracted_text)
+
+    # Close and remove the temporary file
+    temp_file.close()
+
+    content = remove_json_format(content)
+
+    return {"Content": json.loads(content)}
 
 def process_file(file):
     # Create a temporary file and save the uploaded file to it
@@ -373,6 +408,30 @@ def send_request_to_mistral(content: str) -> str:
     json_content = extract_json(json_content)
 
     return json_content
+
+def send_request_to_groq(content: str) -> str:
+    client = Groq(api_key=API_KEY_GROQ)
+    completion = client.chat.completions.create(
+        model="gemma-7b-it",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an API server that receives content from a document and returns a JSON with the defined protocol"
+            },
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+        temperature=1,
+        max_tokens=1024,
+        top_p=1,
+        stream=False,
+        response_format={"type": "json_object"},
+        stop=None,
+    )
+
+    return completion.choices[0].message.content
 
 def extract_json(text):
     # Find the JSON string in the text
