@@ -36,3 +36,12 @@ def test_load_content_from_stream():
     assert content is not None
     assert "Invoice" in content
     assert "0000001" in content
+
+
+def test_cache_for_file():
+    # Act
+    content1 = loader.load_content_from_file(test_file_path)
+    content2 = loader.load_content_from_file(test_file_path)
+
+    # Assert
+    assert content1 is content2

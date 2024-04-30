@@ -39,6 +39,8 @@ select = [
   "E722",
   # unused arguments
   "ARG",
+  # redefined variables
+  "ARG005",
 ]
 ignore = [
   # mutable defaults

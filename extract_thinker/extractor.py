@@ -3,13 +3,9 @@ from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models import (
     Classification,
     ClassificationResponse,
-    DocGroups2,
-    DocGroup,
-    DocGroups,
 )
 from extract_thinker.splitter import Splitter
 from extract_thinker.llm import LLM
-import asyncio
 import os
 
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
@@ -24,7 +20,6 @@ class Extractor:
         self.llm: Optional[LLM] = llm
         self.splitter: Optional[Splitter] = None
         self.file: Optional[str] = None
-        doc_groups: Optional[DocGroups] = None
         self.document_loaders_by_file_type = {}
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
@@ -56,7 +51,9 @@ class Extractor:
     def load_llm(self, model: str) -> None:
         self.llm = LLM(model)
 
-    def extract(self, source: Union[str, IO], response_model: str, vision: bool = False) -> str:
+    def extract(
+        self, source: Union[str, IO], response_model: str, vision: bool = False
+    ) -> str:
         if isinstance(source, str):  # if it's a file path
             return self.extract_from_file(source, response_model, vision)
         elif isinstance(source, IO):  # if it's a stream
@@ -83,15 +80,15 @@ class Extractor:
         if self.document_loader is None:
             raise ValueError("Document loader is not set")
 
-        content = self.document_loader.load_content_from_stream(stream)
+        content = self.document_loader.load(stream)
         return self._extract(content, stream, response_model, vision, is_stream=True)
 
     def classify_from_path(self, path: str, classifications: List[Classification]):
-        content = self.document_loader.getContent(path)
+        content = self.document_loader.load_content_from_file(path)
         return self._classify(content, classifications)
 
     def classify_from_stream(self, stream: IO, classifications: List[Classification]):
-        content = self.document_loader.getContentFromStream(stream)
+        content = self.document_loader.load_content_from_stream(stream)
         self._classify(content, classifications)
 
     def _classify(self, content: str, classifications: List[Classification]):
@@ -104,7 +101,7 @@ class Extractor:
         ]
 
         input_data = (
-            f"##Content\n{content[0]}\n##Classifications\n"
+            f"##Content\n{content}\n##Classifications\n"
             + "\n".join([f"{c.name}: {c.description}" for c in classifications])
             + "\n\n##JSON Output\n"
         )
@@ -115,11 +112,27 @@ class Extractor:
 
         return response
 
+    def classify(self, input: Union[str, IO]):
+        if isinstance(input, str):
+            # Check if the input is a valid file path
+            if os.path.isfile(input):
+                _, ext = os.path.splitext(input)
+                if ext.lower() == ".pdf":
+                    return self.classify_from_path(input)
+                else:
+                    raise ValueError(f"Unsupported file type: {ext}")
+            else:
+                raise ValueError(f"No such file: {input}")
+        elif hasattr(input, 'read'):
+            # Check if the input is a stream (like a file object)
+            return self.classify_from_stream(input)
+        else:
+            raise ValueError("Input must be a file path or a stream.")
+
     def _extract(
         self, content, file_or_stream, response_model, vision=False, is_stream=False
     ):
-
-        #call all the llm interceptors before calling the llm
+        # call all the llm interceptors before calling the llm
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
@@ -156,88 +169,9 @@ class Extractor:
         response = self.llm.request(messages, response_model)
         return response
 
-    def split(self, classifications: List[Classification]):
-        splitter = self.splitter
-
-        # Check if the file is a PDF
-        _, ext = os.path.splitext(self.file)
-        if ext.lower() != ".pdf":
-            raise ValueError("Invalid file type. Only PDFs are accepted.")
-
-        images = self.document_loader.convert_pdf_to_images(self.file)
-
-        groups = splitter.split_document_into_groups([self.file])
-
-        loop = asyncio.get_event_loop()
-        processedGroups = loop.run_until_complete(
-            splitter.process_split_groups(groups, classifications)
-        )
-
-        doc_groups = self.aggregate_split_documents_2(processedGroups)
-
-        self.doc_groups = doc_groups
-
-        return self
-
-    def aggregate_split_documents_2(doc_groups_tasks: List[DocGroups2]) -> DocGroups:
-        doc_groups = DocGroups()
-        current_group = DocGroup()
-        page_number = 1
-
-        # do the first group outside of the loop
-        doc_group = doc_groups_tasks[0]
-
-        if doc_group.belongs_to_same_document:
-            current_group.pages = [1, 2]
-            current_group.classification = doc_group.classification_page1
-            current_group.certainties = [
-                doc_group.certainty,
-                doc_groups_tasks[1].certainty,
-            ]
-        else:
-            current_group.pages = [1]
-            current_group.classification = doc_group.classification_page1
-            current_group.certainties = [doc_group.certainty]
-
-            doc_groups.doc_groups.append(current_group)
-
-            current_group = DocGroup()
-            current_group.pages = [2]
-            current_group.classification = doc_group.classification_page2
-            current_group.certainties = [doc_groups_tasks[1].certainty]
-
-        page_number += 1
-
-        for index in range(1, len(doc_groups_tasks)):
-            doc_group_2 = doc_groups_tasks[index]
-
-            if doc_group_2.belongs_to_same_document:
-                current_group.pages.append(page_number + 1)
-                current_group.certainties.append(doc_group_2.certainty)
-            else:
-                doc_groups.doc_groups.append(current_group)
-
-                current_group = DocGroup()
-                current_group.classification = doc_group_2.classification_page2
-                current_group.pages = [page_number + 1]
-                current_group.certainties = [doc_group_2.certainty]
-
-            page_number += 1
-
-        doc_groups.doc_groups.append(current_group)  # the last group
-
-        return doc_groups
-
-    def where(self, condition):
-        return self
-
     def loadfile(self, file):
         self.file = file
         return self
 
     def loadstream(self, stream):
-        return self
-
-    def loadSplitter(self, splitter):
-        self.splitter = splitter
         return self

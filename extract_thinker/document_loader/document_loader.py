@@ -4,12 +4,14 @@ from io import BytesIO
 import pypdfium2 as pdfium
 import concurrent.futures
 from typing import Any, Dict, List, Union
+from cachetools import TTLCache
 
 
 class DocumentLoader(ABC):
-    def __init__(self, content: Any = None):
+    def __init__(self, content: Any = None, cache_ttl: int = 300):
         self.content = content
         self.file_path = None
+        self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
 
     @abstractmethod
     def load_content_from_file(self, file_path: str) -> Union[str, object]:
