@@ -162,3 +162,6 @@ Scripts/unstructured-ingest-script.py
 Scripts/unstructured-ingest.exe
 Scripts/uvicorn.exe
 Scripts/vba_extract.py
+
+# VSCode settings
+.vscode/
