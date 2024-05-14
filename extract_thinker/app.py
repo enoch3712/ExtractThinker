@@ -1,19 +1,36 @@
+import os
 from dotenv import load_dotenv
 
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
+from extract_thinker.process import Process
+from extract_thinker.image_splitter import ImageSplitter
 from extractor import Extractor
-from models import Classification
-
+from extract_thinker.models.classification import Classification
+from tests.models.invoice import InvoiceContract
+from tests.models.driver_license import DriverLicense
 
 load_dotenv()
 
-classifications = [
-    Classification(name="Driver License", description="This is a driver license"),
-    Classification(name="Invoice", description="This is an invoice"),
-]
-
 # Usage
 extractor = Extractor()
+extractor.load_document_loader(DocumentLoaderTesseract(os.getenv("TESSERACT_PATH")))
+extractor.load_llm("gpt-3.5-turbo")
+
+classifications = [
+    Classification(name="Driver License", description="This is a driver license", contract=DriverLicense, extractor=extractor),
+    Classification(name="Invoice", description="This is an invoice", contract=InvoiceContract, extractor=extractor)
+]
+
+process = Process()
+process.load_document_loader(DocumentLoaderTesseract(os.getenv("TESSERACT_PATH")))
+process.load_splitter(ImageSplitter())
+
+path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\outputTestOne.pdf"
+other_path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\SingleInvoiceTests\\FT63O.pdf"
+
+split_content = process.load_file(path)\
+    .split(classifications)\
+    .extract()
 
 # extractor.loadSplitter(ImageSplitter())
 # extractor.loadfile(

@@ -1,4 +1,4 @@
-from extract_thinker.models import Contract
+from extract_thinker.models.contract import Contract
 
 
 class InvoiceContract(Contract):

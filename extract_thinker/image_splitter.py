@@ -1,32 +1,37 @@
-from ExtractThinker.models import Classification, DocGroups2
-from ExtractThinker.utils import encode_image
-from splitter import Splitter
-
+import base64
 import litellm
-from PIL import Image
-
-
-from typing import IO, List, Union
+from io import BytesIO
+from typing import List, Any
+from extract_thinker.models.classification import Classification
+from extract_thinker.models.doc_groups2 import DocGroups2
+from extract_thinker.splitter import Splitter
+from extract_thinker.utils import extract_json
 
 
 class ImageSplitter(Splitter):
+
+    def encode_image(self, image):
+        buffered = BytesIO()
+        image.save(buffered, format=image.format)
+        img_byte = buffered.getvalue()
+        return base64.b64encode(img_byte).decode("utf-8")
+
     def belongs_to_same_document(self,
-                                 page1: Union[str, IO],
-                                 page2: Union[str, IO],
+                                 obj1: Any,
+                                 obj2: Any,
                                  classifications: List[Classification]
                                  ) -> DocGroups2:
 
-        assistantPrompt = 'What you are an API that extracts information. You receive as input: \r\n1. two pages \r\n2. a group of classifications\r\n output:\r\nA JSON with the classification of each document and if belongs to the same document\r\n\r\n//Example 1\r\n//can be null if belongsToSamePage is true\r\n{\r\n    "belongsToSameDocument": true,\r\n    "classificationPage1": "LLC",\r\n    "classificationPage2": "LLC"\r\n}\r\n//Example 2\r\n{\r\n    "belongsToSameDocument": false,\r\n    "classificationPage1": "LLC",\r\n    "classificationPage2": "Invoice"\r\n}'
+        if 'image' not in obj1 or 'image' not in obj2:
+            raise ValueError("Input objects must have an 'image' key")
 
-        # make sure image1 and image2 are images and not text
-        try:
-            Image.open(page1)
-            Image.open(page2)
-        except IOError:
-            return {"error": "One or both of the input pages are not valid images."}
+        page1 = obj1['image']
+        page2 = obj2['image']
 
-        base64_image1 = encode_image(page1)
-        base64_image2 = encode_image(page2)
+        assistantPrompt = 'What you are an API that extracts information. You receive as input: \r\n1. two pages \r\n2. a group of classifications\r\n output:\r\nA JSON with the classification of each document and if belongs to the same document\r\n\r\n//Example 1\r\n//can be null if belongsToSamePage is true\r\n{\r\n    "belongs_to_same_document": true,\r\n    "classification_page1": "LLC",\r\n    "classification_page2": "LLC"\r\n}\r\n//Example 2\r\n{\r\n    "belongs_to_same_document": false,\r\n    "classification_page1": "LLC",\r\n    "classification_page2": "Invoice"\r\n}'
+
+        base64_image1 = self.encode_image(page1)
+        base64_image2 = self.encode_image(page2)
 
         classifications_text = (
             "##Classifications\n"
@@ -57,9 +62,17 @@ class ImageSplitter(Splitter):
                                 "url": "data:image/jpeg;base64," + base64_image2
                             },
                         },
+                        {"type": "text", "text": "###JSON Output\n"},
                     ],
                 },
             ],
         )
 
-        return resp
+        jsonText = resp.choices[0].message.content
+
+        jsonText = extract_json(jsonText)
+
+        # TODO: eventually will be done in a more robust way
+        validated_obj = DocGroups2(**jsonText)
+
+        return validated_obj

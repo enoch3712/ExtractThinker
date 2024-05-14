@@ -1,65 +1,111 @@
-# Open-DocLLM
+# ExtractThinker
 
-## Introduction
-This project aims to tackle the challenges of data extraction and processing using OCR and LLM. It is inspired by JP Morgan's DocLLM but is fully open-source and offers a larger context window size. The project is divided into two parts: the OCR and LLM layer.
+Library to extract data from files and documents agnostically using LLMs. `extract_thinker` provides ORM-style interaction between files and LLMs, allowing for flexible and powerful document extraction workflows.
 
-![image](https://github.com/enoch3712/Open-DocLLM/assets/9283394/2612cc9e-fc66-401e-912d-3acaef42d9cc)
+## Features
 
-## OCR Layer
-The OCR layer is responsible for reading all the content from a document. It involves the following steps:
+- Supports multiple document loaders including Tesseract OCR, Azure Form Recognizer, AWS TextExtract, Google Document AI.
+- Customizable extraction using contract definitions.
+- Asynchronous processing for efficient document handling.
+- Built-in support for various document formats.
+- ORM-style interaction between files and LLMs.
 
-1. **Convert pages to images**: Any type of file is converted into an image so that all the content in the document can be read.
+## Installation
 
-2. **Preprocess image for OCR**: The image is adjusted to improve its quality and readability.
+To install `extract_thinker`, you can use `pip`:
 
-3. **Tesseract OCR**: The Tesseract OCR, the most popular open-source OCR in the world, is used to read the content from the images.
-
-## LLM Layer
-The LLM layer is responsible for extracting specific content from the document in a structured way. It involves defining an extraction contract and extracting the JSON data.
-
-## Running Locally
-You can run the models on-premises using LLM studio or Ollama. This project uses LlamaIndex and Ollama.
-
-## Running the Code
-The repo includes a FastAPI app with one endpoint for testing. Make sure to point to the proper Tesseract executable and change the key in the config.py file.
-
-1. Install Tessaract 
-https://github.com/tesseract-ocr/tesseract
-
-2. Install the required Python packages.
-```sh
-pip install -r requirements.txt
+```bash
+pip install extract_thinker
 ```
 
-3. Run fast api
-```sh
-uvicorn main:app --reload
+## Usage
+Here's a quick example to get you started with extract_thinker. This example demonstrates how to load a document using Tesseract OCR and extract specific fields defined in a contract.
+
+```python
+import os
+from dotenv import load_dotenv
+from extract_thinker import DocumentLoaderTesseract, Extractor, Contract
+
+load_dotenv()
+cwd = os.getcwd()
+
+class InvoiceContract(Contract):
+    invoice_number: str
+    invoice_date: str
+
+# Arrange
+tesseract_path = os.getenv("TESSERACT_PATH")
+test_file_path = os.path.join(cwd, "test_images", "invoice.png")
+
+extractor = Extractor()
+extractor.load_document_loader(
+    DocumentLoaderTesseract(tesseract_path)
+)
+extractor.load_llm("claude-3-haiku-20240307")
+
+# Act
+result = extractor.extract(test_file_path, InvoiceContract)
+
+# Assert
+assert result is not None
+assert result.invoice_number == "0000001"
+assert result.invoice_date == "2014-05-07"
 ```
 
-4. go to the Swgger page: 
-http://localhost:8000/docs
+## Splitting Files Example
+You can also split and process documents using extract_thinker. Here's how you can do it:
 
-## Running with Docker
-1. Build the Docker image.
-```sh
-docker build -t your-image-name .
+```python
+import os
+from dotenv import load_dotenv
+from extract_thinker import DocumentLoaderTesseract, Extractor, Process, Classification, ImageSplitter
+
+load_dotenv()
+
+class DriverLicense(Contract):
+    # Define your DriverLicense contract fields here
+    pass
+
+class InvoiceContract(Contract):
+    invoice_number: str
+    invoice_date: str
+
+extractor = Extractor()
+extractor.load_document_loader(DocumentLoaderTesseract(os.getenv("TESSERACT_PATH")))
+extractor.load_llm("gpt-3.5-turbo")
+
+classifications = [
+    Classification(name="Driver License", description="This is a driver license", contract=DriverLicense, extractor=extractor),
+    Classification(name="Invoice", description="This is an invoice", contract=InvoiceContract, extractor=extractor)
+]
+
+process = Process()
+process.load_document_loader(DocumentLoaderTesseract(os.getenv("TESSERACT_PATH")))
+process.load_splitter(ImageSplitter())
+
+path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\outputTestOne.pdf"
+other_path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\SingleInvoiceTests\\FT63O.pdf"
+
+split_content = process.load_file(path)\
+    .split(classifications)\
+    .extract()
+
+# Process the split_content as needed
 ```
 
-2. Run the Docker container.
-```sh
-docker run -p 8000:8000 your-image-name
-```
+## Additional Examples
+You can find more examples in the repository. These examples cover various use cases and demonstrate the flexibility of extract_thinker.
 
-3. go to the Swgger page: 
-http://localhost:8000/docs
+## Contributing
+We welcome contributions from the community! If you would like to contribute, please follow these steps:
 
+Fork the repository.
+Create a new branch for your feature or bugfix.
+Write tests for your changes.
+Run tests to ensure everything is working correctly.
+Submit a pull request with a description of your changes.
+License
+This project is licensed under the Apache License 2.0. See the LICENSE file for more details.
 
-## Advanced Cases: 1 Million token context
-The project also explores advanced cases like a 1 million token context using LLM Lingua and Mistral Yarn 128k context window.
-
-## Conclusion
-The integration of OCR and LLM technologies in this project marks a pivotal advancement in analyzing unstructured data. The combination of open-source projects like Tesseract and Mistral makes a perfect implementation that could be used in an on-premise use case.
-
-## References & Documents 
-1. [DOCLLM: A LAYOUT-AWARE GENERATIVE LANGUAGE MODEL FOR MULTIMODAL DOCUMENT UNDERSTANDING](https://arxiv.org/pdf/2401.00908.pdf)
-2. [YaRN: Efficient Context Window Extension of Large Language Models](https://arxiv.org/pdf/2309.00071.pdf)
+## Contact
+For any questions or issues, please open an issue on the GitHub repository.

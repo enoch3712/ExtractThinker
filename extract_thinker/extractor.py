@@ -1,15 +1,22 @@
-from typing import List, Optional, IO, Union
+import asyncio
+from typing import Any, Dict, List, Optional, IO, Union
+
+from pydantic import BaseModel
 from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.models import (
-    Classification,
+from extract_thinker.models.classification import Classification
+from extract_thinker.models.classification_response import (
     ClassificationResponse,
 )
-from extract_thinker.splitter import Splitter
 from extract_thinker.llm import LLM
 import os
 
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
+
+from extract_thinker.utils import get_image_type
+
+
+SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
 
 
 class Extractor:
@@ -18,9 +25,8 @@ class Extractor:
     ):
         self.document_loader: Optional[DocumentLoader] = processor
         self.llm: Optional[LLM] = llm
-        self.splitter: Optional[Splitter] = None
         self.file: Optional[str] = None
-        self.document_loaders_by_file_type = {}
+        self.document_loaders_by_file_type: Dict[str, DocumentLoader] = {}
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
 
@@ -51,15 +57,29 @@ class Extractor:
     def load_llm(self, model: str) -> None:
         self.llm = LLM(model)
 
-    def extract(
-        self, source: Union[str, IO], response_model: str, vision: bool = False
-    ) -> str:
+    def extract(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False) -> str:
+        if not issubclass(response_model, BaseModel):
+            raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
+
         if isinstance(source, str):  # if it's a file path
             return self.extract_from_file(source, response_model, vision)
         elif isinstance(source, IO):  # if it's a stream
             return self.extract_from_stream(source, response_model, vision)
+        elif isinstance(source, list) and all(isinstance(item, dict) for item in source):  # if it's a list of dictionaries
+            return self.extract_from_list(source, response_model, vision)
         else:
-            raise ValueError("Source must be a file path or a stream")
+            raise ValueError("Source must be a file path, a stream, or a list of dictionaries")
+
+    async def extract_async(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False) -> str:
+        return await asyncio.to_thread(self.extract, source, response_model, vision)
+
+    def extract_from_list(self, data: List[Dict[Any, Any]], response_model: type[BaseModel], vision: bool) -> str:
+        # check if document_loader is None, raise error
+        if self.document_loader is None:
+            raise ValueError("Document loader is not set")
+
+        content = "\n".join([f"#{k}:\n{v}" for d in data for k, v in d.items() if k != "image"])
+        return self._extract(content, data, response_model, vision, is_stream=False)
 
     def extract_from_file(
         self, file: str, response_model: str, vision: bool = False
@@ -112,20 +132,20 @@ class Extractor:
 
         return response
 
-    def classify(self, input: Union[str, IO]):
+    def classify(self, input: Union[str, IO], classifications: List[Classification]):
         if isinstance(input, str):
             # Check if the input is a valid file path
             if os.path.isfile(input):
-                _, ext = os.path.splitext(input)
-                if ext.lower() == ".pdf":
-                    return self.classify_from_path(input)
+                file_type = get_image_type(input)
+                if file_type in SUPPORTED_IMAGE_FORMATS:
+                    return self.classify_from_path(input, classifications)
                 else:
-                    raise ValueError(f"Unsupported file type: {ext}")
+                    raise ValueError(f"Unsupported file type: {input}")
             else:
                 raise ValueError(f"No such file: {input}")
         elif hasattr(input, 'read'):
             # Check if the input is a stream (like a file object)
-            return self.classify_from_stream(input)
+            return self.classify_from_stream(input, classifications)
         else:
             raise ValueError("Input must be a file path or a stream.")
 
@@ -164,7 +184,7 @@ class Extractor:
                 }
             ]
         else:
-            messages.append({"role": "user", "content": content})
+            messages.append({"role": "user", "content": "##Content\n\n" + content})
 
         response = self.llm.request(messages, response_model)
         return response

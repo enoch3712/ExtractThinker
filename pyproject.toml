@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "extract_thinker"
 version = "0.0.1"
-description = "ORM style library to extract data from documents with LLMs"
+description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
 
@@ -17,6 +17,8 @@ pypdfium2 = "^4.29.0"
 instructor = "^1.2.2"
 python-dotenv = "^1.0.1"
 cachetools = "^5.3.3"
+pyyaml = "^6.0.1"
+tiktoken = "^0.6.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.9.2"
