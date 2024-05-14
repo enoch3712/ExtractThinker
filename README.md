@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/41d9d151-acb5-44da-9c10-0058f76c2512" alt="Extract Thinker Logo" width="200"/>
+</p>
+<p align="center">
+<a href="https://medium.com/@enoch3712">
+    <img alt="Medium" src="https://img.shields.io/badge/Medium-12100E?style=flat&logo=medium&logoColor=white" />
+</a>
+<img alt="GitHub Last Commit" src="https://img.shields.io/github/last-commit/enoch3712/Open-DocLLM" />
+<img alt="Github License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" />
+</p>
+
 # ExtractThinker
 
 Library to extract data from files and documents agnostically using LLMs. `extract_thinker` provides ORM-style interaction between files and LLMs, allowing for flexible and powerful document extraction workflows.
@@ -9,6 +20,10 @@ Library to extract data from files and documents agnostically using LLMs. `extra
 - Asynchronous processing for efficient document handling.
 - Built-in support for various document formats.
 - ORM-style interaction between files and LLMs.
+
+<p align="center">
+  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/b1b8800c-3c55-4ee5-92fe-b8b663c7a81f" alt="Extract Thinker Features Diagram" width="300"/>
+</p>
 
 ## Installation
 
@@ -33,7 +48,6 @@ class InvoiceContract(Contract):
     invoice_number: str
     invoice_date: str
 
-# Arrange
 tesseract_path = os.getenv("TESSERACT_PATH")
 test_file_path = os.path.join(cwd, "test_images", "invoice.png")
 
@@ -43,13 +57,10 @@ extractor.load_document_loader(
 )
 extractor.load_llm("claude-3-haiku-20240307")
 
-# Act
 result = extractor.extract(test_file_path, InvoiceContract)
 
-# Assert
-assert result is not None
-assert result.invoice_number == "0000001"
-assert result.invoice_date == "2014-05-07"
+print("Invoice Number: ", result.invoice_number)
+print("Invoice Date: ", result.invoice_date)
 ```
 
 ## Splitting Files Example
@@ -83,8 +94,7 @@ process = Process()
 process.load_document_loader(DocumentLoaderTesseract(os.getenv("TESSERACT_PATH")))
 process.load_splitter(ImageSplitter())
 
-path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\outputTestOne.pdf"
-other_path = "C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\SingleInvoiceTests\\FT63O.pdf"
+path = "..."
 
 split_content = process.load_file(path)\
     .split(classifications)\
@@ -92,6 +102,17 @@ split_content = process.load_file(path)\
 
 # Process the split_content as needed
 ```
+
+## Infrastructure
+
+The `extract_thinker` project is inspired by the LangChain ecosystem, featuring a modular infrastructure with templates, components, and core functions to facilitate robust document extraction and processing. 
+
+<p align="center">
+  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/996fb2de-0558-4f13-ab3d-7ea56a593951" alt="Extract Thinker Logo" width="400"/>
+</p>
+
+## Why Just Not LangChain?
+While LangChain is a generalized framework designed for a wide array of use cases, extract_thinker is specifically focused on Intelligent Document Processing (IDP). Although achieving 100% accuracy in IDP remains a challenge, leveraging LLMs brings us significantly closer to this goal.
 
 ## Additional Examples
 You can find more examples in the repository. These examples cover various use cases and demonstrate the flexibility of extract_thinker.
@@ -104,7 +125,8 @@ Create a new branch for your feature or bugfix.
 Write tests for your changes.
 Run tests to ensure everything is working correctly.
 Submit a pull request with a description of your changes.
-License
+
+## License
 This project is licensed under the Apache License 2.0. See the LICENSE file for more details.
 
 ## Contact
