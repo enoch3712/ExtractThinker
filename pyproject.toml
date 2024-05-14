@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "extract_thinker"
+version = "0.0.1"
+description = "Library to extract data from files and documents agnositicaly using LLMs"
+authors = ["Júlio Almeida <enoch3712@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pydantic = "^2.7.0"
+litellm = "^1.35.20"
+pytesseract = "^0.3.10"
+pillow = "^10.3.0"
+python-docx = "^1.1.0"
+xlrd = "^2.0.1"
+pypdfium2 = "^4.29.0"
+instructor = "^1.2.2"
+python-dotenv = "^1.0.1"
+cachetools = "^5.3.3"
+pyyaml = "^6.0.1"
+tiktoken = "^0.6.0"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^3.9.2"
+black = "^21.9b0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
