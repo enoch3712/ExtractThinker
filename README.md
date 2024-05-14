@@ -115,7 +115,7 @@ The `extract_thinker` project is inspired by the LangChain ecosystem, featuring 
 While LangChain is a generalized framework designed for a wide array of use cases, extract_thinker is specifically focused on Intelligent Document Processing (IDP). Although achieving 100% accuracy in IDP remains a challenge, leveraging LLMs brings us significantly closer to this goal.
 
 ## Additional Examples
-You can find more examples in the repository. These examples cover various use cases and demonstrate the flexibility of extract_thinker.
+You can find more examples in the repository. These examples cover various use cases and demonstrate the flexibility of extract_thinker. Also check my the medium of the author that contains several examples about the library
 
 ## Contributing
 We welcome contributions from the community! If you would like to contribute, please follow these steps:
