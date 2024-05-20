@@ -4,9 +4,7 @@ from dotenv import load_dotenv
 
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 
-# Get the current working directory
 cwd = os.getcwd()
-
 load_dotenv()
 
 # Arrange

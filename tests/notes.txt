@@ -1,0 +1,7 @@
+Point to the folder system 
+
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+change folder location for images
+test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")

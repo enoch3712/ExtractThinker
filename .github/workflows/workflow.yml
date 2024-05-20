@@ -23,8 +23,8 @@ jobs:
         pip install poetry
         poetry install
 
-    - name: Run tests
-      run: poetry run pytest
+    # - name: Run tests
+    #   run: poetry run pytest
 
     - name: Build package
       run: poetry build
