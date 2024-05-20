@@ -6,6 +6,7 @@ from PIL import Image
 import tiktoken
 from pydantic import BaseModel
 import typing
+import os
 
 
 def encode_image(image_path):
@@ -93,3 +94,9 @@ def extract_json(text):
     else:
         print("No JSON found")
         return None
+
+
+def get_file_extension(file_path):
+    _, ext = os.path.splitext(file_path)
+    ext = ext[1:]  # remove the dot
+    return ext

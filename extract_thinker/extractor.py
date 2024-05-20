@@ -13,10 +13,11 @@ import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 
-from extract_thinker.utils import get_image_type
+from extract_thinker.utils import get_file_extension
 
 
 SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
+SUPPORTED_EXCEL_FORMATS = ['.xls', '.xlsx', '.xlsm', '.xlsb', '.odf', '.ods', '.odt', '.csv']
 
 
 class Extractor:
@@ -111,6 +112,13 @@ class Extractor:
         content = self.document_loader.load_content_from_stream(stream)
         self._classify(content, classifications)
 
+    def classify_from_excel(self, path: Union[str, IO], classifications: List[Classification]):
+        if isinstance(path, str):
+            content = self.document_loader.load_content_from_file(path)
+        else:
+            content = self.document_loader.load_content_from_stream(path)
+        return self._classify(content, classifications)
+
     def _classify(self, content: str, classifications: List[Classification]):
         messages = [
             {
@@ -136,9 +144,11 @@ class Extractor:
         if isinstance(input, str):
             # Check if the input is a valid file path
             if os.path.isfile(input):
-                file_type = get_image_type(input)
+                file_type = get_file_extension(input)
                 if file_type in SUPPORTED_IMAGE_FORMATS:
                     return self.classify_from_path(input, classifications)
+                elif file_type in SUPPORTED_EXCEL_FORMATS:
+                    return self.classify_from_excel(input, classifications)
                 else:
                     raise ValueError(f"Unsupported file type: {input}")
             else:
@@ -148,6 +158,9 @@ class Extractor:
             return self.classify_from_stream(input, classifications)
         else:
             raise ValueError("Input must be a file path or a stream.")
+
+    async def classify_async(self, input: Union[str, IO], classifications: List[Classification]):
+        return await asyncio.to_thread(self.classify, input, classifications)
 
     def _extract(
         self, content, file_or_stream, response_model, vision=False, is_stream=False

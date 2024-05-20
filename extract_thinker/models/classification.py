@@ -1,10 +1,10 @@
 from typing import Any, Optional
-from extract_thinker.models.contract import Contract
 from pydantic import BaseModel
+from extract_thinker.models.contract import Contract
 
 
 class Classification(BaseModel):
     name: str
     description: str
-    contract: type[Contract]
+    contract: Optional[Contract] = None
     extractor: Optional[Any] = None

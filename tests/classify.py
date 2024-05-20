@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.process import Process
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
-from extract_thinker.models import classification, classification_response
+from extract_thinker.models.classification import Classification
+from extract_thinker.models.classification_response import ClassificationResponse
 
 load_dotenv()
 cwd = os.getcwd()
@@ -15,9 +16,9 @@ def test_classify_feature():
     tesseract_path = os.getenv("TESSERACT_PATH")
     test_file_path = os.path.join(cwd, "test_images", "invoice.png")
 
-    classifications = [
-        classification(name="Driver License", description="This is a driver license"),
-        classification(name="Invoice", description="This is an invoice"),
+    Classifications = [
+        Classification(name="Driver License", description="This is a driver license"),
+        Classification(name="Invoice", description="This is an invoice"),
     ]
 
     extractor = Extractor()
@@ -25,11 +26,11 @@ def test_classify_feature():
     extractor.load_llm("claude-3-haiku-20240307")
 
     # Act
-    result = extractor.classify_from_path(test_file_path, classifications)
+    result = extractor.classify_from_path(test_file_path, Classifications)
 
     # Assert
     assert result is not None
-    assert isinstance(result, classification_response)
+    assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
 
 
@@ -53,15 +54,15 @@ def test_classify():
 
     process.add_classifyExtractor([[open35extractor, mistral2extractor], [gpt4extractor]])
 
-    classifications = [
-        classification(name="Driver License", description="This is a driver license"),
-        classification(name="Invoice", description="This is an invoice"),
+    Classifications = [
+        Classification(name="Driver License", description="This is a driver license"),
+        Classification(name="Invoice", description="This is an invoice"),
     ]
 
     # Act
-    result = asyncio.run(process.classify_async(test_file_path, classifications))
+    result = asyncio.run(process.classify_async(test_file_path, Classifications))
 
     # Assert
     assert result is not None
-    assert isinstance(result, classification_response)
+    assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
