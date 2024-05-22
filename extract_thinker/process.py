@@ -11,6 +11,14 @@ from extract_thinker.models.doc_groups import (
 )
 from extract_thinker.utils import get_image_type
 
+from enum import Enum
+
+
+class ClassificationStrategy(Enum):
+    CONSENSUS = "consensus"
+    HIGHER_ORDER = "higher_order"
+    BOTH = "both"
+
 
 class Process:
     def __init__(self):
@@ -39,25 +47,39 @@ class Process:
         self.splitter = splitter
         return self
 
-    def add_classifyExtractor(self, extractor_groups: List[List[Extractor]]):
+    def add_classify_extractor(self, extractor_groups: List[List[Extractor]]):
         for extractors in extractor_groups:
             self.extractor_groups.append(extractors)
         return self
 
-    async def _classify_async(self, extractor, file, classifications):
+    async def _classify_async(self, extractor: Extractor, file: str, classifications: List[Classification], image: bool = False):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, extractor.classify, file, classifications)
+        return await loop.run_in_executor(None, extractor.classify, file, classifications, image)
 
-    async def classify_async(self, file: str, classifications) -> Optional[Classification]:
+    def classify(self, file: str, classifications, strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS, threshold: int = 9, image: bool = False) -> Optional[Classification]:
+        result = asyncio.run(self.classify_async(file, classifications, strategy, threshold, image))
+
+        return result
+
+    async def classify_async(self, file: str, classifications, strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS, threshold: int = 9, image: str = False) -> Optional[Classification]:
         for extractor_group in self.extractor_groups:
-            group_classifications = await asyncio.gather(*(self._classify_async(extractor, file, classifications) for extractor in extractor_group))
+            group_classifications = await asyncio.gather(*(self._classify_async(extractor, file, classifications, image) for extractor in extractor_group))
 
+        # Implement different strategies
+        if strategy == ClassificationStrategy.CONSENSUS:
             # Check if all classifications in the group are the same
             if len(set(group_classifications)) == 1:
                 return group_classifications[0]
+        elif strategy == ClassificationStrategy.HIGHER_ORDER:
+            # Pick the result with the highest confidence
+            return max(group_classifications, key=lambda c: c.confidence)
+        elif strategy == ClassificationStrategy.BOTH:
+            if len(set(group_classifications)) == 1:
+                maxResult = max(group_classifications, key=lambda c: c.confidence)
+                if maxResult.confidence >= threshold:
+                    return maxResult
 
-        # If no agreement was found, return None
-        return None
+        raise ValueError("No consensus could be reached on the classification of the document. Please try again with a different strategy or threshold.")
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)
