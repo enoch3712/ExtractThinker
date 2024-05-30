@@ -24,16 +24,15 @@ class DocumentLoaderPyPdf(DocumentLoaderLLMImage):
 
     def extract_data_from_pdf(self, reader: PdfReader) -> Union[str, Dict[str, Any]]:
         document_data = {
-            "text": [],
-            "images": [],
-            "tables": []  # Additional processing for tables might be needed
+            "text": []
         }
 
         for page in reader.pages:
-            # Extract text
-            document_data["text"].append(page.extract_text())
+            # Extract text and split by newline characters
+            page_text = page.extract_text()
+            document_data["text"].extend(page_text.split('\n'))
 
-        # Skip image extraction
+        # Skip image extraction for now. TODO
         # for img_index, image in enumerate(page.images):
         #     image_data = self.extract_image_content(io.BytesIO(image["data"]))
         #     if image_data:

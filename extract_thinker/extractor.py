@@ -13,7 +13,8 @@ import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 
-from extract_thinker.utils import get_file_extension
+from extract_thinker.utils import get_file_extension, encode_image
+import yaml
 
 
 SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
@@ -30,6 +31,7 @@ class Extractor:
         self.document_loaders_by_file_type: Dict[str, DocumentLoader] = {}
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
+        self.extra_content: Optional[str] = None
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -55,10 +57,17 @@ class Extractor:
     def load_document_loader(self, document_loader: DocumentLoader) -> None:
         self.document_loader = document_loader
 
-    def load_llm(self, model: str) -> None:
-        self.llm = LLM(model)
+    def load_llm(self, model: Optional[str] = None) -> None:
+        if isinstance(model, LLM):
+            self.llm = model
+        elif model is not None:
+            self.llm = LLM(model)
+        else:
+            raise ValueError("Either a model string or an LLM object must be provided.")
 
-    def extract(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False) -> str:
+    def extract(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False, content: Optional[str] = None) -> Any:
+        self.extra_content = content
+
         if not issubclass(response_model, BaseModel):
             raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
 
@@ -71,7 +80,7 @@ class Extractor:
         else:
             raise ValueError("Source must be a file path, a stream, or a list of dictionaries")
 
-    async def extract_async(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False) -> str:
+    async def extract_async(self, source: Union[str, IO, list], response_model: type[BaseModel], vision: bool = False) -> Any:
         return await asyncio.to_thread(self.extract, source, response_model, vision)
 
     def extract_from_list(self, data: List[Dict[Any, Any]], response_model: type[BaseModel], vision: bool) -> str:
@@ -162,9 +171,13 @@ class Extractor:
     async def classify_async(self, input: Union[str, IO], classifications: List[Classification]):
         return await asyncio.to_thread(self.classify, input, classifications)
 
-    def _extract(
-        self, content, file_or_stream, response_model, vision=False, is_stream=False
-    ):
+    def _extract(self,
+                 content,
+                 file_or_stream,
+                 response_model,
+                 vision=False,
+                 is_stream=False
+                 ):
         # call all the llm interceptors before calling the llm
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
@@ -177,8 +190,18 @@ class Extractor:
             },
         ]
 
+        if self.extra_content is not None:
+            if isinstance(self.extra_content, dict):
+                self.extra_content = yaml.dump(self.extra_content)
+            messages.append({"role": "user", "content": "##Extra Content\n\n" + self.extra_content})
+
+        if content is not None:
+            if isinstance(content, dict):
+                content = yaml.dump(content)
+            messages.append({"role": "user", "content": "##Content\n\n" + content})
+
         if vision:
-            base64_encoded_image = self._encode_image_to_base64(
+            base64_encoded_image = encode_image(
                 file_or_stream, is_stream
             )
 
@@ -196,8 +219,6 @@ class Extractor:
                     ],
                 }
             ]
-        else:
-            messages.append({"role": "user", "content": "##Content\n\n" + content})
 
         response = self.llm.request(messages, response_model)
         return response
