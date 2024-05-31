@@ -3,6 +3,7 @@ from .document_loader.document_loader import DocumentLoader
 from .document_loader.cached_document_loader import CachedDocumentLoader
 from .document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadSheet
+from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_text import DocumentLoaderText
 from .models import classification, classification_response
 from .process import Process
@@ -17,6 +18,7 @@ __all__ = [
     'DocumentLoader',
     'CachedDocumentLoader',
     'DocumentLoaderTesseract',
+    'DocumentLoaderPyPdf',
     'DocumentLoaderText',
     'classification',
     'classification_response',

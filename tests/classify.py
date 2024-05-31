@@ -23,7 +23,7 @@ def test_classify_feature():
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    extractor.load_llm("claude-3-haiku-20240307")
+    extractor.load_llm("gpt-3.5-turbo")
 
     # Act
     result = extractor.classify_from_path(test_file_path, Classifications)
