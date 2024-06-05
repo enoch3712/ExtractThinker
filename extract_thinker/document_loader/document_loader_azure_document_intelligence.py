@@ -10,7 +10,7 @@ from cachetools.keys import hashkey
 
 
 class DocumentLoaderAzureForm(CachedDocumentLoader):
-    def __init__(self, subscription_key: str, endpoint: str, is_container: bool = False, content: Any = None, cache_ttl: int = 300):
+    def __init__(self, subscription_key: str, endpoint: str, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
         self.subscription_key = subscription_key
         self.endpoint = endpoint
@@ -42,33 +42,50 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
         for page in result.pages:
             paragraphs = [p.content for p in page.lines]
             tables = self.build_tables(result.tables)
-            words_with_locations = self.process_words(page)
+            # words_with_locations = self.process_words(page)
+            # Remove lines that are present in tables
+            paragraphs = self.remove_lines_present_in_tables(paragraphs, tables)
             output = {
-                "type": "pdf",
-                "content": result.content,
+                #"content": result.content,
                 "paragraphs": paragraphs,
-                "words": words_with_locations,
-                "tables": tables
+                #"words": words_with_locations,
+                "tables": tables.get(page.page_number, [])
             }
             extract_results.append(output)
-        return extract_results
+        return {"pages": extract_results}
+
+    def remove_lines_present_in_tables(self, paragraphs: List[str], tables: dict[int, List[List[str]]]) -> List[str]:
+        for table in tables.values():
+            for row in table:
+                for cell in row:
+                    if cell in paragraphs:
+                        paragraphs.remove(cell)
+        return paragraphs
+
+    def page_to_string(self, page: DocumentPage) -> str:
+        page_string = ""
+        for word in page.words:
+            for point in word.polygon:
+                page_string += f"({point.x}, {point.y}): {word.content}\n"
+        return page_string
 
     def process_words(self, page: DocumentPage) -> List[dict]:
         words_with_locations = []
-        for line in page.lines:
-            for word in line.words:
-                word_info = {
-                    "content": word.content,
-                    "bounding_box": {
-                        "points": self.build_points(word.bounding_box)
-                    },
-                    "page_number": page.page_number
-                }
-                words_with_locations.append(word_info)
+
+        for word in page.words:
+            word_info = {
+                "content": word.content,
+                "bounding_box": {
+                    "points": word.polygon
+                },
+                "page_number": page.page_number
+            }
+            words_with_locations.append(word_info)
+
         return words_with_locations
 
-    def build_tables(self, tables: List[DocumentTable]) -> List[List[str]]:
-        table_data = []
+    def build_tables(self, tables: List[DocumentTable]) -> dict[int, List[List[str]]]:
+        table_data = {}
         for table in tables:
             rows = []
             for row_idx in range(table.row_count):
@@ -77,7 +94,8 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                     if cell.row_index == row_idx:
                         row.append(cell.content)
                 rows.append(row)
-            table_data.append(rows)
+            # Use the page number as the key for the dictionary
+            table_data[table.bounding_regions[0].page_number] = rows
         return table_data
 
     def build_points(self, bounding_box: List[Point]) -> List[dict]:
