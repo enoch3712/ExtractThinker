@@ -1,6 +1,7 @@
 from io import BytesIO
 from operator import attrgetter
 import os
+import threading
 from typing import Any, List, Union
 from PIL import Image
 import pytesseract
@@ -10,9 +11,9 @@ from extract_thinker.utils import get_image_type
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-import concurrent.futures
+from queue import Queue
 
-SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
+SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]
 
 
 class DocumentLoaderTesseract(CachedDocumentLoader):
@@ -20,7 +21,6 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
         super().__init__(content, cache_ttl)
         self.tesseract_cmd = tesseract_cmd
         if isContainer:
-            # docker path to tesseract
             self.tesseract_cmd = os.environ.get("TESSERACT_PATH", "tesseract")
         pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
         if not os.path.isfile(self.tesseract_cmd):
@@ -54,35 +54,83 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
         except Exception as e:
             raise Exception(f"Error processing stream: {e}") from e
 
-    def process_image(self, image):
+    def process_image(self, image: BytesIO) -> str:
         for attempt in range(3):
-            raw_text = str(pytesseract.image_to_string(Image.open(BytesIO(image))))
-            if raw_text:
-                return raw_text
-            raise Exception("Failed to process image after 3 attempts")
+            try:
+                raw_text = str(pytesseract.image_to_string(Image.open(image)))
+                if raw_text:
+                    return raw_text
+            except Exception as e:
+                if attempt == 2:
+                    raise Exception(f"Failed to process image after 3 attempts: {e}")
+        return ""
 
-    @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
+    def worker(self, input_queue: Queue, output_queue: Queue):
+        while True:
+            image = input_queue.get()
+            if image is None:  # Sentinel to indicate shutdown
+                break
+            try:
+                text = self.process_image(image)
+                output_queue.put((image, text))
+            except Exception as e:
+                output_queue.put((image, str(e)))
+            input_queue.task_done()
+
     def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
         images = self.convert_to_images(stream)
+        input_queue = Queue()
+        output_queue = Queue()
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {i: executor.submit(self.process_image, image[i]) for i, image in enumerate(images.values())}
+        for img in images.values():
+            input_queue.put(BytesIO(img))
+
+        threads = []
+        for _ in range(4):  # Number of worker threads
+            t = threading.Thread(target=self.worker, args=(input_queue, output_queue))
+            t.start()
+            threads.append(t)
+
+        input_queue.join()
+
+        for _ in range(4):
+            input_queue.put(None)
+
+        for t in threads:
+            t.join()
 
         contents = []
-        for i, future in futures.items():
-            contents.append({"image": images[i], "content": future.result()})
+        while not output_queue.empty():
+            image, content = output_queue.get()
+            contents.append({"image": image, "content": content})
 
         return contents
 
-    @cachedmethod(cache=attrgetter('cache'), key=lambda self, input_list: hashkey(id(input_list)))
     def load_content_from_file_list(self, input: List[Union[str, BytesIO]]) -> List[Any]:
         images = self.convert_to_images(input)
+        input_queue = Queue()
+        output_queue = Queue()
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {i: executor.submit(self.process_image, image[i]) for i, image in enumerate(images.values())}
+        for img in images.values():
+            input_queue.put(BytesIO(img))
+
+        threads = []
+        for _ in range(4):  # Number of worker threads
+            t = threading.Thread(target=self.worker, args=(input_queue, output_queue))
+            t.start()
+            threads.append(t)
+
+        input_queue.join()
+
+        for _ in range(4):
+            input_queue.put(None)
+
+        for t in threads:
+            t.join()
 
         contents = []
-        for i, future in futures.items():
-            contents.append({"image": Image.open(BytesIO(images[i][i])), "content": future.result()})
+        while not output_queue.empty():
+            image, content = output_queue.get()
+            contents.append({"image": Image.open(image), "content": content})
 
         return contents
