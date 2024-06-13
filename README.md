@@ -120,16 +120,15 @@ You can find more examples in the repository. These examples cover various use c
 ## Contributing
 We welcome contributions from the community! If you would like to contribute, please follow these steps:
 
-## Community
-
-Júlio Almeida
-    https://pub.towardsai.net/extractthinker-ai-document-intelligence-with-llms-72cbce1890ef
-
 Fork the repository.
 Create a new branch for your feature or bugfix.
 Write tests for your changes.
 Run tests to ensure everything is working correctly.
 Submit a pull request with a description of your changes.
+
+## Community
+Júlio Almeida
+    https://pub.towardsai.net/extractthinker-ai-document-intelligence-with-llms-72cbce1890ef
 
 ## License
 This project is licensed under the Apache License 2.0. See the LICENSE file for more details.
