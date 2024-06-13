@@ -6,10 +6,13 @@ from litellm import Router
 
 
 class LLM:
-    def __init__(self, model: str):
+    def __init__(self, model: str, api_base: str = None, api_key: str = None, api_version: str = None):
         self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
         self.model = model
         self.router = None
+        self.api_base = api_base
+        self.api_key = api_key
+        self.api_version = api_version
 
     def load_router(self, router: Router) -> None:
         self.router = router
@@ -31,7 +34,10 @@ class LLM:
                 model=self.model,
                 max_tokens=max_tokens,
                 messages=messages,
-                response_model=response_model
+                response_model=response_model,
+                api_base=self.api_base,
+                api_key=self.api_key,
+                api_version=self.api_version
             )
 
         return response

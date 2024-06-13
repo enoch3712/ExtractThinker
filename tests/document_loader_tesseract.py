@@ -43,3 +43,11 @@ def test_cache_for_file():
 
     # Assert
     assert content1 is content2
+
+
+def test_queue_load():
+    for _ in range(10):
+        # Act
+        content = loader.load_content_from_file(test_file_path)
+        # Assert
+        assert "0000001" in content
