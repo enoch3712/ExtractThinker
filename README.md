@@ -120,6 +120,11 @@ You can find more examples in the repository. These examples cover various use c
 ## Contributing
 We welcome contributions from the community! If you would like to contribute, please follow these steps:
 
+## Community
+
+Júlio Almeida
+    https://pub.towardsai.net/extractthinker-ai-document-intelligence-with-llms-72cbce1890ef
+
 Fork the repository.
 Create a new branch for your feature or bugfix.
 Write tests for your changes.
