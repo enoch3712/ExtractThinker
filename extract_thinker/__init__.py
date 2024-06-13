@@ -1,4 +1,5 @@
 from .extractor import Extractor
+from .llm import LLM
 from .document_loader.document_loader import DocumentLoader
 from .document_loader.cached_document_loader import CachedDocumentLoader
 from .document_loader.document_loader_tesseract import DocumentLoaderTesseract
@@ -16,6 +17,7 @@ from .models.contract import Contract
 
 __all__ = [
     'Extractor',
+    'LLM',
     'DocumentLoader',
     'CachedDocumentLoader',
     'DocumentLoaderTesseract',

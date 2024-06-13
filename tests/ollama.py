@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from extract_thinker.llm import LLM
+from extract_thinker import LLM
 from extract_thinker import DocumentLoaderTesseract
 
 from extract_thinker.extractor import Extractor

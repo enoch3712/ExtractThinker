@@ -9,7 +9,7 @@ import yaml
 from extract_thinker import Extractor, Contract, DocumentLoaderPyPdf
 from litellm import Router
 
-from extract_thinker.llm import LLM
+from extract_thinker import LLM
 
 
 def json_to_yaml(json_dict):
