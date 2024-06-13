@@ -88,6 +88,21 @@ def test_classify_higher_order():
     process = arrange_process_with_extractors()
     result = process.classify(TEST_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.HIGHER_ORDER)
 
+    test_file_path = os.path.join(cwd, "test_images", "invoice.png")
+
+    Classifications = [
+        Classification(name="Driver License", description="This is a driver license"),
+        Classification(name="Invoice", description="This is an invoice"),
+    ]
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm("gpt-3.5-turbo")
+
+    # Act
+    result = extractor.classify_from_path(test_file_path, Classifications)
+
+    # Assert
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
@@ -129,6 +144,3 @@ def test_with_image():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
-
-
-test_with_image()
