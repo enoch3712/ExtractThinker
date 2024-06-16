@@ -7,7 +7,7 @@ from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import (
     ClassificationResponse,
 )
-from extract_thinker import LLM
+from extract_thinker.llm import LLM
 import os
 
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
