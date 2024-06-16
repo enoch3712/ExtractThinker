@@ -9,7 +9,7 @@ from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import (
     ClassificationResponse,
 )
-from extract_thinker import LLM
+from extract_thinker.llm import LLM
 import os
 
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
@@ -33,6 +33,7 @@ class Extractor:
         self.document_loaders_by_file_type: Dict[str, DocumentLoader] = {}
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
+        self.is_classify_image: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -114,6 +115,13 @@ class Extractor:
         content = self.document_loader.load(stream)
         return self._extract(content, stream, response_model, vision, is_stream=True)
 
+    def classify_from_image(self, image: Any, classifications: List[Classification]):
+        # requires no content extraction from loader
+        content = {
+            "image": image,
+        }
+        return self._classify(content, classifications, image)
+
     def classify_from_path(self, path: str, classifications: List[Classification]):
         content = self.document_loader.load_content_from_file_list(path) if self.is_classify_image else self.document_loader.load_content_from_file(path)
         return self._classify(content, classifications)
@@ -151,7 +159,7 @@ class Extractor:
                 content += field_details + "\n"
         return content
 
-    def _classify(self, content: str, classifications: List[Classification], image: Optional[Any] = None):
+    def _classify(self, content: Any, classifications: List[Classification], image: Optional[Any] = None):
         messages = [
             {
                 "role": "system",
@@ -160,29 +168,55 @@ class Extractor:
             },
         ]
 
-        input_data = (
-            f"##Content\n{content}\n##Classifications\n#if contract present, fields present increase confidence level\n"
-            + "\n\n".join([f"{c.name}: {c.description} \n{self._add_classification_structure(c)}" for c in classifications])
-            + "\n\n##ClassificationResponse JSON Output\n"
-        )
+        if self.is_classify_image:
+            input_data = (
+                f"##Take the first image, and compare to the several images provided. Then classificationaccording to the classifcation attached to the image\n"
+                + "Output Example: \n"
+                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                + "\n\n##ClassificationResponse JSON Output\n"
+            )
+
+        else:
+            input_data = (
+                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
+                + "\n".join([f"{c.name}: {c.description} \n{self._add_classification_structure(c)}" for c in classifications])
+                + "#Dont use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
+                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                + "\n\n##ClassificationResponse JSON Output\n"
+            )
+
+        messages.append({"role": "user", "content": input_data})
 
         if self.is_classify_image:
-            messages.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/jpeg;base64," + self.encode_image(image)
-                            }})
+            for classification in classifications:
+                if classification.image:
+                    messages.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "{classification.name}: {classification.description}"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": "data:image/jpeg;base64," + encode_image(classification.image)
+                                },
+                            },
+                        ],
+                    })
+                else:
+                    raise ValueError(f"Image required for classification '{classification.name}' but not found.")
 
-            messages.append({"role": "user", "content": input_data})
             response = self.classify_with_image(messages)
         else:
-            messages.append({"role": "user", "content": input_data})
             response = self.llm.request(messages, ClassificationResponse)
 
         return response
 
     def classify(self, input: Union[str, IO], classifications: List[Classification], image: bool = False):
         self.is_classify_image = image
+
+        if image:
+            return self.classify_from_image(input, classifications)
+
         if isinstance(input, str):
             # Check if the input is a valid file path
             if os.path.isfile(input):

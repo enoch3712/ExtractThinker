@@ -15,8 +15,10 @@ from tests.models.driver_license import DriverLicense
 
 # Setup environment and common paths
 load_dotenv()
+tesseract_path = os.getenv("TESSERACT_PATH")
 CURRENT_WORKING_DIRECTORY = os.getcwd()
-TEST_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "test_images", "invoice.png")
+INVOICE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "invoice.png")
+DRIVER_LICENSE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "driver_license.jpg")
 
 # Common classifications setup
 COMMON_CLASSIFICATIONS = [
@@ -33,7 +35,7 @@ def setup_extractors():
     extractors = [
         ("gpt-3.5-turbo", "gpt-3.5-turbo"),
         ("claude-3-haiku-20240307", "claude-3-haiku-20240307"),
-        ("gpt-4-turbo", "gpt-4-turbo")
+        ("gpt-4o", "gpt-4o")
     ]
 
     configured_extractors = []
@@ -56,7 +58,7 @@ def arrange_process_with_extractors():
 def test_classify_feature():
     """Test classification using a single feature."""
     extractor = setup_extractors()[1]  # Using the second configured extractor
-    result = extractor.classify_from_path(TEST_FILE_PATH, COMMON_CLASSIFICATIONS)
+    result = extractor.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
@@ -66,7 +68,7 @@ def test_classify_feature():
 def test_classify_async():
     """Test asynchronous classification."""
     process = arrange_process_with_extractors()
-    result = asyncio.run(process.classify_async(TEST_FILE_PATH, COMMON_CLASSIFICATIONS))
+    result = asyncio.run(process.classify_async(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS))
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
@@ -76,7 +78,7 @@ def test_classify_async():
 def test_classify_consensus():
     """Test classification using consensus strategy."""
     process = arrange_process_with_extractors()
-    result = process.classify(TEST_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS)
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
@@ -86,21 +88,9 @@ def test_classify_consensus():
 def test_classify_higher_order():
     """Test classification using higher order strategy."""
     process = arrange_process_with_extractors()
-    result = process.classify(TEST_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.HIGHER_ORDER)
-
-    test_file_path = os.path.join(cwd, "test_images", "invoice.png")
-
-    Classifications = [
-        Classification(name="Driver License", description="This is a driver license"),
-        Classification(name="Invoice", description="This is an invoice"),
-    ]
-
-    extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    extractor.load_llm("gpt-3.5-turbo")
 
     # Act
-    result = extractor.classify_from_path(test_file_path, Classifications)
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.HIGHER_ORDER)
 
     # Assert
     assert result is not None
@@ -111,7 +101,7 @@ def test_classify_higher_order():
 def test_classify_both():
     """Test classification using both consensus and higher order strategies with a threshold."""
     process = arrange_process_with_extractors()
-    result = process.classify(TEST_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.BOTH, threshold=9)
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.BOTH, threshold=9)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
@@ -125,11 +115,25 @@ def test_with_contract():
     COMMON_CLASSIFICATIONS[0].contract = InvoiceContract
     COMMON_CLASSIFICATIONS[1].contract = DriverLicense
 
-    result = process.classify(TEST_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS)
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+
+
+def setup_process_with_gpt4_extractor():
+    """Sets up and returns a process configured with only the GPT-4 extractor."""
+    tesseract_path = os.getenv("TESSERACT_PATH")
+    document_loader = DocumentLoaderTesseract(tesseract_path)
+
+    # Initialize the GPT-4 extractor
+    gpt_4_extractor = Extractor(document_loader)
+    gpt_4_extractor.load_llm("gpt-4o")
+
+    # Create the process with only the GPT-4 extractor
+    process = Process([gpt_4_extractor])
+    return process
 
 
 def test_with_image():
@@ -139,8 +143,14 @@ def test_with_image():
     COMMON_CLASSIFICATIONS[0].contract = InvoiceContract
     COMMON_CLASSIFICATIONS[1].contract = DriverLicense
 
-    result = process.classify(TEST_FILE_PATH.replace("test_images", "tests/test_images"), COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
+    COMMON_CLASSIFICATIONS[0].image = INVOICE_FILE_PATH
+    COMMON_CLASSIFICATIONS[1].image = DRIVER_LICENSE_FILE_PATH
+
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+
+
+test_with_image()
