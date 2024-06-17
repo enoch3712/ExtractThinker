@@ -1,4 +1,6 @@
 import asyncio
+import base64
+from io import BytesIO
 from typing import Any, Dict, List, Optional, IO, Union
 
 from pydantic import BaseModel
@@ -15,7 +17,7 @@ from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 
 from extract_thinker.utils import get_file_extension, encode_image
 import yaml
-
+import litellm
 
 SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
 SUPPORTED_EXCEL_FORMATS = ['.xls', '.xlsx', '.xlsm', '.xlsb', '.odf', '.ods', '.odt', '.csv']
@@ -31,7 +33,7 @@ class Extractor:
         self.document_loaders_by_file_type: Dict[str, DocumentLoader] = {}
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
-        self.extra_content: Optional[str] = None
+        self.is_classify_image: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -113,12 +115,19 @@ class Extractor:
         content = self.document_loader.load(stream)
         return self._extract(content, stream, response_model, vision, is_stream=True)
 
+    def classify_from_image(self, image: Any, classifications: List[Classification]):
+        # requires no content extraction from loader
+        content = {
+            "image": image,
+        }
+        return self._classify(content, classifications, image)
+
     def classify_from_path(self, path: str, classifications: List[Classification]):
-        content = self.document_loader.load_content_from_file(path)
+        content = self.document_loader.load_content_from_file_list(path) if self.is_classify_image else self.document_loader.load_content_from_file(path)
         return self._classify(content, classifications)
 
     def classify_from_stream(self, stream: IO, classifications: List[Classification]):
-        content = self.document_loader.load_content_from_stream(stream)
+        content = self.document_loader.load_content_from_stream_list(stream) if self.is_classify_image else self.document_loader.load_content_from_stream(stream)
         self._classify(content, classifications)
 
     def classify_from_excel(self, path: Union[str, IO], classifications: List[Classification]):
@@ -128,28 +137,98 @@ class Extractor:
             content = self.document_loader.load_content_from_stream(path)
         return self._classify(content, classifications)
 
-    def _classify(self, content: str, classifications: List[Classification]):
+    # def classify_with_image(self, messages: List[Dict[str, Any]]):
+    #     resp = litellm.completion(self.llm.model, messages)
+
+    #     return ClassificationResponse(**resp.choices[0].message.content)
+
+    def _add_classification_structure(self, classification: Classification) -> str:
+        content = ""
+        if classification.contract:
+            content = "\tContract Structure:\n"
+            # Iterate over the fields of the contract attribute if it's not None
+            for name, field in classification.contract.model_fields.items():
+                # Extract the type and required status from the field's string representation
+                field_str = str(field)
+                field_type = field_str.split('=')[1].split(' ')[0]  # Extracts the type
+                required = 'required' in field_str  # Checks if 'required' is in the string
+                # Creating a string representation of the field attributes
+                attributes = f"required={required}"
+                # Append each field's details to the content string
+                field_details = f"\t\tName: {name}, Type: {field_type}, Attributes: {attributes}"
+                content += field_details + "\n"
+        return content
+
+    def _classify(self, content: Any, classifications: List[Classification], image: Optional[Any] = None):
         messages = [
             {
                 "role": "system",
                 "content": "You are a server API that receives document information "
-                "and returns specific fields in JSON format.",
+                "and returns specific fields in JSON format.\n",
             },
         ]
 
-        input_data = (
-            f"##Content\n{content}\n##Classifications\n"
-            + "\n".join([f"{c.name}: {c.description}" for c in classifications])
-            + "\n\n##JSON Output\n"
-        )
+        if self.is_classify_image:
+            input_data = (
+                f"##Take the first image, and compare to the several images provided. Then classificationaccording to the classifcation attached to the image\n"
+                + "Output Example: \n"
+                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                + "\n\n##ClassificationResponse JSON Output\n"
+            )
 
-        messages.append({"role": "user", "content": input_data})
+        else:
+            input_data = (
+                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
+                + "\n".join([f"{c.name}: {c.description} \n{self._add_classification_structure(c)}" for c in classifications])
+                + "#Dont use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
+                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                + "\n\n##ClassificationResponse JSON Output\n"
+            )
 
-        response = self.llm.request(messages, ClassificationResponse)
+        #messages.append({"role": "user", "content": input_data})
+
+        if self.is_classify_image:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": input_data,
+                        },
+                    ],
+                }
+            )
+            for classification in classifications:
+                if classification.image:
+                    messages.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "{classification.name}: {classification.description}"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": "data:image/png;base64," + encode_image(classification.image)
+                                },
+                            },
+                        ],
+                    })
+                else:
+                    raise ValueError(f"Image required for classification '{classification.name}' but not found.")
+
+            response = self.llm.request(messages, ClassificationResponse)
+        else:
+            messages.append({"role": "user", "content": input_data})
+            response = self.llm.request(messages, ClassificationResponse)
 
         return response
 
-    def classify(self, input: Union[str, IO], classifications: List[Classification]):
+    def classify(self, input: Union[str, IO], classifications: List[Classification], image: bool = False):
+        self.is_classify_image = image
+
+        if image:
+            return self.classify_from_image(input, classifications)
+
         if isinstance(input, str):
             # Check if the input is a valid file path
             if os.path.isfile(input):
@@ -209,7 +288,6 @@ class Extractor:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Whats in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
