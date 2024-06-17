@@ -18,21 +18,21 @@ class LLM:
         self.router = router
 
     def request(self, messages: List[Dict[str, str]], response_model: str) -> Any:
-        contents = map(lambda message: message['content'], messages)
-        all_contents = ' '.join(contents)
-        max_tokens = num_tokens_from_string(all_contents)
+        # contents = map(lambda message: message['content'], messages)
+        # all_contents = ' '.join(contents)
+        # max_tokens = num_tokens_from_string(all_contents)
 
         if self.router:
             response = self.router.completion(
                 model=self.model,
-                max_tokens=max_tokens,
+                #max_tokens=max_tokens,
                 messages=messages,
                 response_model=response_model,
             )
         else:
             response = self.client.chat.completions.create(
                 model=self.model,
-                max_tokens=max_tokens,
+                #max_tokens=max_tokens,
                 messages=messages,
                 response_model=response_model,
                 api_base=self.api_base,

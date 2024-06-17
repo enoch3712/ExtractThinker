@@ -17,8 +17,8 @@ from tests.models.driver_license import DriverLicense
 load_dotenv()
 tesseract_path = os.getenv("TESSERACT_PATH")
 CURRENT_WORKING_DIRECTORY = os.getcwd()
-INVOICE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "invoice.png")
-DRIVER_LICENSE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "driver_license.jpg")
+INVOICE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "test_images", "invoice.png")
+DRIVER_LICENSE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "test_images", "driver_license.png")
 
 # Common classifications setup
 COMMON_CLASSIFICATIONS = [
@@ -132,13 +132,15 @@ def setup_process_with_gpt4_extractor():
     gpt_4_extractor.load_llm("gpt-4o")
 
     # Create the process with only the GPT-4 extractor
-    process = Process([gpt_4_extractor])
+    process = Process()
+    process.add_classify_extractor([[gpt_4_extractor]])
+
     return process
 
 
 def test_with_image():
     """Test classification using both consensus and higher order strategies with a threshold."""
-    process = arrange_process_with_extractors()
+    process = setup_process_with_gpt4_extractor()
 
     COMMON_CLASSIFICATIONS[0].contract = InvoiceContract
     COMMON_CLASSIFICATIONS[1].contract = DriverLicense
@@ -151,6 +153,3 @@ def test_with_image():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
-
-
-test_with_image()

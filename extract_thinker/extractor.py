@@ -137,10 +137,10 @@ class Extractor:
             content = self.document_loader.load_content_from_stream(path)
         return self._classify(content, classifications)
 
-    def classify_with_image(self, messages: List[Dict[str, Any]]):
-        resp = litellm.completion(self.llm.model, messages)
+    # def classify_with_image(self, messages: List[Dict[str, Any]]):
+    #     resp = litellm.completion(self.llm.model, messages)
 
-        return ClassificationResponse(**resp.choices[0].message.content)
+    #     return ClassificationResponse(**resp.choices[0].message.content)
 
     def _add_classification_structure(self, classification: Classification) -> str:
         content = ""
@@ -185,9 +185,20 @@ class Extractor:
                 + "\n\n##ClassificationResponse JSON Output\n"
             )
 
-        messages.append({"role": "user", "content": input_data})
+        #messages.append({"role": "user", "content": input_data})
 
         if self.is_classify_image:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": input_data,
+                        },
+                    ],
+                }
+            )
             for classification in classifications:
                 if classification.image:
                     messages.append({
@@ -197,7 +208,7 @@ class Extractor:
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": "data:image/jpeg;base64," + encode_image(classification.image)
+                                    "url": "data:image/png;base64," + encode_image(classification.image)
                                 },
                             },
                         ],
@@ -205,8 +216,9 @@ class Extractor:
                 else:
                     raise ValueError(f"Image required for classification '{classification.name}' but not found.")
 
-            response = self.classify_with_image(messages)
+            response = self.llm.request(messages, ClassificationResponse)
         else:
+            messages.append({"role": "user", "content": input_data})
             response = self.llm.request(messages, ClassificationResponse)
 
         return response
@@ -276,7 +288,6 @@ class Extractor:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Whats in this image?"},
                         {
                             "type": "image_url",
                             "image_url": {
