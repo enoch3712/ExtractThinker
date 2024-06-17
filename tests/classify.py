@@ -2,9 +2,6 @@ import os
 import asyncio
 from dotenv import load_dotenv
 
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from extract_thinker.extractor import Extractor
 from extract_thinker.process import Process, ClassificationStrategy
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
