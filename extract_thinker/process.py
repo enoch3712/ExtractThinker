@@ -17,7 +17,7 @@ from enum import Enum
 class ClassificationStrategy(Enum):
     CONSENSUS = "consensus"
     HIGHER_ORDER = "higher_order"
-    BOTH = "both"
+    CONSENSUS_WITH_THRESHOLD = "both"
 
 
 class Process:
@@ -73,7 +73,7 @@ class Process:
         elif strategy == ClassificationStrategy.HIGHER_ORDER:
             # Pick the result with the highest confidence
             return max(group_classifications, key=lambda c: c.confidence)
-        elif strategy == ClassificationStrategy.BOTH:
+        elif strategy == ClassificationStrategy.CONSENSUS_WITH_THRESHOLD:
             if len(set(group_classifications)) == 1:
                 maxResult = max(group_classifications, key=lambda c: c.confidence)
                 if maxResult.confidence >= threshold:
