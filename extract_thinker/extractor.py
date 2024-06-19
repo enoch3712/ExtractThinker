@@ -15,7 +15,7 @@ import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 
-from extract_thinker.utils import get_file_extension, encode_image
+from extract_thinker.utils import get_file_extension, encode_image, json_to_formatted_string
 import yaml
 import litellm
 
@@ -276,6 +276,8 @@ class Extractor:
 
         if content is not None:
             if isinstance(content, dict):
+                if content["is_spreadsheet"]:
+                    content = json_to_formatted_string(content["data"])
                 content = yaml.dump(content)
             messages.append({"role": "user", "content": "##Content\n\n" + content})
 
