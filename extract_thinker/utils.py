@@ -100,3 +100,12 @@ def get_file_extension(file_path):
     _, ext = os.path.splitext(file_path)
     ext = ext[1:]  # remove the dot
     return ext
+
+
+def json_to_formatted_string(data):
+    result = []
+    for sheet, rows in data.items():
+        result.append(f"##{sheet}")
+        for row in rows:
+            result.append(','.join(map(str, row)))
+    return '\n'.join(result)
