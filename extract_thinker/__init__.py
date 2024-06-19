@@ -21,6 +21,7 @@ __all__ = [
     'DocumentLoader',
     'CachedDocumentLoader',
     'DocumentLoaderTesseract',
+    'DocumentLoaderSpreadSheet',
     'DocumentLoaderAzureForm',
     'DocumentLoaderPyPdf',
     'DocumentLoaderText',
