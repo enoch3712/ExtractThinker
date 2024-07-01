@@ -165,3 +165,6 @@ Scripts/vba_extract.py
 
 # VSCode settings
 .vscode/
+
+# Macos
+.DS_Store
