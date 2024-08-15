@@ -23,6 +23,7 @@ openpyxl = "^3.1.2"
 pypdf2 = "^3.0.1"
 azure-ai-formrecognizer = "^3.3.3"
 google-cloud-documentai = "^2.29.1"
+boto3 = "^1.34.161"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.9.2"
