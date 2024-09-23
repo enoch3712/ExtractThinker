@@ -6,10 +6,10 @@ import threading
 from typing import Any, List, Union
 from PIL import Image
 import boto3
-import pdfium
+import pypdfium2 as pdfium
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
-from extract_thinker.utils import get_image_type
+from extract_thinker.utils import get_file_extension, get_image_type
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -35,23 +35,7 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
     @classmethod
     def from_client(cls, textract_client, content=None, cache_ttl=300):
         return cls(textract_client=textract_client, content=content, cache_ttl=cache_ttl)
-
-    @cachedmethod(cache=attrgetter('cache'), key=lambda self, file_path: hashkey(file_path))
-    def load_content_from_file(self, file_path: str) -> Union[dict, object]:
-        try:
-            file_type = get_image_type(file_path)
-            if file_type in SUPPORTED_IMAGE_FORMATS:
-                with open(file_path, 'rb') as file:
-                    file_bytes = file.read()
-                if file_type == 'pdf':
-                    return self.process_pdf(file_bytes)
-                else:
-                    return self.process_image(file_bytes)
-            else:
-                raise Exception(f"Unsupported file type: {file_path}")
-        except Exception as e:
-            raise Exception(f"Error processing file: {e}") from e
-
+    
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
     def load_content_from_stream(self, stream: Union[BytesIO, str]) -> Union[dict, object]:
         try:
@@ -67,42 +51,48 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
         except Exception as e:
             raise Exception(f"Error processing stream: {e}") from e
 
+    @cachedmethod(cache=attrgetter('cache'), key=lambda self, file_path: hashkey(file_path))
+    def load_content_from_file(self, file_path: str) -> Union[dict, object]:
+        try:
+            file_type = get_file_extension(file_path)
+            if file_type == 'pdf':
+                with open(file_path, 'rb') as file:
+                    file_bytes = file.read()
+                return self.process_pdf(file_bytes)
+            elif file_type in SUPPORTED_IMAGE_FORMATS:
+                with open(file_path, 'rb') as file:
+                    file_bytes = file.read()
+                return self.process_image(file_bytes)
+            else:
+                raise Exception(f"Unsupported file type: {file_path}")
+        except Exception as e:
+            raise Exception(f"Error processing file: {e}") from e
+
+    def process_pdf(self, pdf_bytes: bytes) -> dict:
+        for attempt in range(3):
+            try:
+                response = self.textract_client.analyze_document(
+                    Document={'Bytes': pdf_bytes},
+                    FeatureTypes=['TABLES']
+                )
+                return self._parse_analyze_document_response(response)
+            except Exception as e:
+                if attempt == 2:
+                    raise Exception(f"Failed to process PDF after 3 attempts: {e}")
+        return {}
+
     def process_image(self, image_bytes: bytes) -> dict:
         for attempt in range(3):
             try:
                 response = self.textract_client.analyze_document(
                     Document={'Bytes': image_bytes},
-                    FeatureTypes=['TABLES', 'FORMS', 'LAYOUT']
+                    FeatureTypes=['TABLES']  # Only extract tables
                 )
                 return self._parse_analyze_document_response(response)
             except Exception as e:
                 if attempt == 2:
                     raise Exception(f"Failed to process image after 3 attempts: {e}")
         return {}
-
-    def process_pdf(self, pdf_bytes: bytes) -> dict:
-        pdf = pdfium.PdfDocument(pdf_bytes)
-        result = {
-            "pages": [],
-            "tables": [],
-            "forms": [],
-            "layout": {}
-        }
-        for page_number in range(len(pdf)):
-            page = pdf.get_page(page_number)
-            pil_image = page.render().to_pil()
-            img_byte_arr = BytesIO()
-            pil_image.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            page_result = self.process_image(img_byte_arr)
-            result["pages"].extend(page_result["pages"])
-            result["tables"].extend(page_result["tables"])
-            result["forms"].extend(page_result["forms"])
-            for key, value in page_result["layout"].items():
-                if key not in result["layout"]:
-                    result["layout"][key] = []
-                result["layout"][key].extend(value)
-        return result
 
     def _parse_analyze_document_response(self, response: dict) -> dict:
         result = {
