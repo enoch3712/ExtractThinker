@@ -3,6 +3,8 @@ import asyncio
 from dotenv import load_dotenv
 
 from extract_thinker.extractor import Extractor
+from extract_thinker.models.classification_node import ClassificationNode
+from extract_thinker.models.classification_tree import ClassificationTree
 from extract_thinker.process import Process, ClassificationStrategy
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.models.classification import Classification
@@ -22,7 +24,6 @@ COMMON_CLASSIFICATIONS = [
     Classification(name="Driver License", description="This is a driver license"),
     Classification(name="Invoice", description="This is an invoice"),
 ]
-
 
 def setup_extractors():
     """Sets up and returns a list of configured extractors."""
@@ -150,3 +151,46 @@ def test_with_image():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+
+def test_with_tree():
+    """Test classification using the tree strategy"""
+    process = setup_process_with_gpt4_extractor()
+
+    # Create Classification Nodes
+    financial_docs = ClassificationNode(
+        classification=Classification(name="Financial Documents", description="Documents related to finances")
+    )
+    invoice = ClassificationNode(
+        classification=Classification(
+            name="Invoice",
+            description="This is an invoice",
+            contract=InvoiceContract,
+            image=INVOICE_FILE_PATH
+        )
+    )
+    credit_note = ClassificationNode(
+        classification=Classification(name="Credit Note", description="This is a credit note")
+    )
+    financial_docs.children = [invoice, credit_note]
+
+    legal_docs = ClassificationNode(
+        classification=Classification(name="Legal Documents", description="Documents related to legal matters")
+    )
+    contract = ClassificationNode(
+        classification=Classification(name="Contract", description="This is a contract")
+    )
+    legal_docs.children = [contract]
+
+    # Create the classification tree
+    classification_tree = ClassificationTree(
+        nodes=[financial_docs, legal_docs]
+    )
+
+    result = process.classify(INVOICE_FILE_PATH, classification_tree, threshold=0.8)
+
+    assert result is not None
+    assert isinstance(result, Classification)
+    assert result.name == "Invoice"
+
+if __name__ == "__main__":
+    test_with_tree()

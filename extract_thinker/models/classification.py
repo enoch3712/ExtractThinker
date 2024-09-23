@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from extract_thinker.models.contract import Contract
 import os
 
-
 class Classification(BaseModel):
     name: str
     description: str

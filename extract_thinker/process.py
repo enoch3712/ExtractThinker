@@ -1,8 +1,10 @@
 import asyncio
-from typing import IO, Any, Dict, List, Optional
+from typing import IO, Any, Dict, List, Optional, Union
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.models.classification_tree import ClassificationTree
+from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.doc_group import DocGroup
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.splitter import Splitter
@@ -61,7 +63,18 @@ class Process:
 
         return result
 
-    async def classify_async(self, file: str, classifications, strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS, threshold: int = 9, image: str = False) -> Optional[Classification]:
+    async def classify_async(
+        self,
+        file: str,
+        classifications: Union[List[Classification], ClassificationTree],
+        strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS,
+        threshold: int = 9,
+        image: str = False
+    ) -> Optional[Classification]:
+
+        if isinstance(classifications, ClassificationTree):
+            return await self._classify_tree_async(file, classifications, threshold, image)
+
         for extractor_group in self.extractor_groups:
             group_classifications = await asyncio.gather(*(self._classify_async(extractor, file, classifications, image) for extractor in extractor_group))
 
@@ -80,6 +93,42 @@ class Process:
                     return maxResult
 
         raise ValueError("No consensus could be reached on the classification of the document. Please try again with a different strategy or threshold.")
+
+    async def _classify_tree_async(
+        self, 
+        file: str, 
+        classification_tree: ClassificationTree, 
+        threshold: float,
+        image: bool
+    ) -> Optional[Classification]:
+        async def classify_node(node: ClassificationNode) -> tuple[Classification, float]:
+            classifications = [node.classification] + [child.classification for child in node.children]
+            results = await asyncio.gather(*(
+                self._classify_async(self.extractor_groups[0][0], file, [classification], image)
+                for classification in classifications
+            ))
+            
+            best_result = max(results, key=lambda x: x.confidence)
+            
+            if not node.children or best_result.name == node.classification.name:
+                return best_result, best_result.confidence
+            
+            for child in node.children:
+                if child.classification.name == best_result.name:
+                    return await classify_node(child)
+            
+            raise ValueError("Inconsistent classification tree structure")
+
+        best_classification = None
+        best_confidence = -1
+
+        for root_node in classification_tree.nodes:
+            classification, confidence = await classify_node(root_node)
+            if confidence > best_confidence:
+                best_classification = classification
+                best_confidence = confidence
+
+        return best_classification if best_confidence >= threshold else None
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)
