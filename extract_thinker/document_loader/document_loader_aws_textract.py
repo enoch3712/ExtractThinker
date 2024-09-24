@@ -9,7 +9,7 @@ import boto3
 import pypdfium2 as pdfium
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
-from extract_thinker.utils import get_file_extension, get_image_type
+from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_stream
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -35,19 +35,18 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
     @classmethod
     def from_client(cls, textract_client, content=None, cache_ttl=300):
         return cls(textract_client=textract_client, content=content, cache_ttl=cache_ttl)
-    
+        
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
     def load_content_from_stream(self, stream: Union[BytesIO, str]) -> Union[dict, object]:
         try:
-            file_type = get_image_type(stream)
-            if file_type in SUPPORTED_IMAGE_FORMATS:
+            if is_pdf_stream(stream):
                 file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
-                if file_type == 'pdf':
-                    return self.process_pdf(file_bytes)
-                else:
-                    return self.process_image(file_bytes)
+                return self.process_pdf(file_bytes)
+            elif get_image_type(stream) in SUPPORTED_IMAGE_FORMATS:
+                file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
+                return self.process_image(file_bytes)
             else:
-                raise Exception(f"Unsupported stream type: {stream}")
+                raise Exception(f"Unsupported stream type: {get_file_extension(stream) if isinstance(stream, str) else 'unknown'}")
         except Exception as e:
             raise Exception(f"Error processing stream: {e}") from e
 

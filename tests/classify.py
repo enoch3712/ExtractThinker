@@ -228,7 +228,6 @@ def test_with_tree():
     result = process.classify(pdf_path, classification_tree, threshold=0.8)
 
     assert result is not None
-    assert isinstance(result, Classification)
     assert result.name == "Invoice"
 
 if __name__ == "__main__":

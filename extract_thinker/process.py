@@ -101,34 +101,51 @@ class Process:
         threshold: float,
         image: bool
     ) -> Optional[Classification]:
-        async def classify_node(node: ClassificationNode) -> tuple[Classification, float]:
-            classifications = [node.classification] + [child.classification for child in node.children]
-            results = await asyncio.gather(*(
-                self._classify_async(self.extractor_groups[0][0], file, [classification], image)
-                for classification in classifications
-            ))
-            
-            best_result = max(results, key=lambda x: x.confidence)
-            
-            if not node.children or best_result.name == node.classification.name:
-                return best_result, best_result.confidence
-            
-            for child in node.children:
-                if child.classification.name == best_result.name:
-                    return await classify_node(child)
-            
-            raise ValueError("Inconsistent classification tree structure")
-
+        """
+        Perform classification in a hierarchical, level-by-level approach.
+        """
         best_classification = None
-        best_confidence = -1
+        current_nodes = classification_tree.nodes
 
-        for root_node in classification_tree.nodes:
-            classification, confidence = await classify_node(root_node)
-            if confidence > best_confidence:
-                best_classification = classification
-                best_confidence = confidence
+        while current_nodes:
+            # Get the list of classifications at the current level
+            classifications = [node.classification for node in current_nodes]
 
-        return best_classification if best_confidence >= threshold else None
+            # Classify among the current level's classifications
+            classification = await self._classify_async(
+                extractor=self.extractor_groups[0][0],
+                file=file, 
+                classifications=classifications, 
+                image=image
+            )
+
+            if classification.confidence < threshold:
+                raise ValueError(
+                    f"Classification confidence {classification.confidence} "
+                    f"for '{classification.classification}' is below the threshold of {threshold}."
+                )
+
+            best_classification = classification
+
+            matching_node = next(
+                (
+                    node for node in current_nodes 
+                    if node.classification.name == best_classification.name
+                ),
+                None
+            )
+
+            if matching_node is None:
+                raise ValueError(
+                    f"No matching node found for classification '{classification.classification}'."
+                )
+
+            if matching_node.children:
+                current_nodes = matching_node.children
+            else:
+                break
+
+        return best_classification
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)

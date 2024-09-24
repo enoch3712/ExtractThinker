@@ -7,7 +7,7 @@ from PIL import Image
 import pytesseract
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
-from extract_thinker.utils import get_image_type
+from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_stream
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -29,6 +29,11 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, file_path: hashkey(file_path))
     def load_content_from_file(self, file_path: str) -> Union[str, object]:
         try:
+            file_type = get_file_extension(file_path)
+            
+            if is_pdf_stream(file_path):
+                with open(file_path, 'rb') as file:
+                    return self.process_pdf(file)
             file_type = get_image_type(file_path)
             if file_type in SUPPORTED_IMAGE_FORMATS:
                 image = Image.open(file_path)
@@ -43,6 +48,8 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
     def load_content_from_stream(self, stream: Union[BytesIO, str]) -> Union[str, object]:
         try:
+            if is_pdf_stream(stream):
+                return self.process_pdf(stream)
             file_type = get_image_type(stream)
             if file_type in SUPPORTED_IMAGE_FORMATS:
                 image = Image.open(stream)
@@ -53,6 +60,35 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
                 raise Exception(f"Unsupported stream type: {stream}")
         except Exception as e:
             raise Exception(f"Error processing stream: {e}") from e
+        
+    def process_pdf(self, stream: BytesIO) -> str:
+        """
+        Processes a PDF by converting its pages to images and extracting text from each image.
+
+        Args:
+            stream (BytesIO): The PDF file as a BytesIO stream.
+
+        Returns:
+            str: The extracted text from all pages.
+        """
+        try:
+            # Reset stream position
+            stream.seek(0)
+            # Can you give me a file: Union[str, io.BytesIO]
+            file = BytesIO(stream.read())
+            images = self.convert_to_images(file)
+            extracted_text = []
+
+            for page_number, image_bytes in images.items():
+                image = BytesIO(image_bytes[0])
+                text = self.process_image(image)
+                extracted_text.append(text)
+
+            # Combine text from all pages
+            self.content = "\n".join(extracted_text)
+            return self.content
+        except Exception as e:
+            raise Exception(f"Error processing PDF: {e}") from e
 
     def process_image(self, image: BytesIO) -> str:
         for attempt in range(3):

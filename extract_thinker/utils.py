@@ -7,12 +7,50 @@ import tiktoken
 from pydantic import BaseModel
 import typing
 import os
-
+from io import BytesIO
+from typing import Union
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
+def is_pdf_stream(stream: Union[BytesIO, str]) -> bool:
+    """
+    Checks if the provided stream is a PDF.
+
+    Args:
+        stream (Union[BytesIO, str]): The stream to check. It can be a BytesIO object or a file path as a string.
+
+    Returns:
+        bool: True if the stream is a PDF, False otherwise.
+    """
+    try:
+        if isinstance(stream, BytesIO):
+            # Save the current position
+            current_position = stream.tell()
+            # Move to the start of the stream
+            stream.seek(0)
+            # Read the first 5 bytes to check the PDF signature
+            header = stream.read(5)
+            # Restore the original position
+            stream.seek(current_position)
+        elif isinstance(stream, str):
+            if os.path.isfile(stream):
+                with open(stream, 'rb') as file:
+                    header = file.read(5)
+            else:
+                # If it's not a file path, assume it's a bytes string
+                header = stream.encode()[:5] if isinstance(stream, str) else b''
+        else:
+            # Unsupported type
+            return False
+
+        # PDF files start with '%PDF-'
+        return header == b'%PDF-'
+    except Exception as e:
+        # Optional: Log the exception if logging is set up
+        # logger.error(f"Error checking if stream is PDF: {e}")
+        return False
 
 def get_image_type(image_path):
     try:
@@ -20,7 +58,6 @@ def get_image_type(image_path):
         return img.format.lower()
     except IOError as e:
         return f"An error occurred: {str(e)}"
-
 
 def verify_json(json_content: str):
     try:
