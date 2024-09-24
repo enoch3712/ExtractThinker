@@ -1,8 +1,10 @@
 import asyncio
-from typing import IO, Any, Dict, List, Optional
+from typing import IO, Any, Dict, List, Optional, Union
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.models.classification_tree import ClassificationTree
+from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.doc_group import DocGroup
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.splitter import Splitter
@@ -61,7 +63,18 @@ class Process:
 
         return result
 
-    async def classify_async(self, file: str, classifications, strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS, threshold: int = 9, image: str = False) -> Optional[Classification]:
+    async def classify_async(
+        self,
+        file: str,
+        classifications: Union[List[Classification], ClassificationTree],
+        strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS,
+        threshold: int = 9,
+        image: str = False
+    ) -> Optional[Classification]:
+
+        if isinstance(classifications, ClassificationTree):
+            return await self._classify_tree_async(file, classifications, threshold, image)
+
         for extractor_group in self.extractor_groups:
             group_classifications = await asyncio.gather(*(self._classify_async(extractor, file, classifications, image) for extractor in extractor_group))
 
@@ -80,6 +93,59 @@ class Process:
                     return maxResult
 
         raise ValueError("No consensus could be reached on the classification of the document. Please try again with a different strategy or threshold.")
+
+    async def _classify_tree_async(
+        self, 
+        file: str, 
+        classification_tree: ClassificationTree, 
+        threshold: float,
+        image: bool
+    ) -> Optional[Classification]:
+        """
+        Perform classification in a hierarchical, level-by-level approach.
+        """
+        best_classification = None
+        current_nodes = classification_tree.nodes
+
+        while current_nodes:
+            # Get the list of classifications at the current level
+            classifications = [node.classification for node in current_nodes]
+
+            # Classify among the current level's classifications
+            classification = await self._classify_async(
+                extractor=self.extractor_groups[0][0],
+                file=file, 
+                classifications=classifications, 
+                image=image
+            )
+
+            if classification.confidence < threshold:
+                raise ValueError(
+                    f"Classification confidence {classification.confidence} "
+                    f"for '{classification.classification}' is below the threshold of {threshold}."
+                )
+
+            best_classification = classification
+
+            matching_node = next(
+                (
+                    node for node in current_nodes 
+                    if node.classification.name == best_classification.name
+                ),
+                None
+            )
+
+            if matching_node is None:
+                raise ValueError(
+                    f"No matching node found for classification '{classification.classification}'."
+                )
+
+            if matching_node.children:
+                current_nodes = matching_node.children
+            else:
+                break
+
+        return best_classification
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)

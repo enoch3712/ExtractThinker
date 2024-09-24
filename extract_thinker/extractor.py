@@ -233,7 +233,7 @@ class Extractor:
             # Check if the input is a valid file path
             if os.path.isfile(input):
                 file_type = get_file_extension(input)
-                if file_type in SUPPORTED_IMAGE_FORMATS:
+                if file_type == 'pdf':
                     return self.classify_from_path(input, classifications)
                 elif file_type in SUPPORTED_EXCEL_FORMATS:
                     return self.classify_from_excel(input, classifications)
