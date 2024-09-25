@@ -10,7 +10,7 @@ load_dotenv()
 subscription_key = os.getenv("AZURE_SUBSCRIPTION_KEY")
 endpoint = os.getenv("AZURE_ENDPOINT")
 loader = DocumentLoaderAzureForm(subscription_key, endpoint)
-test_file_path = os.path.join(cwd, "test_images", "invoice.png")
+test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
 
 
 def test_load_content_from_file():

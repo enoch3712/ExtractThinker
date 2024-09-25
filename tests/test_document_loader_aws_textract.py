@@ -27,6 +27,3 @@ def test_load_content_from_pdf():
     assert "forms" in result
     assert "layout" in result
     assert len(result["pages"]) > 0
-
-if __name__ == "__main__":
-    test_load_content_from_pdf()

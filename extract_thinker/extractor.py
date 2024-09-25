@@ -276,8 +276,8 @@ class Extractor:
 
         if content is not None:
             if isinstance(content, dict):
-                if content["is_spreadsheet"]:
-                    content = json_to_formatted_string(content["data"])
+                if content.get("is_spreadsheet", False):
+                    content = json_to_formatted_string(content.get("data", {}))
                 content = yaml.dump(content)
             messages.append({"role": "user", "content": "##Content\n\n" + content})
 

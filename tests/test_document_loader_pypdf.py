@@ -7,7 +7,7 @@ load_dotenv()
 
 # Arrange
 loader = DocumentLoaderPyPdf()
-test_file_path = os.path.join(cwd, "files", "CV_Candidate.pdf")
+test_file_path = os.path.join(cwd, "tests", "files", "CV_Candidate.pdf")
 
 
 def test_load_content_from_file():
