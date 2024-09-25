@@ -17,8 +17,8 @@ from tests.models.driver_license import DriverLicense, IdentificationContract
 load_dotenv()
 tesseract_path = os.getenv("TESSERACT_PATH")
 CURRENT_WORKING_DIRECTORY = os.getcwd()
-INVOICE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "test_images", "invoice.png")
-DRIVER_LICENSE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "test_images", "driver_license.png")
+INVOICE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "invoice.png")
+DRIVER_LICENSE_FILE_PATH = os.path.join(CURRENT_WORKING_DIRECTORY, "tests", "test_images", "driver_license.png")
 
 # Common classifications setup
 COMMON_CLASSIFICATIONS = [
@@ -230,5 +230,6 @@ def test_with_tree():
     assert result is not None
     assert result.name == "Invoice"
 
+
 if __name__ == "__main__":
-    test_with_tree()
+    test_classify_feature()

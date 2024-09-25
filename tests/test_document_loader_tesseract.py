@@ -10,7 +10,7 @@ load_dotenv()
 # Arrange
 tesseract_path = os.getenv("TESSERACT_PATH")
 loader = DocumentLoaderTesseract(tesseract_path)
-test_file_path = os.path.join(cwd, "test_images", "invoice.png")
+test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
 
 
 def test_load_content_from_file():
