@@ -5,9 +5,12 @@ from io import BytesIO
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
+from extract_thinker.utils import get_file_extension
 
+SUPPORTED_FORMATS = ['xls', 'xlsx', 'xlsm', 'xlsb', 'odf', 'ods', 'odt', 'csv']
 
 class DocumentLoaderSpreadSheet(CachedDocumentLoader):
+
     def __init__(self, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
 

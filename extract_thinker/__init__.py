@@ -6,7 +6,6 @@ from .document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadSheet
 from .document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
-from .document_loader.document_loader_text import DocumentLoaderText
 from .models import classification, classification_response
 from .process import Process, ClassificationStrategy
 from .splitter import Splitter
@@ -24,7 +23,6 @@ __all__ = [
     'DocumentLoaderSpreadSheet',
     'DocumentLoaderAzureForm',
     'DocumentLoaderPyPdf',
-    'DocumentLoaderText',
     'classification',
     'classification_response',
     'Process',

@@ -6,7 +6,8 @@ import pypdfium2 as pdfium
 import concurrent.futures
 from typing import Any, Dict, List, Union
 from cachetools import TTLCache
-
+import os
+from extract_thinker.utils import get_file_extension
 
 class DocumentLoader(ABC):
     def __init__(self, content: Any = None, cache_ttl: int = 300):
@@ -14,6 +15,24 @@ class DocumentLoader(ABC):
         self.file_path = None
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
 
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+            file_type = None
+            try:
+                if isinstance(source, str):
+                    if not os.path.isfile(source):
+                        return False
+                    file_type = get_file_extension(source)
+                elif isinstance(source, BytesIO):
+                    source.seek(0)
+                    img = Image.open(source)
+                    file_type = img.format.lower()
+                    source.seek(0)
+                else:
+                    return False
+                return file_type.lower() in [fmt.lower() for fmt in self.SUPPORTED_FORMATS]
+            except Exception:
+                return False
+            
     @abstractmethod
     def load_content_from_file(self, file_path: str) -> Union[str, object]:
         pass
@@ -21,6 +40,14 @@ class DocumentLoader(ABC):
     @abstractmethod
     def load_content_from_stream(self, stream: BytesIO) -> Union[str, object]:
         pass
+
+    def load(self, source: Union[str, BytesIO]) -> Any:
+        if isinstance(source, str):
+            return self.load_content_from_file(source)
+        elif isinstance(source, BytesIO):
+            return self.load_content_from_stream(source)
+        else:
+            raise ValueError("Source must be a file path or a stream.")
 
     def getContent(self) -> Any:
         return self.content

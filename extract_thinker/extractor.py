@@ -17,17 +17,12 @@ from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 
 from extract_thinker.utils import get_file_extension, encode_image, json_to_formatted_string
 import yaml
-import litellm
-
-SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff"]
-SUPPORTED_EXCEL_FORMATS = ['.xls', '.xlsx', '.xlsm', '.xlsb', '.odf', '.ods', '.odt', '.csv']
-
 
 class Extractor:
     def __init__(
-        self, processor: Optional[DocumentLoader] = None, llm: Optional[LLM] = None
+        self, document_loader: Optional[DocumentLoader] = None, llm: Optional[LLM] = None
     ):
-        self.document_loader: Optional[DocumentLoader] = processor
+        self.document_loader: Optional[DocumentLoader] = document_loader
         self.llm: Optional[LLM] = llm
         self.file: Optional[str] = None
         self.document_loaders_by_file_type: Dict[str, DocumentLoader] = {}
@@ -47,10 +42,14 @@ class Extractor:
                 "Interceptor must be an instance of LoaderInterceptor or LlmInterceptor"
             )
 
-    def set_document_loader_for_file_type(
-        self, file_type: str, document_loader: DocumentLoader
-    ):
-        self.document_loaders_by_file_type[file_type] = document_loader
+    def get_document_loader_for_file(self, source: Union[str, IO]) -> DocumentLoader:
+        if self.document_loader and self.document_loader.can_handle(source):
+            return self.document_loader
+        else:
+            for loader in self.document_loaders_by_file_type.values():
+                if loader.can_handle(source):
+                    return loader
+        raise ValueError("No suitable document loader found for the input.")
 
     def get_document_loader_for_file(self, file: str) -> DocumentLoader:
         _, ext = os.path.splitext(file)
@@ -229,23 +228,12 @@ class Extractor:
         if image:
             return self.classify_from_image(input, classifications)
 
-        if isinstance(input, str):
-            # Check if the input is a valid file path
-            if os.path.isfile(input):
-                file_type = get_file_extension(input)
-                if file_type == 'pdf':
-                    return self.classify_from_path(input, classifications)
-                elif file_type in SUPPORTED_EXCEL_FORMATS:
-                    return self.classify_from_excel(input, classifications)
-                else:
-                    raise ValueError(f"Unsupported file type: {input}")
-            else:
-                raise ValueError(f"No such file: {input}")
-        elif hasattr(input, 'read'):
-            # Check if the input is a stream (like a file object)
-            return self.classify_from_stream(input, classifications)
-        else:
-            raise ValueError("Input must be a file path or a stream.")
+        document_loader = self.get_document_loader_for_file(input)
+        if document_loader is None:
+            raise ValueError("No suitable document loader found for the input.")
+
+        content = document_loader.load(input)
+        return self._classify(content, classifications)
 
     async def classify_async(self, input: Union[str, IO], classifications: List[Classification]):
         return await asyncio.to_thread(self.classify, input, classifications)
@@ -256,7 +244,7 @@ class Extractor:
                  response_model,
                  vision=False,
                  is_stream=False
-                 ):
+                ):
         # call all the llm interceptors before calling the llm
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
