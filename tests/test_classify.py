@@ -54,9 +54,44 @@ def arrange_process_with_extractors():
     return process
 
 
+def setup_process_with_textract_extractor():
+    """Sets up and returns a process configured with only the Textract extractor."""
+    # Initialize the Textract document loader
+    document_loader = DocumentLoaderAWSTextract()
+
+    # Initialize the Textract extractor
+    textract_extractor = Extractor(document_loader)
+    textract_extractor.load_llm("gpt-4o")
+
+    # Create the process with only the Textract extractor
+    process = Process()
+    process.add_classify_extractor([[textract_extractor]])
+
+    return process
+
+
+def setup_process_with_gpt4_extractor():
+    """Sets up and returns a process configured with only the GPT-4 extractor."""
+    tesseract_path = os.getenv("TESSERACT_PATH")
+    if not tesseract_path:
+        raise ValueError("TESSERACT_PATH environment variable is not set")
+    print(f"Tesseract path: {tesseract_path}")
+    document_loader = DocumentLoaderTesseract(tesseract_path)
+
+    # Initialize the GPT-4 extractor
+    gpt_4_extractor = Extractor(document_loader)
+    gpt_4_extractor.load_llm("gpt-4o")
+
+    # Create the process with only the GPT-4 extractor
+    process = Process()
+    process.add_classify_extractor([[gpt_4_extractor]])
+
+    return process
+
+
 def test_classify_feature():
     """Test classification using a single feature."""
-    extractor = setup_extractors()[1]  # Using the second configured extractor
+    extractor = setup_extractors()[1]
     result = extractor.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS)
 
     assert result is not None
@@ -100,7 +135,7 @@ def test_classify_higher_order():
 def test_classify_both():
     """Test classification using both consensus and higher order strategies with a threshold."""
     process = arrange_process_with_extractors()
-    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.BOTH, threshold=9)
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS_WITH_THRESHOLD, threshold=9)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
@@ -121,37 +156,6 @@ def test_with_contract():
     assert result.name == "Invoice"
 
 
-def setup_process_with_textract_extractor():
-    """Sets up and returns a process configured with only the Textract extractor."""
-    # Initialize the Textract document loader
-    document_loader = DocumentLoaderAWSTextract()
-
-    # Initialize the Textract extractor
-    textract_extractor = Extractor(document_loader)
-    textract_extractor.load_llm("gpt-4o")
-
-    # Create the process with only the Textract extractor
-    process = Process()
-    process.add_classify_extractor([[textract_extractor]])
-
-    return process
-
-def setup_process_with_gpt4_extractor():
-    """Sets up and returns a process configured with only the GPT-4 extractor."""
-    tesseract_path = os.getenv("TESSERACT_PATH")
-    document_loader = DocumentLoaderTesseract(tesseract_path)
-
-    # Initialize the GPT-4 extractor
-    gpt_4_extractor = Extractor(document_loader)
-    gpt_4_extractor.load_llm("gpt-4o")
-
-    # Create the process with only the GPT-4 extractor
-    process = Process()
-    process.add_classify_extractor([[gpt_4_extractor]])
-
-    return process
-
-
 def test_with_image():
     """Test classification using both consensus and higher order strategies with a threshold."""
     process = setup_process_with_gpt4_extractor()
@@ -167,6 +171,7 @@ def test_with_image():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+
 
 def test_with_tree():
     """Test classification using the tree strategy"""
@@ -229,7 +234,3 @@ def test_with_tree():
 
     assert result is not None
     assert result.name == "Invoice"
-
-
-if __name__ == "__main__":
-    test_classify_feature()

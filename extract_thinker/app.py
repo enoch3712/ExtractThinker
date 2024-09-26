@@ -41,7 +41,7 @@ split_content = process.load_file(path)\
 # extractor.loadfile("C:\\Users\\Lopez\\Desktop\\MagniFinance\\examples\\outputTestOne.pdf").split(classifications)
 
 extractor.load_document_loader(
-    DocumentLoaderTesseract("C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
+    DocumentLoaderTesseract(os.getenv("TESSERACT_PATH"))
 )
 extractor.load_llm("claude-3-haiku-20240307")
 

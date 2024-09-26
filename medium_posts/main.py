@@ -42,7 +42,7 @@ from config import API_KEY, API_KEY_ANTROPIC, API_KEY_GROQ
 from utils import remove_json_format
 
 # local path to tesseract
-pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH")
 # docker path to tesseract
 #os.environ.get('TESSERACT_PATH', 'tesseract')
 

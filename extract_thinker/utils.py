@@ -52,12 +52,19 @@ def is_pdf_stream(stream: Union[BytesIO, str]) -> bool:
         # logger.error(f"Error checking if stream is PDF: {e}")
         return False
 
-def get_image_type(image_path):
+def get_image_type(source):
     try:
-        img = Image.open(image_path)
+        if isinstance(source, str):
+            img = Image.open(source)
+        elif isinstance(source, BytesIO):
+            source.seek(0)
+            img = Image.open(source)
+            source.seek(0)
+        else:
+            return None
         return img.format.lower()
     except IOError as e:
-        return f"An error occurred: {str(e)}"
+        return None
 
 def verify_json(json_content: str):
     try:
@@ -134,9 +141,12 @@ def extract_json(text):
 
 
 def get_file_extension(file_path):
-    _, ext = os.path.splitext(file_path)
-    ext = ext[1:]  # remove the dot
-    return ext
+    if isinstance(file_path, str):
+        _, ext = os.path.splitext(file_path)
+        ext = ext[1:]  # remove the dot
+        return ext.lower()
+    else:
+        return None
 
 
 def json_to_formatted_string(data):
