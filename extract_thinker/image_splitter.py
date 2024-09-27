@@ -7,14 +7,11 @@ from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.splitter import Splitter
 from extract_thinker.utils import extract_json
 
-VISION_MODELS = ["gpt-4o", "gpt-4-turbo", "model3", "claude-3-haiku-20240307", "claude-3-opus-20240229", "claude-3-sonnet-20240229"]
-
-
 class ImageSplitter(Splitter):
 
     def __init__(self, model: str):
-        if model not in VISION_MODELS:
-            raise ValueError(f"Model {model} is not supported for ImageSplitter. Supported models are {VISION_MODELS}")
+        if not litellm.supports_vision(model=model):
+            raise ValueError(f"Model {model} is not supported for ImageSplitter, since its not a vision model.")
         self.model = model
 
     def encode_image(self, image):
