@@ -3,6 +3,7 @@ import base64
 from io import BytesIO
 from typing import Any, Dict, List, Optional, IO, Union
 
+import litellm
 from pydantic import BaseModel
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification import Classification
@@ -200,6 +201,9 @@ class Extractor:
             )
             for classification in classifications:
                 if classification.image:
+                    if not litellm.supports_vision(model=self.llm.model):
+                        raise ValueError(f"Model {self.llm.model} is not supported for vision, since its not a vision model.")
+                    
                     messages.append({
                         "role": "user",
                         "content": [
@@ -270,6 +274,9 @@ class Extractor:
             messages.append({"role": "user", "content": "##Content\n\n" + content})
 
         if vision:
+            if not litellm.supports_vision(model=self.llm.model):
+                raise ValueError(f"Model {self.llm.model} is not supported for vision, since its not a vision model.")
+            
             base64_encoded_image = encode_image(
                 file_or_stream, is_stream
             )
