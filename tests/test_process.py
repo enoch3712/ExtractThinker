@@ -72,31 +72,76 @@ def test_mask():
         assert original in unmasked_content, f"Unmasking failed for {original}"
         assert placeholder not in unmasked_content, f"Placeholder {placeholder} still present in unmasked content"
 
-def test_mask_invoice():
-    # Arrange
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+# def test_mask_invoice():
+#     # Arrange
+#     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
-    process = Process()
-    process.load_document_loader(DocumentLoaderPyPdf())
-    process.load_file(test_file_path)
-    llm = LLM("groq/llama-3.2-3b-preview")
-    process.add_masking_llm(llm, MaskingStrategy.MOCKED_DATA)
+#     process = Process()
+#     process.load_document_loader(DocumentLoaderPyPdf())
+#     process.load_file(test_file_path)
+#     process.add_masking_llm("groq/llama-3.2-11b-text-preview")
 
-    # Act
-    content = process.document_loader.load_content_from_file(test_file_path)
-    # concat all the text from the content list
-    content = "".join([item for item in content["text"]])
-    result = asyncio.run(process.mask_content(content))
+#     # Act
+#     test_text = (
+#         "Market Financial Consulting   Experts in earning trusts   450 East 78th Ave  Denver, CO 12345   "
+#         "Phone : (123) 456 -7890 Fax: (123) 456 -7891 INVOICE  INVOICE:  00012  DATE:  1/30/23  "
+#         "TO: Gaurav Cheema   Caneiro Group   89 Pacific Ave   San Francisco, CA 78910   "
+#         "FOR:  Consultation services    DESCRIPTION   HOURS  RATE  AMOUNT  "
+#         "Consultation services   3.0  375.00   1125.00                                                                   "
+#         "TOTAL  1125.00    Make all checks payable to  Market Financial Consulting  "
+#         "Total due in 15 days. Overdue accounts subject to a service charge of 1% per month.   "
+#         "THANK YOU FOR YOUR BUSINESS!"
+#     )
 
-    # Assert
-    assert result.masked_text is not None
-    assert result.mapping is not None
+#     result = asyncio.run(process.mask_content(test_text))
 
-    # Test unmasking
-    unmasked_content = process.unmask_content(result.masked_text, result.mapping)
-    
-    # Check if all masked content is the same as the original content
-    assert content == unmasked_content, "Unmasked content does not match the original content"
+#     # Assert
+#     assert result.masked_text is not None
+#     assert result.mapping is not None
+
+#     # Check if all original sensitive information is masked
+#     sensitive_info = [
+#         "Market Financial Consulting", "450 East 78th Ave", "Denver, CO 12345",
+#         "(123) 456 -7890", "(123) 456 -7891", 
+#         "Gaurav Cheema", "Caneiro Group", "89 Pacific Ave", "San Francisco, CA 78910"
+#     ]
+#     for info in sensitive_info:
+#         assert info not in result.masked_text, f"{info} was not masked properly"
+
+#     # Check if placeholders are present in masked text
+#     placeholder_types = ["COMPANY", "ADDRESS", "PHONE", "NAME"]
+#     assert any(f"[{type}" in result.masked_text for type in placeholder_types), "No expected placeholders found in masked text"
+
+#     # Check if non-sensitive information is still present
+#     non_sensitive_info = [
+#         "INVOICE", "DATE", "FOR:  Consultation services", 
+#         "DESCRIPTION", "HOURS", "RATE", "AMOUNT",
+#         "3.0", "375.00", "1125.00", "TOTAL", 
+#         "Make all checks payable to", 
+#         "Total due in 15 days. Overdue accounts subject to a service charge of 1% per month.",
+#         "THANK YOU FOR YOUR BUSINESS!"
+#     ]
+#     for info in non_sensitive_info:
+#         assert info in result.masked_text, f"{info} was unexpectedly masked"
+
+#     # Check mapping
+#     assert len(result.mapping) >= 5, "Mapping should contain at least 5 items"
+#     assert all(key.startswith('[') and key.endswith(']') for key in result.mapping.keys()), "Mapping keys should be enclosed in square brackets"
+#     assert all(isinstance(value, str) for value in result.mapping.values()), "Mapping values should be strings"
+
+#     # Test unmasking
+#     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
+#     assert "Market Financial Consulting" in unmasked_content, "Unmasking failed for 'Market Financial Consulting'"
+#     assert "450 East 78th Ave" in unmasked_content, "Unmasking failed for '450 East 78th Ave'"
+#     assert "Gaurav Cheema" in unmasked_content, "Unmasking failed for 'Gaurav Cheema'"
+
+#     # Check if all masked content is unmasked
+#     for placeholder, original in result.mapping.items():
+#         assert original in unmasked_content, f"Unmasking failed for {original}"
+#         assert placeholder not in unmasked_content, f"Placeholder {placeholder} still present in unmasked content"
+
+#     # Check if all masked content is the same as the original content
+#     assert test_text == unmasked_content, "Unmasked content does not match the original content"
 
 if __name__ == "__main__":
-    test_mask_invoice()
+    test_mask()

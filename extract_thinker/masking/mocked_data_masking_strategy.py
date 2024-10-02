@@ -18,6 +18,7 @@ class MockedDataMaskingStrategy(AbstractMaskingStrategy):
                 "role": "user",
                 "content": f"""
                 Please mask all sensitive information in the following text with mocked data. Replace sensitive information with realistic but fake data. Return the masked text and a mapping of original values to mocked data.
+                - Keep all values, doesnt constitute sensitive information
 
                 Here are some examples:
 

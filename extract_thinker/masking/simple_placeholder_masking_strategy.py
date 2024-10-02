@@ -19,7 +19,7 @@ class SimplePlaceholderMaskingStrategy(AbstractMaskingStrategy):
                 "role": "user",
                 "content": f"""
                 Please mask all sensitive information in the following text. Replace sensitive information with placeholders like [PERSON1], [PERSON2], [ADDRESS1], [ADDRESS2], [PHONE1], [PHONE2], etc. Return the masked text and a list of placeholders with their original values.
-
+                - Keep all values, doesnt constitute sensitive information
                 Here are some examples:
 
                 Example 1:
@@ -90,7 +90,8 @@ class SimplePlaceholderMaskingStrategy(AbstractMaskingStrategy):
                 Always use [], not "" or ''
                 You can only have one placeholder for each type and vice versa.
                 Make sure that masked_text contains no sensitive information, only the placeholders.
-
+                Keep all values, doesnt constitute sensitive information
+                
                 Example 1:
                 Placeholder list:
                 [PERSON1]: John Smith
