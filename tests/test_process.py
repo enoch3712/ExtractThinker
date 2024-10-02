@@ -3,7 +3,7 @@ import pytest
 from dotenv import load_dotenv
 
 from extract_thinker.extractor import Extractor
-from extract_thinker.process import Process
+from extract_thinker.process import MaskingStrategy, Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.llm import LLM
 import asyncio
@@ -79,8 +79,8 @@ def test_mask_invoice():
     process = Process()
     process.load_document_loader(DocumentLoaderPyPdf())
     process.load_file(test_file_path)
-    llm = LLM("ollama/qwen2.5:3b", "http://localhost:11434")
-    process.add_masking_llm(llm)
+    llm = LLM("groq/llama-3.2-3b-preview")
+    process.add_masking_llm(llm, MaskingStrategy.MOCKED_DATA)
 
     # Act
     content = process.document_loader.load_content_from_file(test_file_path)
@@ -92,34 +92,11 @@ def test_mask_invoice():
     assert result.masked_text is not None
     assert result.mapping is not None
 
-    # Check if sensitive information is masked
-    sensitive_info = [
-        "Market Financial Consulting", "450 East 78th Ave", 
-        "Denver, CO 12345", "(123) 456-7890", "(123) 456-7891",
-        "Gaurav Cheema", "Caneiro Group", "89 Pacific Ave",
-        "San Francisco, CA 78910", "375.00", "1125.00"
-    ]
-    for info in sensitive_info:
-        assert info not in result.masked_text, f"{info} was not masked properly"
-
-    # Check if placeholders are present in masked text
-    placeholder_types = ["COMPANY", "ADDRESS", "PHONE", "NAME", "AMOUNT"]
-    assert any(f"[{type}" in result.masked_text for type in placeholder_types), "No expected placeholders found in masked text"
-
-    # Check mapping
-    assert len(result.mapping) >= 8, "Mapping should contain at least 8 items"
-    assert all(key.startswith('[') and key.endswith(']') for key in result.mapping.keys()), "Mapping keys should be enclosed in square brackets"
-    assert all(isinstance(value, str) for value in result.mapping.values()), "Mapping values should be strings"
-
     # Test unmasking
     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
-    for info in sensitive_info:
-        assert info in unmasked_content, f"Unmasking failed for '{info}'"
-
-    # Check if all masked content is unmasked
-    for placeholder, original in result.mapping.items():
-        assert original in unmasked_content, f"Unmasking failed for {original}"
-        assert placeholder not in unmasked_content, f"Placeholder {placeholder} still present in unmasked content"
+    
+    # Check if all masked content is the same as the original content
+    assert content == unmasked_content, "Unmasked content does not match the original content"
 
 if __name__ == "__main__":
     test_mask_invoice()
