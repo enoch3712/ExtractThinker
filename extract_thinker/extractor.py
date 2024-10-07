@@ -13,6 +13,7 @@ import os
 
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from extract_thinker.utils import (
     get_file_extension,
@@ -83,10 +84,11 @@ class Extractor:
         if not issubclass(response_model, BaseModel):
             raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
 
-        if isinstance(source, str):  # if it's a file path
-            return self.extract_from_file(source, response_model, vision)
-        elif isinstance(source, IO):  # if it's a stream
-            return self.extract_from_stream(source, response_model, vision)
+        if isinstance(source, str):
+            if os.path.exists(source):
+                return self.extract_from_file(source, response_model, vision)
+            else:
+                return self.extract_from_content(source, response_model, vision)
         elif isinstance(source, list) and all(
             isinstance(item, dict) for item in source
         ):  # if it's a list of dictionaries
@@ -103,6 +105,11 @@ class Extractor:
         vision: bool = False,
     ) -> Any:
         return await asyncio.to_thread(self.extract, source, response_model, vision)
+    
+    def extract_from_content(
+        self, content: str, response_model: type[BaseModel], vision: bool = False
+    ) -> str:
+        return self._extract(content, None, response_model, vision)
 
     def extract_from_list(
         self, 
@@ -311,29 +318,46 @@ class Extractor:
         return await asyncio.to_thread(self.classify, input, classifications)
 
     def _extract_with_splitting(
-        self,
-        content,
-        file_or_stream,
-        response_model,
-        vision,
-        is_stream,
-        max_tokens_per_request,
-        base_messages,
-    ):
-        chunks = self.split_content(content, max_tokens_per_request)
-        results = []
-        for chunk in chunks:
-            messages = deepcopy(base_messages)
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "##Content\n\n" + chunk,
-                }
-            )
-            response = self.llm.request(messages, response_model)
-            results.append(response)
+            self,
+            content,
+            file_or_stream,
+            response_model,
+            vision,
+            is_stream,
+            max_tokens_per_request,
+            base_messages,
+        ):
+            chunks = self.split_content(content, max_tokens_per_request)
+            results = []
+            with ThreadPoolExecutor() as executor:
+                # Prepare the messages for each chunk
+                futures = [
+                    executor.submit(
+                        self.llm.request,
+                        deepcopy(base_messages) + [
+                            {
+                                "role": "user",
+                                "content": "##Content\n\n" + chunk,
+                            }
+                        ],
+                        response_model,
+                    )
+                    for chunk in chunks
+                ]
 
-        return self.aggregate_results(results, response_model)
+                # Collect the results as they complete
+                for future in as_completed(futures):
+                    try:
+                        response = future.result()
+                        results.append(response)
+                    except Exception as e:
+                        # Handle exceptions as needed
+                        # For example, log the error and continue
+                        print(f"Error processing chunk: {e}")
+                        # Optionally, append a default value or skip
+                        results.append(None)
+
+            return self.aggregate_results(results, response_model)
 
     def split_content(
         self, content: Union[str, Dict[Any, Any]], max_tokens: int
@@ -447,7 +471,7 @@ class Extractor:
             if isinstance(content, dict):
                 if content.get("is_spreadsheet", False):
                     content = json_to_formatted_string(content.get("data", {}))
-                content = yaml.dump(content)
+                content = yaml.dump(content, default_flow_style=True)
             messages.append(
                 {"role": "user", "content": "##Content\n\n" + content}
             )
