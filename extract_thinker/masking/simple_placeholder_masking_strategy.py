@@ -7,10 +7,11 @@ from extract_thinker.models.MaskContract import MaskContract
 class SimplePlaceholderMaskingStrategy(AbstractMaskingStrategy):
     MASK_PII_PROMPT = (
         "You are an AI assistant that masks only Personally Identifiable Information (PII) in text. "
-        "Do not mask numerical values or non-PII data."
+        "Replace PII with placeholders in the format [TYPE#], e.g., [PERSON1], [ADDRESS1], [EMAIL1], etc. "
+        "Do not mask numerical values or non-PII data. Ensure placeholders do not contain underscores or spaces."
     )
 
-    MASK_PII_USER_PROMPT = """Please mask all PII in the following text. Replace PII with placeholders like [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not mask numerical values, dates, amounts, or other non-PII information. Return the masked text and a list of placeholders with their original values.
+    MASK_PII_USER_PROMPT = """Please mask all PII in the following text. Replace PII with placeholders like [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not use underscores or spaces in placeholders. Do not mask numerical values, dates, amounts, or other non-PII information. Return the masked text and a list of placeholders with their original values.
 
 Here are some examples:
 
@@ -58,10 +59,11 @@ Provide the placeholder list with their original values, followed by the masked 
 
     CONVERT_TO_JSON_PROMPT = (
         "You are an AI assistant that converts masked text information into JSON format, "
-        "preserving only the masking for PII."
+        "preserving only the masking for PII. Ensure that placeholders are strictly in the format [TYPE#], "
+        "without underscores or spaces."
     )
 
-    CONVERT_TO_JSON_USER_PROMPT = """Convert the following masked texts and placeholder lists into a JSON format. For each example, the JSON should have two main keys: "mapping" (a dictionary of placeholders and their original PII values) and "masked_text" (the text with PII placeholders). Do not include non-PII information such as numerical values, dates, or amounts.
+    CONVERT_TO_JSON_USER_PROMPT = """Convert the following masked texts and placeholder lists into a JSON format. For each example, the JSON should have two main keys: "mapping" (a dictionary of placeholders and their original PII values) and "masked_text" (the text with PII placeholders). Do not include non-PII information such as numerical values, dates, or amounts. Ensure placeholders are in the correct format [TYPE#], without underscores or spaces.
 
 Example 1:
 Placeholder list:
@@ -130,6 +132,7 @@ Now, please convert the following masked text and placeholder list into JSON for
     async def mask_content(self, content: str) -> MaskContract:
         response_step1_content = await self._step1_mask_pii(content)
         mask_contract = await self._step2_convert_to_json(response_step1_content)
+        self._validate_placeholders(mask_contract)
         return mask_contract
 
     async def _step1_mask_pii(self, content: str) -> str:
@@ -161,11 +164,11 @@ Now, please convert the following masked text and placeholder list into JSON for
         response_step2.masked_text = masked_text
         return response_step2
 
-    def get_placeholder(self, info_type):
-        if info_type not in self.placeholder_counter:
-            self.placeholder_counter[info_type] = 0
-        self.placeholder_counter[info_type] += 1
-        return f"[{info_type}{self.placeholder_counter[info_type]}]"
+    def _validate_placeholders(self, mask_contract: MaskContract):
+        placeholder_pattern = re.compile(r'^\[[A-Za-z_]+[0-9]*\]$')
+        for placeholder in mask_contract.mapping.keys():
+            if not placeholder_pattern.match(placeholder):
+                raise ValueError(f"Invalid placeholder format: {placeholder}")
 
     def unmask_content(self, masked_content: str, mapping: dict) -> str:
         for placeholder, original in mapping.items():
