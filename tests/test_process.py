@@ -2,16 +2,17 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from extract_thinker.extractor import Extractor
-from extract_thinker.process import MaskingStrategy, Process
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from extract_thinker.process import Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
-from extract_thinker.llm import LLM
 import asyncio
 
 load_dotenv()
 cwd = os.getcwd()
 
-def test_mask():
+async def test_mask():
     # Arrange
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
@@ -33,44 +34,98 @@ def test_mask():
         "Our tax ID number is 12-3456789."
     )
 
-    result = asyncio.run(process.mask_content(test_text))
+    # Act
+    # result = asyncio.run(process.mask_content(test_text))
+    result = await process.mask_content(test_text)
 
     # Assert
     assert result.masked_text is not None
     assert result.mapping is not None
 
-    # Check if all original sensitive information is masked
-    sensitive_info = [
-        "George Collins", "123 Main St", "555-1234",
-        "Jane Smith", "456 Elm Avenue", "(987) 654-3210",
-        "Robert Johnson", "789 Corporate Blvd", 
-        "1-800-555-9876", "support@example.com",
-        "Sarah Lee", "444-333-2222", "sarah.lee@company.com",
-        "$250,000", "$50,000", "$3,500",
-        "+1-555-987-6543", "12-3456789"
+    # Check if all original PII is masked
+    pii_info = ["George Collins", "Jane Smith", "Robert Johnson", "Sarah Lee"]
+
+    non_pii_info = [
+        "123 Main St",
+        "Anytown, USA 12345",
+        "555-1234",
+        "456 Elm Avenue",
+        "Othercity, State 67890",
+        "(987) 654-3210",
+        "789 Corporate Blvd, Suite 500, Bigcity, State 13579",
+        "1-800-555-9876",
+        "support@example.com",
+        "444-333-2222",
+        "sarah.lee@company.com",
+        "$250,000",
+        "$50,000",
+        "$3,500",
+        "+1-555-987-6543",
+        "12-3456789",
     ]
-    for info in sensitive_info:
-        assert info not in result.masked_text, f"{info} was not masked properly"
 
-    # Check if placeholders are present in masked text
-    placeholder_types = ["NAME", "ADDRESS", "PHONE", "EMAIL"]
-    assert any(f"[{type}" in result.masked_text for type in placeholder_types), "No expected placeholders found in masked text"
+    # Ensure PII is masked
+    for info in pii_info:
+        assert info not in result.masked_text, f"PII {info} was not masked properly"
 
-    # Check mapping
-    assert len(result.mapping) >= 10, "Mapping should contain at least 10 items"
-    assert all(key.startswith('[') and key.endswith(']') for key in result.mapping.keys()), "Mapping keys should be enclosed in square brackets"
-    assert all(isinstance(value, str) for value in result.mapping.values()), "Mapping values should be strings"
+    # Ensure non-PII data remains unchanged
+    for info in non_pii_info:
+        assert info in result.masked_text, f"Non-PII {info} was unexpectedly masked"
+
+    # Check mapping contains only PII
+    expected_pii_placeholders = ["[PERSON1]", "[PERSON2]", "[PERSON3]", "[PERSON4]"]
+    for placeholder in expected_pii_placeholders:
+        assert placeholder in result.mapping, f"Expected placeholder {placeholder} not in mapping"
+
+    assert len(result.mapping) == len(pii_info), "Mapping should contain only PII items"
 
     # Test unmasking
     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
-    assert "George Collins" in unmasked_content, "Unmasking failed for 'George Collins'"
-    assert "123 Main St" in unmasked_content, "Unmasking failed for '123 Main St'"
-    assert "555-1234" in unmasked_content, "Unmasking failed for '555-1234'"
+    for info in pii_info:
+        assert info in unmasked_content, f"Unmasking failed for PII {info}"
 
-    # Check if all masked content is unmasked
-    for placeholder, original in result.mapping.items():
-        assert original in unmasked_content, f"Unmasking failed for {original}"
-        assert placeholder not in unmasked_content, f"Placeholder {placeholder} still present in unmasked content"
+    # Ensure non-PII data is unchanged after unmasking
+    for info in non_pii_info:
+        assert info in unmasked_content, f"Non-PII {info} was altered during unmasking"
+
+async def test_simple_use_case():
+    # Arrange
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+
+    process = Process()
+    process.load_document_loader(DocumentLoaderPyPdf())
+    process.load_file(test_file_path)
+    process.add_masking_llm("groq/llama-3.2-3b-preview")
+
+    # Arrange
+    test_text = "John Doe transferred $5000 to Jane Smith on 2021-05-01."
+
+    # Act
+    result = await process.mask_content(test_text)
+
+    # Assert
+    assert result.masked_text is not None
+    assert result.mapping is not None
+
+    # Ensure PII is masked
+    assert "John Doe" not in result.masked_text
+    assert "Jane Smith" not in result.masked_text
+
+    # Ensure non-PII data remains
+    assert "$5000" in result.masked_text
+    assert "2021-05-01" in result.masked_text
+    assert "transferred" in result.masked_text
+
+    # Check mapping
+    assert len(result.mapping) == 2
+    assert "[PERSON1]" in result.mapping
+    assert "[PERSON2]" in result.mapping
+    assert result.mapping["[PERSON1]"] == "John Doe"
+    assert result.mapping["[PERSON2]"] == "Jane Smith"
+
+    # Test unmasking
+    unmasked_content = process.unmask_content(result.masked_text, result.mapping)
+    assert unmasked_content == test_text
 
 # def test_mask_invoice():
 #     # Arrange
@@ -144,4 +199,4 @@ def test_mask():
 #     assert test_text == unmasked_content, "Unmasked content does not match the original content"
 
 if __name__ == "__main__":
-    test_mask()
+    asyncio.run(test_simple_use_case())
