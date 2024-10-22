@@ -1,11 +1,8 @@
 import os
-import pytest
-from dotenv import load_dotenv
-
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from extract_thinker.process import Process
+from dotenv import load_dotenv
+from extract_thinker.process import MaskingStrategy, Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 import asyncio
 
@@ -126,5 +123,19 @@ def test_simple_use_case():
     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
     assert unmasked_content == test_text
 
+def test_deterministic_hashing():
+    # Arrange
+    process = Process()
+    process.add_masking_llm("groq/llama-3.2-11b-text-preview", MaskingStrategy.DETERMINISTIC_HASHING)
+
+    test_text = "John Doe transferred $5000 to Jane Smith on 2021-05-01."
+
+    # Act
+    result = asyncio.run(process.mask_content(test_text))
+
+    # Assert
+    assert result.masked_text is not None
+    assert result.mapping is not None
+
 if __name__ == "__main__":
-    asyncio.run(test_simple_use_case())
+    test_mask()

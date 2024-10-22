@@ -1,6 +1,7 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
 from extract_thinker.extractor import Extractor
+from extract_thinker.masking.deterministic_hashing_masking_strategy import DeterministicHashingMaskingStrategy
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification_tree import ClassificationTree
@@ -28,6 +29,7 @@ class ClassificationStrategy(Enum):
 class MaskingStrategy(Enum):
     SIMPLE_PLACEHOLDER = "simple_placeholder"
     MOCKED_DATA = "mocked_data"
+    DETERMINISTIC_HASHING = "deterministic_hashing"
 
 class Process:
     def __init__(self):
@@ -53,6 +55,8 @@ class Process:
             self.masking_strategy = SimplePlaceholderMaskingStrategy(self.llm)
         elif strategy == MaskingStrategy.MOCKED_DATA:
             self.masking_strategy = MockedDataMaskingStrategy(self.llm)
+        elif strategy == MaskingStrategy.DETERMINISTIC_HASHING:
+            self.masking_strategy = DeterministicHashingMaskingStrategy(self.llm)
 
     async def mask_content(self, content: str) -> MaskContract:
         if self.masking_strategy is None:
