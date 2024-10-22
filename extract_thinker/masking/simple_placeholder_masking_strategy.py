@@ -11,43 +11,45 @@ class SimplePlaceholderMaskingStrategy(AbstractMaskingStrategy):
         "Do not mask numerical values or non-PII data. Ensure placeholders do not contain underscores or spaces."
     )
 
-    MASK_PII_USER_PROMPT = """Please mask all PII in the following text. Replace PII with placeholders like [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not use underscores or spaces in placeholders. Do not mask numerical values, dates, amounts, or other non-PII information. Return the masked text and a list of placeholders with their original values.
+    MASK_PII_USER_PROMPT = """Please mask only Personally Identifiable Information (PII) in the following text. Replace PII with placeholders like [PERSON1], [ADDRESS1], [EMAIL1], [PHONE1], [TAXID1], etc. Do not use underscores or spaces in placeholders. Mask names, addresses, email addresses, phone numbers (including international formats), tax IDs, and other PII. Do not mask numerical values (except phone numbers and tax IDs), dates, amounts, or other non-PII information. Return the masked text and a list of placeholders with their original values.
 
-Here are some examples:
+Here are some examples of correct masking:
 
 Example 1:
 Original text:
-John Smith lives at 123 Main St, New York, NY 10001. His phone number is (555) 123-4567. He deposited $5,000 on 2023-07-15.
+John Smith lives at 123 Main St, New York, NY 10001. His phone number is (555) 123-4567 and his SSN is 123-45-6789. For international calls, use +1-555-987-6543. He deposited $5,000 on 2023-07-15.
 
 Placeholder list:
 [PERSON1]: John Smith
 [ADDRESS1]: 123 Main St, New York, NY 10001
 [PHONE1]: (555) 123-4567
+[TAXID1]: 123-45-6789
+[PHONE2]: +1-555-987-6543
 
 Masked text:
-[PERSON1] lives at [ADDRESS1]. His phone number is [PHONE1]. He deposited $5,000 on 2023-07-15.
+[PERSON1] lives at [ADDRESS1]. His phone number is [PHONE1] and his SSN is [TAXID1]. For international calls, use [PHONE2]. He deposited $5,000 on 2023-07-15.
 
 Example 2:
 Original text:
-Sarah Johnson ordered a laptop from TechStore on 2023-05-15. Her email is sarah.j@email.com. The total amount was $1,200.
+Sarah Johnson ordered a laptop from TechStore on 2023-05-15. Her email is sarah.j@email.com and her work number is 1-800-555-1234. The company's EIN is 12-3456789. The total amount was $1,200.
 
 Placeholder list:
 [PERSON1]: Sarah Johnson
 [EMAIL1]: sarah.j@email.com
+[PHONE1]: 1-800-555-1234
+[TAXID1]: 12-3456789
 
 Masked text:
-[PERSON1] ordered a laptop from TechStore on 2023-05-15. Her email is [EMAIL1]. The total amount was $1,200.
+[PERSON1] ordered a laptop from TechStore on 2023-05-15. Her email is [EMAIL1] and her work number is [PHONE1]. The company's EIN is [TAXID1]. The total amount was $1,200.
 
-Example 3:
+Example 3 (Demonstrating what NOT to mask):
 Original text:
-Dr. Emily Brown, born on 1985-03-22, works at Central Hospital. Her patient, Mr. David Lee, has an appointment on 2023-06-10 at 2:30 PM. The procedure costs $3,500.
-
-Placeholder list:
-[PERSON1]: Dr. Emily Brown
-[PERSON2]: Mr. David Lee
+The company's revenue was $10,000,000 last year. Project XYZ has a budget of $500,000 and is due on 2023-12-31. The office can accommodate 50 employees.
 
 Masked text:
-[PERSON1], born on 1985-03-22, works at Central Hospital. Her patient, [PERSON2], has an appointment on 2023-06-10 at 2:30 PM. The procedure costs $3,500.
+The company's revenue was $10,000,000 last year. Project XYZ has a budget of $500,000 and is due on 2023-12-31. The office can accommodate 50 employees.
+
+Note: In this example, no masking is performed because there is no PII present. Numerical values (except phone numbers and tax IDs), project names, and dates are not considered PII.
 
 Now, please mask the following text:
 

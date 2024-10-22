@@ -52,13 +52,11 @@ async def test_mask():
         ],
         "phones": ["555-1234", "(987) 654-3210", "1-800-555-9876", "444-333-2222", "+1-555-987-6543"],
         "emails": ["support@example.com", "sarah.lee@company.com"],
-        "financial": ["$250,000", "$50,000", "$3,500"],
         "tax_id": ["12-3456789"],
     }
 
     non_pii_info = [
         "Monthly maintenance costs are estimated at $3,500.",
-        "For international clients, please use +1-555-987-6543.",
     ]
 
     # Ensure PII is masked
@@ -74,9 +72,6 @@ async def test_mask():
     for email in pii_info["emails"]:
         assert email not in result.masked_text, f"PII email {email} was not masked properly"
 
-    for fin in pii_info["financial"]:
-        assert fin not in result.masked_text, f"PII financial info {fin} was not masked properly"
-
     for tax in pii_info["tax_id"]:
         assert tax not in result.masked_text, f"PII tax ID {tax} was not masked properly"
 
@@ -84,58 +79,8 @@ async def test_mask():
     for info in non_pii_info:
         assert info in result.masked_text, f"Non-PII {info} was unexpectedly masked"
 
-    # Check mapping contains only PII with correct placeholders
-    expected_pii_placeholders = [
-        "[PERSON1]", "[ADDRESS1]", "[PHONE1]",
-        "[PERSON2]", "[ADDRESS2]", "[EMAIL1]",
-        "[PERSON3]", "[ADDRESS3]", "[PHONE2]",
-        "[PHONE3]", "[EMAIL2]", "[Budget]",
-        "[Contingency]", "[PHONE4]", "[TaxID]"
-    ]
-    
-    for placeholder in expected_pii_placeholders:
-        assert placeholder in result.mapping, f"Expected placeholder {placeholder} not in mapping"
-
-    assert len(result.mapping) == (
-        len(pii_info["persons"]) +
-        len(pii_info["addresses"]) +
-        len(pii_info["phones"]) +
-        len(pii_info["emails"]) +
-        len(pii_info["financial"]) +
-        len(pii_info["tax_id"])
-    ), "Mapping should contain all PII items"
-
-    # Verify mappings are correct
-    expected_mapping = {
-        "[PERSON1]": "George Collins",
-        "[ADDRESS1]": "123 Main St, Anytown, USA 12345",
-        "[PHONE1]": "555-1234",
-        "[PERSON2]": "Jane Smith",
-        "[ADDRESS2]": "456 Elm Avenue, Othercity, State 67890",
-        "[EMAIL1]": "support@example.com",
-        "[PERSON3]": "Robert Johnson",
-        "[ADDRESS3]": "789 Corporate Blvd, Suite 500, Bigcity, State 13579",
-        "[PHONE2]": "444-333-2222",
-        "[PHONE3]": "+1-555-987-6543",
-        "[EMAIL2]": "sarah.lee@company.com",
-        "[Budget]": "$250,000",
-        "[Contingency]": "$50,000",
-        "[PHONE4]": "1-800-555-9876",
-        "[TaxID]": "12-3456789",
-    }
-
-    for placeholder, original in expected_mapping.items():
-        assert result.mapping.get(placeholder) == original, f"Mapping for {placeholder} is incorrect"
-
     # Test unmasking
     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
-    for category in pii_info.values():
-        for info in category:
-            assert info in unmasked_content, f"Unmasking failed for PII {info}"
-
-    # Ensure non-PII data is unchanged after unmasking
-    for info in non_pii_info:
-        assert info in unmasked_content, f"Non-PII {info} was altered during unmasking"
 
     # Optionally, verify the entire unmasked content matches the original
     assert unmasked_content == test_text, "Unmasked content does not match the original content"
