@@ -111,6 +111,12 @@ The `extract_thinker` project is inspired by the LangChain ecosystem, featuring 
   <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/996fb2de-0558-4f13-ab3d-7ea56a593951" alt="Extract Thinker Logo" width="400"/>
 </p>
 
+## 📖 Examples
+
+| Notebook | Description |
+|----------|-------------|
+| [Basic Usage](examples/notebooks/basic_example.ipynb) | Basic usage of ExtractThinker with PyPDF loader and GPT-4o-mini for invoice data extraction |
+
 ## Why Just Not LangChain?
 While LangChain is a generalized framework designed for a wide array of use cases, extract_thinker is specifically focused on Intelligent Document Processing (IDP). Although achieving 100% accuracy in IDP remains a challenge, leveraging LLMs brings us significantly closer to this goal.
 
@@ -135,5 +141,3 @@ This project is licensed under the Apache License 2.0. See the LICENSE file for 
 
 ## Contact
 For any questions or issues, please open an issue on the GitHub repository.
-
-test
