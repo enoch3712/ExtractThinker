@@ -32,6 +32,7 @@ black = "^21.9b0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]
