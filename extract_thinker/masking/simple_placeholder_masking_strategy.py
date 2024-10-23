@@ -9,40 +9,12 @@ class SimplePlaceholderMaskingStrategy(AbstractMaskingStrategy):
         "You are an AI assistant that masks only Personally Identifiable Information (PII) in text. "
         "Replace PII with placeholders in the format [TYPE#], e.g., [PERSON1], [ADDRESS1], [EMAIL1], etc. "
         "Do not mask numerical values or non-PII data. Ensure placeholders do not contain underscores or spaces."
-        "Do not mask the key value result, they will be masked later."
-        "Don't return masked text, only the placeholder list."
-        "Values and Amounts(e.g $1000) are not PII values. The same for dates"
-        "Provide a step-by-step reasoning when identifying PII."
-        "Always return ##Placeholder list: as part of the response"
     )
 
-    MASK_PII_USER_PROMPT = """Task: Mask personally identifiable information (PII) in the provided text, replacing PII with placeholders like [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not mask numerical values unless they are phone numbers or tax IDs. Return only the placeholder list with reasoning for each identified PII.
-
-Step 1: Reasoning & Thought Process
-1. Analyze the text:
-   - Carefully examine each part of the text to determine if it contains PII.
-   - Focus on identifying common types of PII such as names, email addresses, phone numbers, tax IDs, and physical addresses.
-   - Ignore non-PII data such as dates, numerical values (except phone numbers and tax IDs), and any other non-sensitive information.
-
-2. Justify the decision:
-   - For each segment identified as PII, explain why it qualifies as such.
-   - Clearly differentiate between PII and non-PII elements. Provide reasoning for why certain elements are not PII.
-
-Step 2: Action
-1. Mask PII:
-   - Replace each identified PII with an appropriate placeholder in the format [TYPE#] (e.g., [PERSON1], [ADDRESS1]).
-   - Do not mask any non-PII elements.
-
-2. Return placeholder list:
-   - Return a list of placeholders and their corresponding original values (but do not return the masked text).
-   - Ensure placeholders are formatted without underscores or spaces.
-
-**Important: Always include '##PLACEHOLDER LIST:' before the placeholder list.**   
-
-Examples:
+    MASK_PII_USER_PROMPT = """You are an AI assistant that masks only Personally Identifiable Information (PII) in text. Replace PII with placeholders in the format [TYPE#], e.g., [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not mask numerical values or non-PII data.
 
 Example 1:
-Original text:
+Input:
 John Smith lives at 123 Main St, New York, NY 10001. His phone number is (555) 123-4567 and his SSN is 123-45-6789. For international calls, use +1-555-987-6543. He deposited $5,000 on 2023-07-15.
 
 Output:
@@ -53,165 +25,57 @@ Output:
 [TAXID1]: 123-45-6789
 [PHONE2]: +1-555-987-6543
 
-Example 2:
-Original text:
-Sarah Johnson ordered a laptop from TechStore on 2023-05-15. Her email is sarah.j@email.com and her work number is 1-800-555-1234. The company's EIN is 12-3456789. The total amount was $1,200.
-
-Output:
-##PLACEHOLDER LIST:
-[PERSON1]: Sarah Johnson
-[EMAIL1]: sarah.j@email.com
-[PHONE1]: 1-800-555-1234
-[TAXID1]: 12-3456789
-
-Example 3 (Demonstrating what NOT to mask):
-Original text:
-The company's revenue was $10,000,000 last year. Project XYZ has a budget of $500,000 and is due on 2023-12-31. The office can accommodate 50 employees.
-
-Note: In this example, no masking is performed because there is no PII present. Numerical values (except phone numbers and tax IDs), project names, and dates are not considered PII.
-
-Example 4:
-Original text:
-John Doe transferred $5000 to Jane Smith on 2021-05-01.
-
-Step 1: Reasoning & Thought Process
-Upon analyzing the text "John Doe transferred $5000 to Jane Smith on 2021-05-01.", we need to identify any PII present.
-
-1. Identifying PII Types: The common types of PII we're looking for are names (e.g., John Doe, Jane Smith), email addresses, phone numbers, tax IDs, and physical addresses.
-2. Examining Text Segments:
-   - "John Doe" - This is a name, which is a type of PII.
-   - "Jane Smith" - This is another name, which is a type of PII.
-   - "$5000" - This is a financial transaction amount, not a phone number or tax ID, so it's not a type of PII in this context. Numerical values like this are often found in everyday text and aren't PII.
-   - "2021-05-01" - This is a date, which is not PII because it doesn't contain identifying information about a person.
-
-Step 2: Action
-Based on the identified PII types and segments, we'll create placeholders for each PII found.
-
-1. Masking PII: We'll replace each identified PII with an appropriate placeholder in the format [TYPE#].
-2. Returning Placeholder List: We'll return a list of placeholders and their corresponding original values.
-
-Output:
-##PLACEHOLDER LIST:
-[PERSON1]: John Doe
-[PERSON2]: Jane Smith
-
-Text to mask:
+Input: 
 {content}
 
-Provide your step-by-step reasoning, and then return the placeholder list. **Remember to include '##PLACEHOLDER LIST:' before the list.**
-"""
-
-    CONVERT_TO_JSON_PROMPT = (
-        "You are an AI assistant that converts placeholder lists into JSON format. "
-        "Ensure that placeholders are strictly in the format [TYPE#], without underscores or spaces."
-    )
-
-    CONVERT_TO_JSON_USER_PROMPT = """Convert the following placeholder lists into a JSON format. For each example, the JSON should have a single key: "mapping" (a dictionary of placeholders and their original PII values). Ensure placeholders are in the correct format [TYPE#], without underscores or spaces.
-
-Example 1:
-Placeholder list:
-[PERSON1]: John Smith
-[ADDRESS1]: 123 Main St, New York, NY 10001
-[PHONE1]: (555) 123-4567
-
 Output:
-{{
-    "mapping": {{
-        "[PERSON1]": "John Smith",
-        "[ADDRESS1]": "123 Main St, New York, NY 10001",
-        "[PHONE1]": "(555) 123-4567"
-    }}
-}}
-
-Example 2:
-Placeholder list:
-[PERSON1]: Sarah Johnson
-[EMAIL1]: sarah.j@email.com
-
-Output:
-{{
-    "mapping": {{
-        "[PERSON1]": "Sarah Johnson",
-        "[EMAIL1]": "sarah.j@email.com"
-    }}
-}}
-
-Now, please convert the following placeholder list into JSON format:
-
-{response_step1_content}
-
-##JSON
-"""
-
-    RECONCILE_PROMPT = (
-        "You are an AI assistant tasked with reconciling multiple placeholder lists generated from the same text. "
-        "Your goal is to produce a final, consolidated placeholder list that accurately identifies all PII in the text. "
-        "Consider all the provided placeholder lists and the original text, and determine the most accurate and comprehensive mapping. "
-        "Ensure that placeholders are in the format [TYPE#], without underscores or spaces."
-    )
-
-    RECONCILE_USER_PROMPT = """Given the original text and multiple placeholder lists generated by different analyses, reconcile these lists to produce a final, consolidated placeholder list. Your final list should include all PII elements that are consistently identified across the analyses, as well as any additional PII that you determine should be included upon reviewing the original text.
-
-Original Text:
-{content}
-
-Placeholder Lists:
-{placeholder_lists}
-
-Instructions:
-- Review each placeholder list carefully.
-- Compare the lists and identify common PII elements.
-- Re-examine the original text to ensure no PII is missed.
-- Consolidate the placeholders, ensuring unique numbering (e.g., [PERSON1], [PERSON2]).
-- Return the final placeholder list in the same format, preceded by '##FINAL PLACEHOLDER LIST:'.
-
-**Remember to include '##FINAL PLACEHOLDER LIST:' before your consolidated list.**
-
-Example:
-
-If given:
-Placeholder Lists:
-- List 1:
-  [PERSON1]: John Doe
-  [EMAIL1]: john@example.com
-- List 2:
-  [PERSON1]: John Doe
-  [PHONE1]: (555) 123-4567
-
-Your output should be:
-##FINAL PLACEHOLDER LIST:
-[PERSON1]: John Doe
-[EMAIL1]: john@example.com
-[PHONE1]: (555) 123-4567
-
-Now, please provide the final placeholder list.
 """
 
     def __init__(self, llm: LLM):
         super().__init__(llm)
-        self.placeholder_counter = {}
+        self.global_mapping = {}  # Final mapping of placeholders to PII values
+        self.pii_to_placeholder = {}  # Mapping of PII values to placeholders
 
     async def mask_content(self, content: str) -> MaskContract:
-        placeholder_lists = await self._step1_mask_pii(content)
-        final_mapping = await self._step2_reconcile_mappings(content, placeholder_lists)
-        result = self._parse_mask_contract_dict(final_mapping, content)
+        paragraphs = self._split_into_paragraphs(content)
+        masked_paragraphs = []
+        all_mappings = []
+
+        for paragraph in paragraphs:
+            placeholder_list = await self._process_paragraph(paragraph)
+            mapping = self._parse_placeholder_list(placeholder_list)
+            all_mappings.append(mapping)
+            # Mask the paragraph using the mapping
+            masked_paragraph = self._apply_masking(paragraph, mapping)
+            masked_paragraphs.append(masked_paragraph)
+
+        # After processing all paragraphs, reconcile the mappings
+        self._reconcile_mappings(all_mappings)
+
+        # Combine masked paragraphs back into the final masked text
+        masked_text = '\n\n'.join(masked_paragraphs)
+
+        result = MaskContract(masked_text=masked_text, mapping=self.global_mapping)
         return result
 
-    def _parse_mask_contract_dict(self, mapping: dict, content: str) -> MaskContract:
-        masked_text = content
-        for placeholder, value in mapping.items():
-            masked_text = masked_text.replace(value, placeholder)
-        return MaskContract(masked_text=masked_text, mapping=mapping)
+    def _split_into_paragraphs(self, text: str) -> list:
+        # Split text into paragraphs based on various newline patterns
+        paragraphs = re.split(r'\n{2,}|\r\n{2,}|\r{2,}', text.strip())
+        # Further split paragraphs if they contain single newlines
+        result = []
+        for paragraph in paragraphs:
+            sub_paragraphs = paragraph.split('\n')
+            result.extend(sub_para.strip() for sub_para in sub_paragraphs if sub_para.strip())
+        return result
 
-    async def _step1_mask_pii(self, content: str) -> list:
-        MAX_RETRIES = 2  # Maximum number of retries per run
-
+    async def _process_paragraph(self, paragraph: str) -> str:
         async def single_run():
+            MAX_SINGLE_RUN_RETRIES = 2  # Maximum number of retries per single run
             attempt = 0
-            while attempt <= MAX_RETRIES:
+            while attempt <= MAX_SINGLE_RUN_RETRIES:
                 messages_step1 = [
                     {"role": "system", "content": self.MASK_PII_PROMPT},
-                    {"role": "user", "content": self.MASK_PII_USER_PROMPT.format(content=content)},
+                    {"role": "user", "content": self.MASK_PII_USER_PROMPT.format(content=paragraph)},
                 ]
                 response_step1 = self.llm.request(messages_step1)
                 response_step1_content = response_step1.choices[0].message.content
@@ -235,44 +99,67 @@ Now, please provide the final placeholder list.
             # If all retries fail, raise an error
             raise ValueError("Unable to obtain a valid '##PLACEHOLDER LIST:' after multiple attempts.")
 
-        # Run the single_run function multiple times (e.g., 3 times) in parallel
-        runs = [single_run() for _ in range(3)]
-        results = await asyncio.gather(*runs)
+        MAX_RETRIES = 10  # Maximum number of retries for inconsistent results
+        retry_count = 0
 
-        # Now, results is a list of placeholder list strings from each run
-        return results
+        while retry_count < MAX_RETRIES:
+            # Run two parallel requests
+            initial_runs = [single_run() for _ in range(2)]
+            initial_results = await asyncio.gather(*initial_runs)
 
-    async def _step2_reconcile_mappings(self, content: str, placeholder_lists: list) -> dict:
-        # Prepare the placeholder lists string for the prompt
-        placeholder_lists_str = ""
-        for idx, plist in enumerate(placeholder_lists, 1):
-            placeholder_lists_str += f"- List {idx}:\n{plist}\n"
+            # Compare the initial two results
+            if initial_results[0] != initial_results[1]:
+                retry_count += 1
+                continue  # Retry due to inconsistency
 
-        messages_reconcile = [
-            {"role": "system", "content": self.RECONCILE_PROMPT},
-            {
-                "role": "user",
-                "content": self.RECONCILE_USER_PROMPT.format(
-                    content=content,
-                    placeholder_lists=placeholder_lists_str,
-                ),
-            },
+            # Reconcile all mappings
+            all_results = initial_results
+            final_placeholder_list = self._reconcile_placeholder_lists(all_results, paragraph)
+            return final_placeholder_list
+
+        # If all retries fail, raise an error
+        raise ValueError("Unable to obtain consistent placeholder lists after maximum retries.")
+
+
+    def _reconcile_placeholder_lists(self, placeholder_lists: list, paragraph: str) -> str:
+        # Parse each placeholder list into a mapping
+        mappings = [self._parse_placeholder_list(plist) for plist in placeholder_lists]
+
+        # Collect counts of original values and their PII types
+        original_value_counts = {}
+        for mapping in mappings:
+            for placeholder, original_value in mapping.items():
+                # Extract PII type from placeholder, e.g., [PERSON1] -> PERSON
+                m = re.match(r'\[([A-Za-z]+)[0-9]*\]', placeholder)
+                if m:
+                    pii_type = m.group(1)
+                    key = (original_value, pii_type)
+                    if key not in original_value_counts:
+                        original_value_counts[key] = 0
+                    original_value_counts[key] += 1
+
+        # Keep original values that appear in all lists
+        required_count = len(placeholder_lists)
+        final_items = [
+            (original_value, pii_type)
+            for (original_value, pii_type), count in original_value_counts.items()
+            if count == required_count
         ]
 
-        # Send the reconciliation request to the LLM
-        response_reconcile = self.llm.request(messages_reconcile)
-        response_reconcile_content = response_reconcile.choices[0].message.content
+        # If no items appear consistently across all lists, accept all items
+        if not final_items:
+            for (original_value, pii_type), count in original_value_counts.items():
+                final_items.append((original_value, pii_type))
 
-        if "##FINAL PLACEHOLDER LIST:" not in response_reconcile_content:
-            raise ValueError("The final placeholder list was not found in the LLM's response.")
+        # Create a mapping for this paragraph without assigning placeholders yet
+        paragraph_mapping = {}
+        for original_value, pii_type in final_items:
+            paragraph_mapping[original_value] = pii_type
 
-        # Extract the final placeholder list
-        split_result = response_reconcile_content.split("##FINAL PLACEHOLDER LIST:")
-        final_placeholder_list = split_result[1].strip()
+        # Return the paragraph mapping as a placeholder list string
+        placeholder_list = '\n'.join([f'{pii_type}: {original_value}' for original_value, pii_type in paragraph_mapping.items()])
 
-        # Parse the final placeholder list into a mapping
-        final_mapping = self._parse_placeholder_list(final_placeholder_list)
-        return final_mapping
+        return placeholder_list
 
     def _parse_placeholder_list(self, placeholder_list_str: str) -> dict:
         mapping = {}
@@ -289,7 +176,44 @@ Now, please provide the final placeholder list.
             mapping[placeholder] = original_value
         return mapping
 
+    def _reconcile_mappings(self, all_mappings: list):
+        # Collect all PII values and their types
+        pii_items = {}
+        for mapping in all_mappings:
+            for placeholder, original_value in mapping.items():
+                m = re.match(r'\[([A-Za-z]+)[0-9]*\]', placeholder)
+                if m:
+                    pii_type = m.group(1)
+                    if original_value not in pii_items:
+                        pii_items[original_value] = pii_type
+                    else:
+                        # If the same PII value has different types, decide how to handle it
+                        # For simplicity, we'll keep the first type encountered
+                        pass
+
+        # Assign placeholders to PII values
+        placeholder_counters = {}
+        for original_value, pii_type in pii_items.items():
+            if pii_type not in placeholder_counters:
+                placeholder_counters[pii_type] = 1
+            else:
+                placeholder_counters[pii_type] += 1
+            placeholder = f'[{pii_type}{placeholder_counters[pii_type]}]'
+            self.global_mapping[placeholder] = original_value
+            self.pii_to_placeholder[original_value] = placeholder
+
+    def _apply_masking(self, text: str, mapping: dict) -> str:
+        masked_text = text
+        # Use the global mapping to ensure consistency across paragraphs
+        for original_value, pii_type in mapping.items():
+            placeholder = self.pii_to_placeholder.get(original_value)
+            if placeholder:
+                masked_text = masked_text.replace(original_value, placeholder)
+        return masked_text
+
     def unmask_content(self, masked_content: str, mapping: dict) -> str:
-        for placeholder, original in mapping.items():
+        # Sort placeholders by length to avoid partial replacements
+        sorted_mapping = dict(sorted(mapping.items(), key=lambda x: -len(x[0])))
+        for placeholder, original in sorted_mapping.items():
             masked_content = masked_content.replace(placeholder, original)
         return masked_content

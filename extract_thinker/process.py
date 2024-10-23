@@ -45,7 +45,7 @@ class Process:
         self.masking_strategy: Optional[AbstractMaskingStrategy] = None
         self.llm: Optional[LLM] = None
 
-    def add_masking_llm(self, model: Optional[str] = None, strategy: Optional[MaskContract] = MaskingStrategy.SIMPLE_PLACEHOLDER):
+    def add_masking_llm(self, model: Optional[str | LLM] = None, strategy: Optional[MaskContract] = MaskingStrategy.SIMPLE_PLACEHOLDER):
         if isinstance(model, LLM):
             self.llm = model
         elif model is not None:

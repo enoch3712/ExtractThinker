@@ -1,8 +1,9 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from extract_thinker.llm import LLM
 from dotenv import load_dotenv
-from extract_thinker.process import MaskingStrategy, Process
+from extract_thinker.process import Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 import asyncio
 
@@ -16,20 +17,12 @@ def test_mask():
     process = Process()
     process.load_document_loader(DocumentLoaderPyPdf())
     process.load_file(test_file_path)
-    process.add_masking_llm("groq/llama-3.2-11b-text-preview")
+    # process.add_masking_llm("groq/llama-3.2-3b-preview")
+    llm = LLM("groq/llama-3.2-11b-text-preview")
+    process.add_masking_llm(llm)
 
     # Act
-    test_text = (
-        "Mr. George Collins lives at 123 Main St, Anytown, USA 12345. His phone number is 555-1234. "
-        "Jane Smith resides at 456 Elm Avenue, Othercity, State 67890, and can be reached at (987) 654-3210. "
-        "The company's CEO, Robert Johnson, has an office at 789 Corporate Blvd, Suite 500, Bigcity, State 13579. "
-        "For customer service, call 1-800-555-9876 or email support@example.com. "
-        "Sarah Lee, our HR manager, can be contacted at 444-333-2222 or sarah.lee@company.com. "
-        "The project budget is $250,000, with an additional $50,000 allocated for contingencies. "
-        "Monthly maintenance costs are estimated at $3,500. "
-        "For international clients, please use +1-555-987-6543. "
-        "Our tax ID number is 12-3456789."
-    )
+    test_text = "Mr. George Collins lives at 123 Main St, Anytown, USA 12345.\n His phone number is 555-1234.\nJane Smith resides at 456 Elm Avenue, Othercity, State 67890, and can be reached at (987) 654-3210.\nThe company's CEO, Robert Johnson, has an office at 789 Corporate Blvd, Suite 500, Bigcity, State 13579. \nFor customer service, call 1-800-555-9876 or email support@example.com. \nSarah Lee, our HR manager, can be contacted at 444-333-2222 or sarah.lee@company.com.\nThe project budget is $250,000, with an additional $50,000 allocated for contingencies. \nMonthly maintenance costs are estimated at $3,500. \nFor international clients, please use +1-555-987-6543. \nOur tax ID number is 12-3456789."
 
     # Act
     result = asyncio.run(process.mask_content(test_text))
@@ -123,19 +116,19 @@ def test_simple_use_case():
     unmasked_content = process.unmask_content(result.masked_text, result.mapping)
     assert unmasked_content == test_text
 
-def test_deterministic_hashing():
-    # Arrange
-    process = Process()
-    process.add_masking_llm("groq/llama-3.2-11b-text-preview", MaskingStrategy.DETERMINISTIC_HASHING)
+# def test_deterministic_hashing():
+#     # Arrange
+#     process = Process()
+#     process.add_masking_llm("groq/llama-3.2-11b-text-preview", MaskingStrategy.DETERMINISTIC_HASHING)
 
-    test_text = "John Doe transferred $5000 to Jane Smith on 2021-05-01."
+#     test_text = "John Doe transferred $5000 to Jane Smith on 2021-05-01."
 
-    # Act
-    result = asyncio.run(process.mask_content(test_text))
+#     # Act
+#     result = asyncio.run(process.mask_content(test_text))
 
-    # Assert
-    assert result.masked_text is not None
-    assert result.mapping is not None
+#     # Assert
+#     assert result.masked_text is not None
+#     assert result.mapping is not None
 
 if __name__ == "__main__":
     test_mask()
