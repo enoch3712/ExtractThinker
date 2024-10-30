@@ -178,63 +178,10 @@ class Process:
             self.doc_groups = eager_group
         else:  # LAZY strategy
             processed_groups = self.splitter.split_lazy_doc_group(content, classifications)
-            self.doc_groups = self.aggregate_split_documents_2(processed_groups)
+            self.doc_groups = processed_groups.doc_groups
 
         return self
 
-        # groups = self.splitter.split_document_into_groups(content)
-
-        # loop = asyncio.get_event_loop()
-        # processedGroups = loop.run_until_complete(
-        #     self.splitter.process_split_groups(groups, classifications)
-        # )
-
-        # doc_groups = self.aggregate_split_documents_2(processedGroups)
-
-        # self.doc_groups = doc_groups
-
-        return self
-
-    def aggregate_split_documents_2(self, doc_groups_tasks: List[DocGroups2]) -> DocGroups:
-        doc_groups = DocGroups()
-        current_group = DocGroup()
-        page_number = 1
-
-        # do the first group outside of the loop
-        doc_group = doc_groups_tasks[0]
-
-        if doc_group.belongs_to_same_document:
-            current_group.pages = [1, 2]
-            current_group.classification = doc_group.classification_page1
-        else:
-            current_group.pages = [1]
-            current_group.classification = doc_group.classification_page1
-
-            doc_groups.doc_groups.append(current_group)
-
-            current_group = DocGroup()
-            current_group.pages = [2]
-            current_group.classification = doc_group.classification_page2
-
-        page_number += 1
-
-        for index in range(1, len(doc_groups_tasks)):
-            doc_group_2 = doc_groups_tasks[index]
-
-            if doc_group_2.belongs_to_same_document:
-                current_group.pages.append(page_number + 1)
-            else:
-                doc_groups.doc_groups.append(current_group)
-
-                current_group = DocGroup()
-                current_group.classification = doc_group_2.classification_page2
-                current_group.pages = [page_number + 1]
-
-            page_number += 1
-
-        doc_groups.doc_groups.append(current_group)  # the last group
-
-        return doc_groups
 
     def where(self, condition):
         pass

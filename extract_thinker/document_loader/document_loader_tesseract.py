@@ -1,6 +1,7 @@
 from io import BytesIO
 from operator import attrgetter
 import os
+
 import threading
 from typing import Any, List, Union
 from PIL import Image
@@ -105,7 +106,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
         for attempt in range(3):
             try:
                 # Convert bytes to PIL Image
-                pil_image = Image.open(BytesIO(image))
+                pil_image = Image.open(image)
                 raw_text = str(pytesseract.image_to_string(pil_image))
                 if raw_text:
                     return raw_text
@@ -154,6 +155,9 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
             image, content = output_queue.get()
             contents.append({"image": image, "content": content})
 
+        # put the first page at the end of the list
+        contents.append(contents.pop(0))
+
         return contents
 
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, input: hashkey(id(input)))
@@ -184,4 +188,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
             image, content = output_queue.get()
             contents.append({"image": Image.open(image), "content": content})
 
+        # put the first page at the end of the list
+        contents.append(contents.pop(0))
+        
         return contents

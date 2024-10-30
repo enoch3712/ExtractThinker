@@ -26,85 +26,112 @@ class ImageSplitter(Splitter):
         return base64.b64encode(img_byte).decode("utf-8")
 
     def belongs_to_same_document(self,
-                                 obj1: Any,
-                                 obj2: Any,
-                                 classifications: List[Classification]
-                                 ) -> DocGroups2:
-
+                             obj1: Any,
+                             obj2: Any,
+                             classifications: List[Classification]
+                             ) -> DocGroups2:
+        """
+        Compare two pages to determine if they belong to the same document and classify them.
+        
+        Args:
+            obj1: First page object containing an image
+            obj2: Second page object containing an image
+            classifications: List of possible document classifications
+        
+        Returns:
+            DocGroups2 object containing the comparison results
+        """
         if 'image' not in obj1 or 'image' not in obj2:
             raise ValueError("Input objects must have an 'image' key")
 
         page1 = obj1['image']
         page2 = obj2['image']
 
-        assistantPrompt = 'What you are an API that extracts information. You receive as input: \r\n1. two pages \r\n2. a group of classifications\r\n output:\r\nA JSON with the classification of each document and if belongs to the same document\r\n\r\n//Example 1\r\n//can be null if belongsToSamePage is true\r\n{\r\n    "belongs_to_same_document": true,\r\n    "classification_page1": "LLC",\r\n    "classification_page2": "LLC"\r\n}\r\n//Example 2\r\n{\r\n    "belongs_to_same_document": false,\r\n    "classification_page1": "LLC",\r\n    "classification_page2": "Invoice"\r\n}'
-
+        # Encode images to base64
         base64_image1 = self.encode_image(page1)
         base64_image2 = self.encode_image(page2)
 
-        classifications_text = (
-            "##Classifications\n"
-            + "\n".join([f"{c.name}: {c.description}" for c in classifications])
-            + "\n\n##JSON Output\n"
-        )
+        content = f"""Analyze these two pages and determine if they belong to the same document.
+    Consider:
+    - Visual consistency and layout
+    - Content flow and continuity
+    - Header/footer patterns
+    - Page numbering
+    - Document identifiers
 
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": assistantPrompt,
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": classifications_text},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/jpeg;base64," + base64_image1
-                            },
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/jpeg;base64," + base64_image2
-                            },
-                        },
-                        {"type": "text", "text": "###JSON Output\n"},
-                    ],
-                },
-            ],
-        )
+    {self._classifications_to_text(classifications)}
 
-        jsonText = resp.choices[0].message.content
+    Return your analysis in the following JSON format:
+    {{
+        "belongs_to_same_document": true/false,
+        "classification_page1": "classification name from the list above",
+        "classification_page2": "classification name from the list above",
+        "reasoning": "explanation of your decision"
+    }}"""
 
-        jsonText = extract_json(jsonText)
+        # Add all images to the content
+        messages = [{"type": "text", "text": content}]
+        messages.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{base64_image1}"
+            }
+        })
+        messages.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{base64_image2}"
+            }
+        })
 
-        # TODO: eventually will be done in a more robust way
-        validated_obj = DocGroups2(**jsonText)
-
-        return validated_obj
-
-    def split_lazy_doc_group(self, lazy_doc_group: DocGroups2, classifications: List[Classification]) -> List[EagerDocGroup]:
-        """
-        Process a lazy document group to determine document boundaries for images
-        """
-        if not lazy_doc_group.belongs_to_same_document:
-            # If images don't belong together, split them into separate groups
-            return [
-                DocGroups2(
-                    belongs_to_same_document=False,
-                    classification_page1=lazy_doc_group.classification_page1,
-                    classification_page2=None
-                ),
-                DocGroups2(
-                    belongs_to_same_document=False,
-                    classification_page1=lazy_doc_group.classification_page2,
-                    classification_page2=None
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": messages
+                    }
+                ],
+                response_model=DocGroups2
+            )
+            return response
+        except Exception as e:
+            # Fallback response if analysis fails
+            return DocGroups2(
+                    belongs_to_same_document=True,  # Conservative approach: keep pages together
+                    classification_page1=classifications[0].name,  # Default to first classification
+                    classification_page2=classifications[0].name
                 )
-            ]
-        return [lazy_doc_group]
+        
+    def split_lazy_doc_group(self, document: List[dict], classifications: List[Classification]) -> DocGroups:
+        """
+        Process a document lazily by comparing consecutive pages to determine document boundaries.
+        Returns a list of DocGroups2 objects representing the document groupings.
+        """
+        if len(document) < 2:
+            # Handle single-page documents
+            return [DocGroups2(
+                belongs_to_same_document=True,
+                classification_page1=classifications[0].name,  # Default to first classification
+                classification_page2=None
+            )]
+
+        # Create and process page pairs
+        page_pairs = self.split_document_into_groups(document)
+        
+        # Process each pair of pages
+        doc_groups = []
+        for page1, page2 in page_pairs:
+            # Compare pages using belongs_to_same_document
+            group_result = self.belongs_to_same_document(
+                obj1={"image": page1["image"]},
+                obj2={"image": page2["image"]},
+                classifications=classifications
+            )
+            doc_groups.append(group_result)
+
+        return self.aggregate_doc_groups(doc_groups)
 
     def split_eager_doc_group(self, document: List[dict], classifications: List[Classification]) -> DocGroups:
         """
