@@ -1,12 +1,24 @@
 import asyncio
 from typing import Any, List
 from abc import ABC, abstractmethod
+
+from extract_thinker.models.classification import Classification
+from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
+from extract_thinker.models.eager_doc_group import EagerDocGroup
 
 
 class Splitter(ABC):
     @abstractmethod
     def belongs_to_same_document(self, page1: Any, page2: Any, contract: str) -> DocGroups2:
+        pass
+
+    @abstractmethod
+    def split_lazy_doc_group(self, lazy_doc_group: List[Any], classifications: List[Classification]) -> EagerDocGroup:
+        pass
+
+    @abstractmethod
+    def split_eager_doc_group(self, lazy_doc_group: List[Any], classifications: List[Classification]) -> DocGroups:
         pass
 
     def split_document_into_groups(self, document: List[Any]) -> List[List[Any]]:

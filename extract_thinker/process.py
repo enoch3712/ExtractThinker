@@ -1,26 +1,19 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
+from extract_thinker.ClassificationStrategy import ClassificationStrategy
+from extract_thinker.models.doc_groups2 import DocGroups2
+from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification_tree import ClassificationTree
 from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.doc_group import DocGroup
-from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.splitter import Splitter
 from extract_thinker.models.doc_groups import (
     DocGroups,
 )
 from extract_thinker.utils import get_image_type
-
-from enum import Enum
-
-
-class ClassificationStrategy(Enum):
-    CONSENSUS = "consensus"
-    HIGHER_ORDER = "higher_order"
-    CONSENSUS_WITH_THRESHOLD = "both"
-
 
 class Process:
     def __init__(self):
@@ -162,7 +155,7 @@ class Process:
         self.file_path = file
         return self
 
-    def split(self, classifications: List[Classification]):
+    def split(self, classifications: List[Classification], strategy: SplittingStrategy = SplittingStrategy.EAGER):
 
         self.split_classifications = classifications
 
@@ -180,23 +173,26 @@ class Process:
 
         if len(content) == 1:
             raise ValueError("Document must have at least 2 pages")
+        
+        if strategy == SplittingStrategy.EAGER:
+            eager_group = self.splitter.split_eager_doc_group(content, classifications)
+            self.doc_groups = eager_group
+        else:  # LAZY strategy
+            processed_groups = self.splitter.split_lazy_doc_group(content, classifications)
+            self.doc_groups = self.aggregate_split_documents_2(processed_groups)
 
-        groups = self.splitter.split_document_into_groups(content)
+        return self
 
-        loop = asyncio.get_event_loop()
-        processedGroups = loop.run_until_complete(
-            self.splitter.process_split_groups(groups, classifications)
-        )
+        # groups = self.splitter.split_document_into_groups(content)
 
-        doc_groups = self.aggregate_split_documents_2(processedGroups)
+        # loop = asyncio.get_event_loop()
+        # processedGroups = loop.run_until_complete(
+        #     self.splitter.process_split_groups(groups, classifications)
+        # )
 
-        # doc_groups = DocGroups()
-        # doc_groups.doc_groups.append(DocGroup(pages=[1], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[2], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[3], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[4, 5], classification='Invoice'))
+        # doc_groups = self.aggregate_split_documents_2(processedGroups)
 
-        self.doc_groups = doc_groups
+        # self.doc_groups = doc_groups
 
         return self
 
@@ -279,7 +275,7 @@ class Process:
             pages_content = [content[i - 1] for i in doc_group.pages]
             return await extractor.extract_async(pages_content, contract)
 
-        doc_groups = self.doc_groups.doc_groups
+        doc_groups = self.doc_groups
 
         async def process_doc_groups(groups: List[Any]) -> List[Any]:
             # Create asynchronous tasks for processing each group
