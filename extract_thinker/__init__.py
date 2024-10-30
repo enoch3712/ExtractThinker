@@ -1,4 +1,4 @@
-from .ClassificationStrategy import ClassificationStrategy
+from .models.classification_strategy import ClassificationStrategy
 from .extractor import Extractor
 from .llm import LLM
 from .document_loader.document_loader import DocumentLoader

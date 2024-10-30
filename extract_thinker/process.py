@@ -1,6 +1,6 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
-from extract_thinker.ClassificationStrategy import ClassificationStrategy
+from extract_thinker.models.classification_strategy import ClassificationStrategy
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
