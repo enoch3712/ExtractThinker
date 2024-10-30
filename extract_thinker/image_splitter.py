@@ -156,23 +156,16 @@ Return your analysis in the following JSON format:
             })
         
         try:
-            # response = self.client.chat.completions.create(
-            #     model=self.model,
-            #     messages=[
-            #         {
-            #             "role": "user",
-            #             "content": messages
-            #         }
-            #     ],
-            #     response_model=DocGroupsEager
-            # )
-
-            #get json string to use in debug
-            # json_string = response.model_dump_json()
-
-            response = json.loads('{"reasoning":"These images belong to related but separate documents for the same individual. The first two pages show a New York State Vehicle Registration/Title Application form (form MV-82DEAL), which is a complete 2-page document with consistent formatting, header, and form number. The third image shows a New York State Commercial Driver License. While they are for the same person (with matching name and address), they are distinct document types serving different purposes - one for vehicle registration and one for driver identification/authorization. The driver\'s license follows a standard ID card format that is completely different from the registration form layout.","groupOfDocuments":[{"pages":[1,2],"classification":"Vehicle Registration"},{"pages":[3],"classification":"Driver License"}]}')
-            # cast to DocGroups
-            response = DocGroupsEager(**response)
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": messages
+                    }
+                ],
+                response_model=DocGroupsEager
+            )
 
             # Convert DocGroupsEager into List[EagerDocGroup]
             eager_groups = []

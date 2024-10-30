@@ -163,7 +163,6 @@ class Process:
 
         if documentLoader is None:
             raise ValueError("No suitable document loader found for file type")
-
         if self.file_path:
             content = documentLoader.load_content_from_file_list(self.file_path)
         elif self.file_stream:
@@ -245,7 +244,7 @@ class Process:
             raise ValueError("Document groups have not been initialized")
 
         async def _extract(doc_group):
-            classificationStr = doc_group.classification  # str
+            classificationStr = doc_group.classification
 
             for classification in self.split_classifications:
                 if classification.name == classificationStr:
