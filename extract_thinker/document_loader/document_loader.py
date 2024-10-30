@@ -114,27 +114,18 @@ class DocumentLoader(ABC):
         return self._convert_pdf_to_images(pdfium.PdfDocument(file_stream), scale)
 
     def _convert_pdf_to_images(self, pdf_file, scale: float) -> Dict[int, bytes]:
-        page_indices = [i for i in range(len(pdf_file))]
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {i: executor.submit(self.render_page, pdf_file, i, scale) for i in page_indices}
-
-        final_images = {}
-        for i, future in futures.items():
-            final_images[i] = future.result()
-
-        return final_images
-
-    @staticmethod
-    def render_page(pdf_file: pdfium.PdfDocument, page_index: int, scale: float) -> Dict[int, bytes]:
+        # Get all pages at once
         renderer = pdf_file.render(
             pdfium.PdfBitmap.to_pil,
-            page_indices=[page_index],
+            page_indices=list(range(len(pdf_file))),
             scale=scale,
         )
-        image_list = list(renderer)
-        image = image_list[0]
-        image_byte_array = BytesIO()
-        image.save(image_byte_array, format="jpeg", optimize=True)
-        image_byte_array = image_byte_array.getvalue()
-        return {page_index: image_byte_array}
+        
+        # Convert all images to bytes and store in dictionary
+        final_images = {}
+        for page_index, image in enumerate(renderer):
+            image_byte_array = BytesIO()
+            image.save(image_byte_array, format="jpeg", optimize=True)
+            final_images[page_index] = image_byte_array.getvalue()
+            
+        return final_images
