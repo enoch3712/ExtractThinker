@@ -15,6 +15,7 @@ from .image_splitter import ImageSplitter
 from .text_splitter import TextSplitter
 from .models.classification import Classification
 from .models.contract import Contract
+from .models.splitting_strategy import SplittingStrategy
 
 
 __all__ = [
