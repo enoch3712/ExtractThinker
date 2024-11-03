@@ -116,6 +116,8 @@ The `extract_thinker` project is inspired by the LangChain ecosystem, featuring 
 | Notebook | Description |
 |----------|-------------|
 | [Basic Usage](examples/notebooks/basic_example.ipynb) | Basic usage of ExtractThinker with PyPDF loader and GPT-4o-mini for invoice data extraction |
+| [Classify files Example](classification.ipynb) | Example of classifying files using ExtractThinker |
+| [Splitting Files Example](splitting.ipynb) | Example of splitting files using ExtractThinker |
 
 ## Why Just Not LangChain?
 While LangChain is a generalized framework designed for a wide array of use cases, extract_thinker is specifically focused on Intelligent Document Processing (IDP). Although achieving 100% accuracy in IDP remains a challenge, leveraging LLMs brings us significantly closer to this goal.
