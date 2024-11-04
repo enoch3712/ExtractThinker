@@ -1,15 +1,16 @@
 import os
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from tests.models import ChartWithContent
 from tests.models.invoice import InvoiceContract
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
+import json
 
 load_dotenv()
 cwd = os.getcwd()
-
 
 def test_extract_with_tessaract_and_gpt4o_mini():
 
@@ -69,3 +70,29 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     assert result.lines[0].quantity == 3
     assert result.lines[0].unit_price == 375
     assert result.lines[0].amount == 1125
+
+def test_vision_with_chart():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o")
+    test_file_path = os.path.join(cwd, "tests", "test_images", "image.png")
+
+    # Act
+    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
+
+    # Assert
+    assert result is not None
+    # TODO: For now is sanity to test for errors
+
+def test_vision_content_pdf():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o")
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+
+    # Act
+    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
+
+    # Assert
+    assert result is not None
+    # TODO: For now is sanity to test for errors

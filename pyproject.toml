@@ -31,8 +31,8 @@ flake8 = "^3.9.2"
 black = "^21.9b0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.0"
 ipykernel = "^6.29.5"
+pytest = "^8.2.0"
 
 [build-system]
 requires = ["poetry-core"]

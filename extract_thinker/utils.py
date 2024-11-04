@@ -10,9 +10,34 @@ import os
 from io import BytesIO
 from typing import Union
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+def encode_image(image_source: Union[str, BytesIO]) -> str:
+    """
+    Encode an image to base64 string from either a file path or BytesIO stream.
+
+    Args:
+        image_source (Union[str, BytesIO]): The image source, either a file path or BytesIO stream
+
+    Returns:
+        str: Base64 encoded string of the image
+    """
+    try:
+        if isinstance(image_source, str):
+            with open(image_source, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode("utf-8")
+        elif isinstance(image_source, BytesIO):
+            # Save current position
+            current_position = image_source.tell()
+            # Move to start of stream
+            image_source.seek(0)
+            # Encode stream content
+            encoded = base64.b64encode(image_source.read()).decode("utf-8")
+            # Restore original position
+            image_source.seek(current_position)
+            return encoded
+        else:
+            raise ValueError("Image source must be either a file path (str) or BytesIO stream")
+    except Exception as e:
+        raise Exception(f"Failed to encode image: {str(e)}")
 
 def is_pdf_stream(stream: Union[BytesIO, str]) -> bool:
     """
