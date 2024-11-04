@@ -84,13 +84,15 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
                 
             extracted_text = []
             for page_number, image_bytes in images.items():
-                # Check if image_bytes is not empty and has the expected structure
-                # if not image_bytes or not isinstance(image_bytes, (list, tuple)):
-                #     print(f"Skipping page {page_number}: Invalid image data")
-                #     continue
-                    
-                # image = BytesIO(image_bytes[0])
-                text = self.process_image(image_bytes)
+                # Convert image data to proper BytesIO stream
+                if isinstance(image_bytes, bytes):
+                    image_stream = BytesIO(image_bytes)
+                elif isinstance(image_bytes, BytesIO):
+                    image_stream = image_bytes
+                else:
+                    raise ValueError(f"Unexpected image data type for page {page_number}: {type(image_bytes)}")
+
+                text = self.process_image(image_stream)
                 extracted_text.append(text)
 
             if not extracted_text:
@@ -117,14 +119,22 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
 
     def worker(self, input_queue: Queue, output_queue: Queue):
         while True:
-            image = input_queue.get()
-            if image is None:  # Sentinel to indicate shutdown
+            image_data = input_queue.get()
+            if image_data is None:  # Sentinel to indicate shutdown
                 break
             try:
-                text = self.process_image(image)
-                output_queue.put((image, text))
+                # Convert bytes to BytesIO if needed
+                if isinstance(image_data, bytes):
+                    image_stream = BytesIO(image_data)
+                elif isinstance(image_data, BytesIO):
+                    image_stream = image_data
+                else:
+                    raise ValueError(f"Unexpected image data type: {type(image_data)}")
+                    
+                text = self.process_image(image_stream)
+                output_queue.put((image_data, text))
             except Exception as e:
-                output_queue.put((image, str(e)))
+                output_queue.put((image_data, str(e)))
             input_queue.task_done()
 
     @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))

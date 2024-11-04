@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "extract_thinker"
-version = "0.0.20"
+version = "0.0.21"
 description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
@@ -31,8 +31,8 @@ flake8 = "^3.9.2"
 black = "^21.9b0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.0"
 ipykernel = "^6.29.5"
+pytest = "^8.2.0"
 
 [build-system]
 requires = ["poetry-core"]

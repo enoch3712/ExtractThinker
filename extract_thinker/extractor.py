@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, IO, Union, get_origin, get_args
 import litellm
 from pydantic import BaseModel
 from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.llm import LLM
@@ -83,6 +84,12 @@ class Extractor:
 
         if not issubclass(response_model, BaseModel):
             raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
+
+        if vision and not self.get_document_loader_for_file(source):
+            if not litellm.supports_vision(self.llm.model):
+                raise ValueError(f"Model {self.llm.model} does not support vision. Please provide a document loader or a model that supports vision.")
+            else:
+                self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
 
         if isinstance(source, str):
             if os.path.exists(source):
@@ -449,54 +456,83 @@ class Extractor:
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a server API that receives document information "
-                "and returns specific fields in JSON format.",
-            },
-        ]
-
-        if self.extra_content is not None:
-            if isinstance(self.extra_content, dict):
-                self.extra_content = yaml.dump(self.extra_content)
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "##Extra Content\n\n" + self.extra_content,
-                }
-            )
-
-        if content is not None:
-            if isinstance(content, dict):
-                if content.get("is_spreadsheet", False):
-                    content = json_to_formatted_string(content.get("data", {}))
-                content = yaml.dump(content, default_flow_style=True)
-            messages.append(
-                {"role": "user", "content": "##Content\n\n" + content}
-            )
-
         if vision:
             if not litellm.supports_vision(model=self.llm.model):
                 raise ValueError(
                     f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
                 )
 
-            base64_encoded_image = encode_image(file_or_stream, is_stream)
-
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
+            # Initialize the content list for the message
+            message_content = []
+            
+            # Add text content if it exists
+            if isinstance(content, str):
+                message_content.append({
+                    "type": "text",
+                    "text": content
+                })
+            
+            # Add images
+            if isinstance(content, list):  # Assuming content is a list of dicts with 'image' key
+                for page in content:
+                    if 'image' in page:
+                        base64_image = encode_image(page['image'])
+                        message_content.append({
                             "type": "image_url",
                             "image_url": {
-                                "url": "data:image/jpeg;base64," + base64_encoded_image
-                            },
-                        },
-                    ],
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        })
+
+            # Create the messages array with the correct structure
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                },
+                {
+                    "role": "user",
+                    "content": message_content
                 }
             ]
+
+            # Add extra content if it exists
+            if self.extra_content is not None:
+                if isinstance(self.extra_content, dict):
+                    self.extra_content = yaml.dump(self.extra_content)
+                messages.insert(1, {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "##Extra Content\n\n" + self.extra_content}]
+                })
+
+        else:
+            # Non-vision logic remains the same
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                },
+            ]
+
+            if self.extra_content is not None:
+                if isinstance(self.extra_content, dict):
+                    self.extra_content = yaml.dump(self.extra_content)
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "##Extra Content\n\n" + self.extra_content,
+                    }
+                )
+
+            if content is not None:
+                if isinstance(content, dict):
+                    if content.get("is_spreadsheet", False):
+                        content = json_to_formatted_string(content.get("data", {}))
+                    content = yaml.dump(content, default_flow_style=True)
+                if isinstance(content, str):
+                    messages.append(
+                        {"role": "user", "content": "##Content\n\n" + content}
+                    )
 
         if self.llm.token_limit:
             max_tokens_per_request = self.llm.token_limit - 1000
