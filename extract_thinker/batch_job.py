@@ -124,21 +124,6 @@ class BatchJob:
         }
         return status_mapping.get(api_status, 'failed')
 
-    async def cancel(self) -> bool:
-        """Cancel the current batch job."""
-        if not self.batch_id:
-            return False
-        
-        try:
-            await asyncio.to_thread(
-                self.client.batches.cancel,
-                self.batch_id
-            )
-            return True
-        except Exception as e:
-            print(f"Error cancelling batch: {e}")
-            return False
-
     async def get_result(self) -> BaseModel:
         """
         Wait for job completion and return parsed results using Instructor.
@@ -177,19 +162,19 @@ class BatchJob:
                 f.write(response.text)
 
             # Use Instructor to parse the results
-            parsed = InstructorBatchJob.parse_from_file(
+            parsed, unparsed = InstructorBatchJob.parse_from_file(
                 file_path=self.output_path,
                 response_model=self.response_model
             )
             
-            return parsed
+            return parsed[0]
                 
         except Exception as e:
             raise ValueError(f"Failed to process output file: {e}")
         finally:
             self._cleanup_files()
 
-    async def cancel_batch(self) -> bool:
+    async def cancel(self) -> bool:
         """Cancel the current batch job and confirm cancellation."""
         if not self.batch_id:
             print("No batch job to cancel.")
@@ -201,7 +186,7 @@ class BatchJob:
                 self.batch_id
             )
             print("Batch job canceled successfully.")
-            self._cleanup_files()  # Clean up files after cancellation
+            self._cleanup_files()
             return True
         except Exception as e:
             print(f"Error cancelling batch: {e}")

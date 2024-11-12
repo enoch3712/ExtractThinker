@@ -149,6 +149,3 @@ def test_cancel_batch_extraction():
     # Check if files were removed
     assert not os.path.exists(batch_job.file_path), f"Batch input file was not removed: {batch_job.file_path}"
     assert not os.path.exists(batch_job.output_path), f"Batch output file was not removed: {batch_job.output_path}"
-
-if __name__ == "__main__":
-    asyncio.run(test_batch_extraction_single_source())
