@@ -1,8 +1,9 @@
 import asyncio
 import base64
 from io import BytesIO
-from typing import Any, Dict, List, Optional, IO, Union, get_origin, get_args
-
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
+from instructor.batch import BatchJob
+import uuid
 import litellm
 from pydantic import BaseModel
 from extract_thinker.document_loader.document_loader import DocumentLoader
@@ -15,9 +16,10 @@ import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from extract_thinker.batch_job import BatchJob
+
 
 from extract_thinker.utils import (
-    get_file_extension,
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
@@ -26,6 +28,13 @@ import yaml
 from copy import deepcopy
 
 class Extractor:
+    BATCH_SUPPORTED_MODELS = [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "gpt-4o-2024-08-06",
+        "gpt-4",
+    ]
+
     def __init__(
         self, document_loader: Optional[DocumentLoader] = None, llm: Optional[LLM] = None
     ):
@@ -197,11 +206,6 @@ class Extractor:
         else:
             content = self.document_loader.load_content_from_stream(path)
         return self._classify(content, classifications)
-
-    # def classify_with_image(self, messages: List[Dict[str, Any]]):
-    #     resp = litellm.completion(self.llm.model, messages)
-
-    #     return ClassificationResponse(**resp.choices[0].message.content)
 
     def _add_classification_structure(self, classification: Classification) -> str:
         content = ""
@@ -443,6 +447,154 @@ class Extractor:
 
         # Create an instance of the response_model with the aggregated_dict
         return response_model(**aggregated_dict)
+
+    def extract_batch(
+        self,
+        source: Union[str, IO, List[Union[str, IO]]],
+        response_model: Type[BaseModel],
+        vision: bool = False,
+        content: Optional[str] = None,
+        output_file_path: Optional[str] = None,
+        batch_file_path: Optional[str] = None,
+    ) -> BatchJob:
+        """
+        Extracts information from a source or list of sources using batch processing.
+
+        Args:
+            source: A single source (file path or IO stream) or a list of sources.
+            response_model: The Pydantic model to parse the response into.
+            vision: Whether to use vision capabilities (processing images).
+            content: Additional content to include in the extraction.
+
+        Returns:
+            A BatchJob object to monitor and retrieve batch processing results.
+        """
+        if not self.can_handle_batch():
+            raise ValueError(
+                f"Model {self.llm.model} does not support batch processing. "
+                f"Supported models: {', '.join(self.BATCH_SUPPORTED_MODELS)}"
+            )
+
+        # Create batch directory if it doesn't exist
+        batch_dir = os.path.join(os.getcwd(), "extract_thinker_batch")
+        os.makedirs(batch_dir, exist_ok=True)
+
+        # Generate unique paths if not provided
+        unique_id = str(uuid.uuid4())
+        if output_file_path is None:
+            new_output_file_path = os.path.join(batch_dir, f"output_{unique_id}.jsonl")
+        else:
+            new_output_file_path = output_file_path
+            
+        if batch_file_path is None:
+            new_batch_file_path = os.path.join(batch_dir, f"input_{unique_id}.jsonl")
+        else:
+            new_batch_file_path = batch_file_path
+        
+        # Check if provided paths exist
+        for path in [new_output_file_path, new_batch_file_path]:
+            if os.path.exists(path):
+                raise ValueError(f"File already exists: {path}")
+
+        self.extra_content = content
+        
+        # Ensure that sources is a list
+        if not isinstance(source, list):
+            sources = [source]
+        else:
+            sources = source
+
+        def get_messages():
+            for idx, src in enumerate(sources):
+                # Prepare content for each source
+                if vision:
+                    # Handle vision content
+                    if isinstance(src, str):
+                        if os.path.exists(src):
+                            with open(src, "rb") as f:
+                                image_data = f.read()
+                        else:
+                            raise ValueError(f"File {src} does not exist.")
+                    elif isinstance(src, IO):
+                        image_data = src.read()
+                    else:
+                        raise ValueError("Invalid source type for vision data.")
+
+                    encoded_image = base64.b64encode(image_data).decode("utf-8")
+                    image_content = f"data:image/jpeg;base64,{encoded_image}"
+                    message_content = [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_content
+                            }
+                        }
+                    ]
+                    if self.extra_content:
+                        message_content.insert(0, {"type": "text", "text": self.extra_content})
+
+                    messages = [
+                        {
+                            "role": "system",
+                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                        },
+                        {
+                            "role": "user",
+                            "content": message_content,
+                        },
+                    ]
+                else:
+                    if isinstance(src, str):
+                        if os.path.exists(src):
+                            content_data = self.document_loader.load_content_from_file(src)
+                        else:
+                            content_data = src  # Assume src is the text content
+                    elif isinstance(src, IO):
+                        content_data = self.document_loader.load_content_from_stream(src)
+                    else:
+                        raise ValueError("Invalid source type.")
+
+                    message_content = f"##Content\n\n{content_data}"
+                    if self.extra_content:
+                        message_content = f"##Extra Content\n\n{self.extra_content}\n\n" + message_content
+
+                    messages = [
+                        {
+                            "role": "system",
+                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                        },
+                        {
+                            "role": "user",
+                            "content": message_content,
+                        },
+                    ]
+                yield messages
+
+        # Create batch job with the message generator
+        batch_job = BatchJob(
+            messages_batch=get_messages(),
+            model=self.llm.model,
+            response_model=response_model,
+            file_path=new_batch_file_path,
+            output_path=new_output_file_path
+        )
+
+        return batch_job
+
+    def can_handle_batch(self) -> bool:
+        """
+        Checks if the current LLM model supports batch processing.
+        
+        Returns:
+            bool: True if batch processing is supported, False otherwise.
+        """
+        if not self.llm or not self.llm.model:
+            return False
+            
+        return any(
+            supported_model in self.llm.model.lower() 
+            for supported_model in self.BATCH_SUPPORTED_MODELS
+        )
 
     def _extract(
         self,

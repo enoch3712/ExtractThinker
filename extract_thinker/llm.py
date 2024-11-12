@@ -1,15 +1,14 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import instructor
 import litellm
-from extract_thinker.utils import num_tokens_from_string
+from extract_thinker.models.batch_result import BatchResult
 from litellm import Router
 
-
 class LLM:
-    def __init__(self, 
-                 model: str, 
-                 api_base: str = None, 
-                 api_key: str = None, 
+    def __init__(self,
+                 model: str,
+                 api_base: str = None,
+                 api_key: str = None,
                  api_version: str = None,
                  token_limit: int = None):
         self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
@@ -47,3 +46,9 @@ class LLM:
             )
 
         return response
+
+    def batch_request(self, batch_requests: List[Dict[str, Any]]) -> str:
+        return self.batch_client.create_batch(batch_requests)
+
+    def retrieve_batch_results(self, batch_id: str) -> BatchResult:
+        return self.batch_client.get_batch_results(batch_id)
