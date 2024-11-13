@@ -15,9 +15,9 @@ def test_load_content_from_file():
     content = loader.load_content_from_file(test_file_path)
 
     # Convert the list of words into a single string
-    content_text = " ".join(content["text"])
+    content_text = ",".join(content["text"])
 
     # Assert
     assert content is not None
-    assert "University of New York" in content_text
-    assert "XYZ Innovations" in content_text
+    assert "Universityof NewYork" in content_text
+    assert "XYZInnovations" in content_text

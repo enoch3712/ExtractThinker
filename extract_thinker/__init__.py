@@ -16,7 +16,7 @@ from .text_splitter import TextSplitter
 from .models.classification import Classification
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
-
+from .batch_job import BatchJob
 
 __all__ = [
     'Extractor',
@@ -38,4 +38,5 @@ __all__ = [
     'Classification',
     'Contract',
     'SplittingStrategy',
+	'BatchJob'
 ]

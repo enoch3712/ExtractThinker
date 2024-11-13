@@ -1,8 +1,8 @@
 import io
 from typing import Any, Dict, List, Union
-from PyPDF2 import PdfReader
-from extract_thinker.utils import get_file_extension
+from pypdf import PdfReader
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+
 SUPPORTED_FORMATS = ['pdf']
 
 class DocumentLoaderPyPdf(CachedDocumentLoader):
