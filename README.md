@@ -27,10 +27,7 @@ ExtractThinker is a flexible document intelligence tool that leverages Large Lan
 - **Splitting Strategies**: Implement lazy or eager splitting strategies to process documents page by page or as a whole.
 - **Integration with LLMs**: Easily integrate with different LLM providers like OpenAI, Anthropic, Cohere, and more.
 - **Community-driven Development**: Inspired by the LangChain ecosystem with a focus on intelligent document processing.
-
-<p align="center">
-  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/996fb2de-0558-4f13-ab3d-7ea56a593951" alt="Extract Thinker Infrastructure Diagram" width="600"/>
-</p>
+![image](https://github.com/user-attachments/assets/844b425c-0bb7-4abc-9d08-96e4a736d096)
 
 ## 📦 Installation
 
@@ -286,9 +283,7 @@ ExtractThinker uses a modular architecture inspired by the LangChain ecosystem:
 - **Classifications**: Classify documents or document sections to apply appropriate extraction contracts.
 - **Processes**: Manage the workflow of loading, classifying, splitting, and extracting data from documents.
 
-<p align="center">
-  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/b1b8800c-3c55-4ee5-92fe-b8b663c7a81f" alt="Extract Thinker Components Diagram" width="500"/>
-</p>
+![image](https://github.com/user-attachments/assets/b12ba937-20a8-47da-a778-c126bc1748b3)
 
 ## 📝 Why Use ExtractThinker?
 
@@ -313,7 +308,12 @@ We welcome contributions from the community! To contribute:
 
 Stay updated and connect with the community:
 
-- [Author's Medium](https://medium.com/@enoch3712)
+- [Claude 3.5 — The King of Document Intelligence](https://medium.com/gitconnected/claude-3-5-the-king-of-document-intelligence-f57bea1d209d?sk=124c5abb30c0e7f04313c5e20e79c2d1)
+- [Classification Tree for LLMs](https://medium.com/gitconnected/classification-tree-for-llms-32b69015c5e0?sk=8a258cf74fe3483e68ab164e6b3aaf4c)
+- [Advanced Document Classification with LLMs](https://medium.com/gitconnected/advanced-document-classification-with-llms-8801eaee3c58?sk=f5a22ee72022eb70e112e3e2d1608e79)
+- [Phi-3 and Azure: PDF Data Extraction | ExtractThinker](https://medium.com/towards-artificial-intelligence/phi-3-and-azure-pdf-data-extraction-extractthinker-cb490a095adb?sk=7be7e625b8f9932768442f87dd0ebcec)
+- [ExtractThinker: Document Intelligence for LLMs](https://medium.com/towards-artificial-intelligence/extractthinker-ai-document-intelligence-with-llms-72cbce1890ef)
+  
 - [GitHub Issues](https://github.com/enoch3712/Open-DocLLM/issues)
 
 ## 📄 License
