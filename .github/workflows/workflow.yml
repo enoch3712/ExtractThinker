@@ -52,7 +52,7 @@ jobs:
     - name: Verify Python version
       run: |
         python_version=$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-        if (( $(echo "$python_version >= 3.9" | bc -l) )) && (( $(echo "$python_version < 4.0" | bc -l) )); then
+        if python -c "import sys; exit(0 if sys.version_info >= (3, 9) and sys.version_info < (4, 0) else 1)"; then
           echo "Python version $python_version meets requirements (>=3.9, <4.0)"
         else
           echo "Python version $python_version does not meet requirements (>=3.9, <4.0)"
