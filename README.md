@@ -46,7 +46,7 @@ Here's a quick example to get you started with ExtractThinker. This example demo
 ```python
 import os
 from dotenv import load_dotenv
-from extract_thinker import Extractor, DocumentLoaderTesseract, Contract
+from extract_thinker import Extractor, DocumentLoaderPyPdf, Contract
 
 load_dotenv()
 
