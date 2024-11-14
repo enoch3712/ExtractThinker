@@ -23,8 +23,10 @@ jobs:
         pip install poetry
         poetry install
 
-    # - name: Run tests
-    #   run: poetry run pytest
+    - name: Run critical tests
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: poetry run pytest tests/critical/ -v
 
     - name: Build package
       run: poetry build
