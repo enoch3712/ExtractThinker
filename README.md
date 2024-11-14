@@ -41,7 +41,7 @@ pip install extract_thinker
 
 ### Basic Extraction Example
 
-Here's a quick example to get you started with ExtractThinker. This example demonstrates how to load a document using Tesseract OCR and extract specific fields defined in a contract.
+Here's a quick example to get you started with ExtractThinker. This example demonstrates how to load a document using PyPdf and extract specific fields defined in a contract.
 
 ```python
 import os
