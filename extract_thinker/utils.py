@@ -9,10 +9,37 @@ import typing
 import os
 from io import BytesIO
 from typing import Union
+import sys
+from typing import List
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+def encode_image(image_source: Union[str, BytesIO]) -> str:
+    """
+    Encode an image to base64 string from either a file path or BytesIO stream.
+
+    Args:
+        image_source (Union[str, BytesIO]): The image source, either a file path or BytesIO stream
+
+    Returns:
+        str: Base64 encoded string of the image
+    """
+    try:
+        if isinstance(image_source, str):
+            with open(image_source, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode("utf-8")
+        elif isinstance(image_source, BytesIO):
+            # Save current position
+            current_position = image_source.tell()
+            # Move to start of stream
+            image_source.seek(0)
+            # Encode stream content
+            encoded = base64.b64encode(image_source.read()).decode("utf-8")
+            # Restore original position
+            image_source.seek(current_position)
+            return encoded
+        else:
+            raise ValueError("Image source must be either a file path (str) or BytesIO stream")
+    except Exception as e:
+        raise Exception(f"Failed to encode image: {str(e)}")
 
 def is_pdf_stream(stream: Union[BytesIO, str]) -> bool:
     """
@@ -92,24 +119,67 @@ def convert_yaml_to_json(yaml_data: str):
     return json_content
 
 
+def simple_token_counter(text: str) -> int:
+    """
+    A lightweight token counter that approximates GPT tokenization rules.
+    Used as fallback for Python 3.13+
+    """
+    if not text:
+        return 0
+        
+    # Preprocessing
+    text = text.lower()
+    
+    # Split into chunks (words, punctuation, numbers)
+    chunks = re.findall(r"""
+        [a-z]{1,20}|         # Words
+        [0-9]+|              # Numbers
+        [^a-z0-9\s]{1,2}|   # 1-2 special chars
+        \s+                  # Whitespace
+        """, text, re.VERBOSE)
+    
+    # Count tokens with some basic rules
+    token_count = 0
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+            
+        # Whitespace
+        if chunk.isspace():
+            token_count += 1
+            continue
+            
+        # Short words (likely one token)
+        if len(chunk) <= 4:
+            token_count += 1
+            continue
+            
+        # Longer words (may be split into subwords)
+        token_count += max(1, len(chunk) // 4)
+    
+    return token_count
+
+
 def num_tokens_from_string(text: str) -> int:
     """
-    Returns the number of tokens in a text string using the GPT-4 encoding.
-
-    Args:
-    text (str): The text string to tokenize.
-
-    Returns:
-    int: The number of tokens.
+    Returns the number of tokens in a text string.
+    Uses tiktoken for Python <3.13, falls back to simple counter for 3.13+
     """
-    # Automatically load the encoding for GPT-4
-    encoding = tiktoken.encoding_for_model("gpt-4")
-
-    # Encode the string to get the list of token integers.
-    tokens = encoding.encode(text)
-
-    # Return the number of tokens.
-    return len(tokens)
+    python_version = sys.version_info[:2]
+    
+    # For Python versions below 3.13, use tiktoken
+    if python_version < (3, 13):
+        try:
+            import tiktoken
+            encoding = tiktoken.encoding_for_model("gpt-4")
+            return len(encoding.encode(text))
+        except ImportError:
+            print("Warning: tiktoken not installed for Python <3.13. Using fallback counter.")
+            return simple_token_counter(text)
+    
+    # For Python 3.13+, use the simple counter
+    return simple_token_counter(text)
 
 
 def string_to_pydantic_class(class_definition: str):

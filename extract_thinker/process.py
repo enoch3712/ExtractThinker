@@ -1,5 +1,8 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
+from extract_thinker.models.classification_strategy import ClassificationStrategy
+from extract_thinker.models.doc_groups2 import DocGroups2
+from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
 from extract_thinker.masking.deterministic_hashing_masking_strategy import DeterministicHashingMaskingStrategy
 from extract_thinker.models.classification import Classification
@@ -7,7 +10,6 @@ from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification_tree import ClassificationTree
 from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.doc_group import DocGroup
-from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.splitter import Splitter
 from extract_thinker.models.doc_groups import (
     DocGroups,
@@ -52,7 +54,7 @@ class Process:
             self.llm = LLM(model)
             
         if strategy == MaskingStrategy.SIMPLE_PLACEHOLDER:
-            self.masking_strategy = SimplePlaceholderMaskingStrategy(self.llm)
+            self.masking_strategy = LLMMaskingStrategy(self.llm)
         elif strategy == MaskingStrategy.MOCKED_DATA:
             self.masking_strategy = MockedDataMaskingStrategy(self.llm)
         elif strategy == MaskingStrategy.DETERMINISTIC_HASHING:
@@ -198,7 +200,7 @@ class Process:
         self.file_path = file
         return self
 
-    def split(self, classifications: List[Classification]):
+    def split(self, classifications: List[Classification], strategy: SplittingStrategy = SplittingStrategy.EAGER):
 
         self.split_classifications = classifications
 
@@ -206,7 +208,6 @@ class Process:
 
         if documentLoader is None:
             raise ValueError("No suitable document loader found for file type")
-
         if self.file_path:
             content = documentLoader.load_content_from_file_list(self.file_path)
         elif self.file_stream:
@@ -216,66 +217,16 @@ class Process:
 
         if len(content) == 1:
             raise ValueError("Document must have at least 2 pages")
-
-        groups = self.splitter.split_document_into_groups(content)
-
-        loop = asyncio.get_event_loop()
-        processedGroups = loop.run_until_complete(
-            self.splitter.process_split_groups(groups, classifications)
-        )
-
-        doc_groups = self.aggregate_split_documents_2(processedGroups)
-
-        # doc_groups = DocGroups()
-        # doc_groups.doc_groups.append(DocGroup(pages=[1], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[2], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[3], classification='Invoice'))
-        # doc_groups.doc_groups.append(DocGroup(pages=[4, 5], classification='Invoice'))
-
-        self.doc_groups = doc_groups
+        
+        if strategy == SplittingStrategy.EAGER:
+            eager_group = self.splitter.split_eager_doc_group(content, classifications)
+            self.doc_groups = eager_group
+        else:  # LAZY strategy
+            processed_groups = self.splitter.split_lazy_doc_group(content, classifications)
+            self.doc_groups = processed_groups.doc_groups
 
         return self
 
-    def aggregate_split_documents_2(self, doc_groups_tasks: List[DocGroups2]) -> DocGroups:
-        doc_groups = DocGroups()
-        current_group = DocGroup()
-        page_number = 1
-
-        # do the first group outside of the loop
-        doc_group = doc_groups_tasks[0]
-
-        if doc_group.belongs_to_same_document:
-            current_group.pages = [1, 2]
-            current_group.classification = doc_group.classification_page1
-        else:
-            current_group.pages = [1]
-            current_group.classification = doc_group.classification_page1
-
-            doc_groups.doc_groups.append(current_group)
-
-            current_group = DocGroup()
-            current_group.pages = [2]
-            current_group.classification = doc_group.classification_page2
-
-        page_number += 1
-
-        for index in range(1, len(doc_groups_tasks)):
-            doc_group_2 = doc_groups_tasks[index]
-
-            if doc_group_2.belongs_to_same_document:
-                current_group.pages.append(page_number + 1)
-            else:
-                doc_groups.doc_groups.append(current_group)
-
-                current_group = DocGroup()
-                current_group.classification = doc_group_2.classification_page2
-                current_group.pages = [page_number + 1]
-
-            page_number += 1
-
-        doc_groups.doc_groups.append(current_group)  # the last group
-
-        return doc_groups
 
     def where(self, condition):
         pass
@@ -285,7 +236,7 @@ class Process:
             raise ValueError("Document groups have not been initialized")
 
         async def _extract(doc_group):
-            classificationStr = doc_group.classification  # str
+            classificationStr = doc_group.classification
 
             for classification in self.split_classifications:
                 if classification.name == classificationStr:
@@ -315,7 +266,7 @@ class Process:
             pages_content = [content[i - 1] for i in doc_group.pages]
             return await extractor.extract_async(pages_content, contract)
 
-        doc_groups = self.doc_groups.doc_groups
+        doc_groups = self.doc_groups
 
         async def process_doc_groups(groups: List[Any]) -> List[Any]:
             # Create asynchronous tasks for processing each group

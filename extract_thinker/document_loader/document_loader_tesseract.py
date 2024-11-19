@@ -1,6 +1,7 @@
 from io import BytesIO
 from operator import attrgetter
 import os
+
 import threading
 from typing import Any, List, Union
 from PIL import Image
@@ -74,16 +75,29 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
         try:
             # Reset stream position
             stream.seek(0)
-            # Can you give me a file: Union[str, io.BytesIO]
             file = BytesIO(stream.read())
             images = self.convert_to_images(file)
+            
+            # Add debug logging
+            if not images:
+                raise Exception("No images were extracted from PDF")
+                
             extracted_text = []
-
             for page_number, image_bytes in images.items():
-                image = BytesIO(image_bytes[0])
-                text = self.process_image(image)
+                # Convert image data to proper BytesIO stream
+                if isinstance(image_bytes, bytes):
+                    image_stream = BytesIO(image_bytes)
+                elif isinstance(image_bytes, BytesIO):
+                    image_stream = image_bytes
+                else:
+                    raise ValueError(f"Unexpected image data type for page {page_number}: {type(image_bytes)}")
+
+                text = self.process_image(image_stream)
                 extracted_text.append(text)
 
+            if not extracted_text:
+                raise Exception("No text was extracted from any pages")
+                
             # Combine text from all pages
             self.content = "\n".join(extracted_text)
             return self.content
@@ -93,7 +107,9 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     def process_image(self, image: BytesIO) -> str:
         for attempt in range(3):
             try:
-                raw_text = str(pytesseract.image_to_string(Image.open(image)))
+                # Convert bytes to PIL Image
+                pil_image = Image.open(image)
+                raw_text = str(pytesseract.image_to_string(pil_image))
                 if raw_text:
                     return raw_text
             except Exception as e:
@@ -103,16 +119,25 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
 
     def worker(self, input_queue: Queue, output_queue: Queue):
         while True:
-            image = input_queue.get()
-            if image is None:  # Sentinel to indicate shutdown
+            image_data = input_queue.get()
+            if image_data is None:  # Sentinel to indicate shutdown
                 break
             try:
-                text = self.process_image(image)
-                output_queue.put((image, text))
+                # Convert bytes to BytesIO if needed
+                if isinstance(image_data, bytes):
+                    image_stream = BytesIO(image_data)
+                elif isinstance(image_data, BytesIO):
+                    image_stream = image_data
+                else:
+                    raise ValueError(f"Unexpected image data type: {type(image_data)}")
+                    
+                text = self.process_image(image_stream)
+                output_queue.put((image_data, text))
             except Exception as e:
-                output_queue.put((image, str(e)))
+                output_queue.put((image_data, str(e)))
             input_queue.task_done()
 
+    @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
     def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
         images = self.convert_to_images(stream)
         input_queue = Queue()
@@ -140,8 +165,12 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
             image, content = output_queue.get()
             contents.append({"image": image, "content": content})
 
+        # put the first page at the end of the list
+        contents.append(contents.pop(0))
+
         return contents
 
+    @cachedmethod(cache=attrgetter('cache'), key=lambda self, input: hashkey(id(input)))
     def load_content_from_file_list(self, input: List[Union[str, BytesIO]]) -> List[Any]:
         images = self.convert_to_images(input)
         input_queue = Queue()
@@ -169,4 +198,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
             image, content = output_queue.get()
             contents.append({"image": Image.open(image), "content": content})
 
+        # put the first page at the end of the list
+        contents.append(contents.pop(0))
+        
         return contents

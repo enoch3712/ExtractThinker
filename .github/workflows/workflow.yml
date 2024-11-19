@@ -23,8 +23,10 @@ jobs:
         pip install poetry
         poetry install
 
-    # - name: Run tests
-    #   run: poetry run pytest
+    - name: Run critical tests
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: poetry run pytest tests/critical/ -v
 
     - name: Build package
       run: poetry build
@@ -35,3 +37,30 @@ jobs:
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
+
+  test-python-versions:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Verify Python version
+      run: |
+        python_version=$(python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+        if python -c "import sys; exit(0 if sys.version_info >= (3, 9) and sys.version_info < (4, 0) else 1)"; then
+          echo "Python version $python_version meets requirements (>=3.9, <4.0)"
+        else
+          echo "Python version $python_version does not meet requirements (>=3.9, <4.0)"
+          exit 1
+        fi
+    - name: Test installation
+      run: |
+        pip install poetry
+        poetry install
