@@ -1,8 +1,9 @@
 import asyncio
 import base64
 from io import BytesIO
-from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
-from instructor.batch import BatchJob
+import json
+import os
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
 import uuid
 import litellm
 from pydantic import BaseModel
@@ -11,8 +12,6 @@ from extract_thinker.document_loader.document_loader_llm_image import DocumentLo
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.llm import LLM
-import os
-
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -101,7 +100,10 @@ class Extractor:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
 
         if isinstance(source, str):
-            if os.path.exists(source):
+            # Check if it's a URL (basic check for http/https prefix)
+            if source.startswith(('http://', 'https://')):
+                return self.extract_from_file(source, response_model, vision)
+            elif os.path.exists(source):
                 return self.extract_from_file(source, response_model, vision)
             else:
                 return self.extract_from_content(source, response_model, vision)
@@ -111,7 +113,7 @@ class Extractor:
             return self.extract_from_list(source, response_model, vision)
         else:
             raise ValueError(
-                "Source must be a file path, a stream, or a list of dictionaries"
+                "Source must be a file path, a URL, a stream, or a list of dictionaries"
             )
 
     async def extract_async(
@@ -713,3 +715,114 @@ class Extractor:
 
     def loadstream(self, stream):
         return self
+
+    async def extract_batch(
+        self,
+        sources: List[Union[str, IO]],
+        response_model: type[BaseModel],
+        vision: bool = False,
+        content: Optional[str] = None,
+    ) -> List[Any]:
+        self.extra_content = content
+
+        # Prepare batch requests
+        batch_requests = []
+        for idx, source in enumerate(sources):
+            if isinstance(source, str):
+                if source.startswith(('http://', 'https://')) or os.path.exists(source):
+                    content = self.extract_from_file(source, response_model, vision)
+                else:
+                    content = self.extract_from_content(source, response_model, vision)
+            elif isinstance(source, list) and all(isinstance(item, dict) for item in source):
+                content = self.extract_from_list(source, response_model, vision)
+            else:
+                raise ValueError("Source must be a file path, a URL, a stream, or a list of dictionaries")
+
+            # Prepare messages as in extract()
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                },
+            ]
+
+            if self.extra_content is not None:
+                if isinstance(self.extra_content, dict):
+                    self.extra_content = yaml.dump(self.extra_content)
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "##Extra Content\n\n" + self.extra_content,
+                    }
+                )
+
+            if content is not None:
+                if isinstance(content, dict):
+                    if content.get("is_spreadsheet", False):
+                        content = json_to_formatted_string(content.get("data", {}))
+                    content = yaml.dump(content, default_flow_style=True)
+                messages.append(
+                    {"role": "user", "content": "##Content\n\n" + content}
+                )
+
+            # Now, prepare the request object
+            request_obj = {
+                "custom_id": f"task-{idx}",
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": {
+                    "model": self.llm.model,
+                    "messages": messages,
+                },
+            }
+            batch_requests.append(request_obj)
+
+        # Create the JSONL file content
+        jsonl_content = '\n'.join(json.dumps(req) for req in batch_requests)
+        jsonl_bytes = jsonl_content.encode('utf-8')
+
+        # Upload the JSONL file to OpenAI
+        file_obj = await litellm.acreate_file(
+            file=BytesIO(jsonl_bytes),
+            purpose="batch",
+            custom_llm_provider="openai",
+        )
+        print("Response from creating file:", file_obj)
+
+        # Create batch request
+        create_batch_response = await litellm.acreate_batch(
+            completion_window="24h",
+            endpoint="/v1/chat/completions",
+            input_file_id=file_obj['id'],
+            custom_llm_provider="openai",
+            metadata={"batch_type": "extract_batch"},
+        )
+        print("Response from creating batch:", create_batch_response)
+
+        batch_id = create_batch_response['id']
+
+        # Wait for the batch to complete
+        # Implement proper polling in a real scenario
+        while True:
+            retrieved_batch = await litellm.aretrieve_batch(
+                batch_id=batch_id,
+                custom_llm_provider="openai"
+            )
+            status = retrieved_batch.get('status')
+            if status == 'completed':
+                break
+            elif status == 'failed':
+                raise Exception("Batch processing failed")
+            else:
+                await asyncio.sleep(5)  # Wait before polling again
+
+        # Parse the results
+        results = []
+        for result in retrieved_batch['results']:
+            # Each result should have an 'output' field with the assistant's reply
+            assistant_message = result['output']['choices'][0]['message']['content']
+            # Parse the assistant's message into the response_model
+            response = response_model.parse_raw(assistant_message)
+            results.append(response)
+
+        return results

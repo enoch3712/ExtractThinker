@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
@@ -149,3 +151,6 @@ def test_cancel_batch_extraction():
     # Check if files were removed
     assert not os.path.exists(batch_job.file_path), f"Batch input file was not removed: {batch_job.file_path}"
     assert not os.path.exists(batch_job.output_path), f"Batch output file was not removed: {batch_job.output_path}"
+
+if __name__ == "__main__":
+    test_cancel_batch_extraction()
