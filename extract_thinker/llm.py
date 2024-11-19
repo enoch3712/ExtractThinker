@@ -46,9 +46,3 @@ class LLM:
             )
 
         return response
-
-    def batch_request(self, batch_requests: List[Dict[str, Any]]) -> str:
-        return self.batch_client.create_batch(batch_requests)
-
-    def retrieve_batch_results(self, batch_id: str) -> BatchResult:
-        return self.batch_client.get_batch_results(batch_id)
