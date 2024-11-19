@@ -8,7 +8,7 @@ class LLMMaskingStrategy(AbstractMaskingStrategy):
         messages_step1 = [
             {
                 "role": "system",
-                "content": "You are an AI assistant that masks sensitive information in text."
+                "content": "You are an AI assistant that masks only Personally Identifiable Information (PII) in text. Replace PII with placeholders in the format [TYPE#], e.g., [PERSON1], [ADDRESS1], [EMAIL1], etc. Do not mask numerical values or non-PII data."
             },
             {
                 "role": "user",
