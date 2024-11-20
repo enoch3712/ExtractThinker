@@ -83,7 +83,7 @@ class Extractor:
     def extract(
         self,
         source: Union[str, IO, list],
-        response_model: type[BaseModel],
+        response_model: Type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
     ) -> Any:
@@ -115,20 +115,20 @@ class Extractor:
     async def extract_async(
         self,
         source: Union[str, IO, list],
-        response_model: type[BaseModel],
+        response_model: Type[BaseModel],
         vision: bool = False,
     ) -> Any:
         return await asyncio.to_thread(self.extract, source, response_model, vision)
     
     def extract_from_content(
-        self, content: str, response_model: type[BaseModel], vision: bool = False
+        self, content: str, response_model: Type[BaseModel], vision: bool = False
     ) -> str:
         return self._extract(content, None, response_model, vision)
 
     def extract_from_list(
         self, 
         data: List[Dict[Any, Any]], 
-        response_model: type[BaseModel], 
+        response_model: Type[BaseModel], 
         vision: bool
     ) -> str:
         # check if document_loader is None, raise error
@@ -146,7 +146,7 @@ class Extractor:
         return self._extract(content, data, response_model, vision, is_stream=False)
 
     def extract_from_file(
-        self, file: str, response_model: type[BaseModel], vision: bool = False
+        self, file: str, response_model: Type[BaseModel], vision: bool = False
     ) -> str:
         if self.document_loader is not None:
             content = self.document_loader.load_content_from_file(file)
@@ -158,7 +158,7 @@ class Extractor:
         return self._extract(content, file, response_model, vision)
 
     def extract_from_stream(
-        self, stream: IO, response_model: type[BaseModel], vision: bool = False
+        self, stream: IO, response_model: Type[BaseModel], vision: bool = False
     ) -> str:
         # check if document_loader is None, raise error
         if self.document_loader is None:
@@ -401,7 +401,7 @@ class Extractor:
             chunks.append(current_chunk.strip())
         return chunks
 
-    def aggregate_results(self, results: List[Any], response_model: type[BaseModel]) -> Any:
+    def aggregate_results(self, results: List[Any], response_model: Type[BaseModel]) -> Any:
         if len(results) == 1:
             return results[0]
 
