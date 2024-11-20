@@ -8,6 +8,7 @@ from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadShe
 from .document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
+from .document_loader.beautiful_soup_web_loader import DocumentLoaderBeautifulSoup
 from .models import classification, classification_response
 from .process import Process
 from .splitter import Splitter
@@ -28,6 +29,7 @@ __all__ = [
     'DocumentLoaderAzureForm',
     'DocumentLoaderPyPdf',
     'DocumentLoaderPdfPlumber',
+    'DocumentLoaderBeautifulSoup',
     'classification',
     'classification_response',
     'Process',

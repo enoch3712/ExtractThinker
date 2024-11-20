@@ -101,7 +101,10 @@ class Extractor:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
 
         if isinstance(source, str):
-            if os.path.exists(source):
+            # Check if it's a URL (basic check for http/https prefix)
+            if source.startswith(('http://', 'https://')):
+                return self.extract_from_file(source, response_model, vision)
+            elif os.path.exists(source):
                 return self.extract_from_file(source, response_model, vision)
             else:
                 return self.extract_from_content(source, response_model, vision)
@@ -111,7 +114,7 @@ class Extractor:
             return self.extract_from_list(source, response_model, vision)
         else:
             raise ValueError(
-                "Source must be a file path, a stream, or a list of dictionaries"
+                "Source must be a file path, a URL, a stream, or a list of dictionaries"
             )
 
     async def extract_async(
