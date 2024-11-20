@@ -73,7 +73,7 @@ class DocumentLoader(ABC):
     def getContent(self) -> Any:
         return self.content
 
-    def load_content_list(self, input_data: Union[str, BytesIO, List[Union[str, BytesIO]]]) -> Union[str, List[str]]:
+    def load_content_list(self, input_data: Union[str, BytesIO, List[Union[str, BytesIO]]]) -> Union[str, List[str]]:  
         if isinstance(input_data, (str, BytesIO)):
             return self.load_content_from_stream_list(input_data)
         elif isinstance(input_data, list):
@@ -90,8 +90,6 @@ class DocumentLoader(ABC):
         pass
 
     def convert_to_images(self, file: Union[str, io.BytesIO], scale: float = 300 / 72) -> Dict[int, bytes]:
-        if not self.can_handle(file):
-            raise ValueError("Unsupported file type or stream.")
         # Determine if the input is a file path or a stream
         if isinstance(file, str):
             return self._convert_file_to_images(file, scale)

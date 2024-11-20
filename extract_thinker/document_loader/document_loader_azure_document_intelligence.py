@@ -10,6 +10,7 @@ from cachetools.keys import hashkey
 
 
 class DocumentLoaderAzureForm(CachedDocumentLoader):
+    SUPPORTED_FORMATS = ["pdf", "jpeg", "jpg", "png", "bmp", "tiff", "heif", "docx", "xlsx", "pptx", "html"]
     def __init__(self, subscription_key: str, endpoint: str, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
         self.subscription_key = subscription_key

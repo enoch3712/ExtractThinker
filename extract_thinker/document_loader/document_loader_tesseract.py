@@ -14,10 +14,9 @@ from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from queue import Queue
 
-SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]
-
-
 class DocumentLoaderTesseract(CachedDocumentLoader):
+    SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]
+    
     def __init__(self, tesseract_cmd, isContainer=False, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
         self.tesseract_cmd = tesseract_cmd
@@ -36,7 +35,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
                 with open(file_path, 'rb') as file:
                     return self.process_pdf(file)
             file_type = get_image_type(file_path)
-            if file_type in SUPPORTED_IMAGE_FORMATS:
+            if file_type in self.SUPPORTED_FORMATS:
                 image = Image.open(file_path)
                 raw_text = str(pytesseract.image_to_string(image))
                 self.content = raw_text
@@ -52,7 +51,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
             if is_pdf_stream(stream):
                 return self.process_pdf(stream)
             file_type = get_image_type(stream)
-            if file_type in SUPPORTED_IMAGE_FORMATS:
+            if file_type in self.SUPPORTED_FORMATS:
                 image = Image.open(stream)
                 raw_text = str(pytesseract.image_to_string(image))
                 self.content = raw_text

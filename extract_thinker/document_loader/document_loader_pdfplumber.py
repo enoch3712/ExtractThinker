@@ -6,15 +6,15 @@ import pdfplumber
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import get_file_extension
 
-SUPPORTED_FORMATS = ['pdf']
-
 class DocumentLoaderPdfPlumber(CachedDocumentLoader):
+    SUPPORTED_FORMATS = ['pdf']
+
     def __init__(self, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
 
     def load_content_from_file(self, file_path: str) -> Union[str, Dict[str, Any]]:
         try:
-            if get_file_extension(file_path).lower() not in SUPPORTED_FORMATS:
+            if get_file_extension(file_path).lower() not in self.SUPPORTED_FORMATS:
                 raise Exception(f"Unsupported file type: {file_path}")
 
             with pdfplumber.open(file_path) as pdf:
