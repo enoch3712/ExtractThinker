@@ -16,23 +16,42 @@ class DocumentLoader(ABC):
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
 
     def can_handle(self, source: Union[str, BytesIO]) -> bool:
-            file_type = None
-            try:
-                if isinstance(source, str):
-                    if not os.path.isfile(source):
-                        return False
-                    file_type = get_file_extension(source)
-                elif isinstance(source, BytesIO):
-                    source.seek(0)
-                    img = Image.open(source)
-                    file_type = img.format.lower()
-                    source.seek(0)
-                else:
-                    return False
-                return file_type.lower() in [fmt.lower() for fmt in self.SUPPORTED_FORMATS]
-            except Exception:
-                return False
+        """
+        Checks if the loader can handle the given source.
+        
+        Args:
+            source: Either a file path (str) or a BytesIO stream
             
+        Returns:
+            bool: True if the loader can handle the source, False otherwise
+        """
+        try:
+            if isinstance(source, str):
+                return self._can_handle_file_path(source)
+            elif isinstance(source, BytesIO):
+                return self._can_handle_stream(source)
+            return False
+        except Exception:
+            return False
+
+    def _can_handle_file_path(self, file_path: str) -> bool:
+        """Checks if the loader can handle the given file path."""
+        if not os.path.isfile(file_path):
+            return False
+        file_type = get_file_extension(file_path)
+        return file_type.lower() in [fmt.lower() for fmt in self.SUPPORTED_FORMATS]
+
+    def _can_handle_stream(self, stream: BytesIO) -> bool:
+        """Checks if the loader can handle the given BytesIO stream."""
+        try:
+            stream.seek(0)
+            img = Image.open(stream)
+            file_type = img.format.lower()
+            stream.seek(0)
+            return file_type.lower() in [fmt.lower() for fmt in self.SUPPORTED_FORMATS]
+        except Exception:
+            return False
+                
     @abstractmethod
     def load_content_from_file(self, file_path: str) -> Union[str, object]:
         pass
@@ -42,6 +61,8 @@ class DocumentLoader(ABC):
         pass
 
     def load(self, source: Union[str, BytesIO]) -> Any:
+        if not self.can_handle(source):
+            raise ValueError("Unsupported file type or stream.")
         if isinstance(source, str):
             return self.load_content_from_file(source)
         elif isinstance(source, BytesIO):
@@ -52,7 +73,7 @@ class DocumentLoader(ABC):
     def getContent(self) -> Any:
         return self.content
 
-    def load_content_list(self, input_data: Union[str, BytesIO, List[Union[str, BytesIO]]]) -> Union[str, List[str]]:
+    def load_content_list(self, input_data: Union[str, BytesIO, List[Union[str, BytesIO]]]) -> Union[str, List[str]]:  
         if isinstance(input_data, (str, BytesIO)):
             return self.load_content_from_stream_list(input_data)
         elif isinstance(input_data, list):

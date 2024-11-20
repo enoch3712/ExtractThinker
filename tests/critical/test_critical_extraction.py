@@ -1,7 +1,4 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from dotenv import load_dotenv
 from extract_thinker import Extractor
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
@@ -24,4 +21,4 @@ def test_critical_extract_with_pypdf():
     assert result.lines[0].description == "Consultation services"
     assert result.lines[0].quantity == 3
     assert result.lines[0].unit_price == 375
-    assert result.lines[0].amount == 1125 
+    assert result.lines[0].amount == 1125

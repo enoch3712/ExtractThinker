@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Union
 from pypdf import PdfReader
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-SUPPORTED_FORMATS = ['pdf']
-
 class DocumentLoaderPyPdf(CachedDocumentLoader):
+    SUPPORTED_FORMATS = ['pdf']
+    
     def __init__(self, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
 

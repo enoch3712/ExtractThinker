@@ -13,11 +13,9 @@ from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_str
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-from queue import Queue
-
-SUPPORTED_IMAGE_FORMATS = ["jpeg", "png", "pdf"]
 
 class DocumentLoaderAWSTextract(CachedDocumentLoader):
+    SUPPORTED_FORMATS = ["jpeg", "png", "pdf", "tiff"]
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, textract_client=None, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
         if textract_client:
@@ -42,7 +40,7 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
             if is_pdf_stream(stream):
                 file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
                 return self.process_pdf(file_bytes)
-            elif get_image_type(stream) in SUPPORTED_IMAGE_FORMATS:
+            elif get_image_type(stream) in self.SUPPORTED_FORMATS:
                 file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
                 return self.process_image(file_bytes)
             else:
@@ -58,7 +56,7 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
                 with open(file_path, 'rb') as file:
                     file_bytes = file.read()
                 return self.process_pdf(file_bytes)
-            elif file_type in SUPPORTED_IMAGE_FORMATS:
+            elif file_type in self.SUPPORTED_FORMATS:
                 with open(file_path, 'rb') as file:
                     file_bytes = file.read()
                 return self.process_image(file_bytes)
