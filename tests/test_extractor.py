@@ -1,7 +1,5 @@
 import asyncio
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
@@ -72,31 +70,31 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     assert result.lines[0].unit_price == 375
     assert result.lines[0].amount == 1125
 
-# def test_vision_with_chart():
-#     # Arrange
-#     extractor = Extractor()
-#     extractor.load_llm("gpt-4o")
-#     test_file_path = os.path.join(cwd, "tests", "test_images", "image.png")
+def test_vision_with_chart():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o")
+    test_file_path = os.path.join(cwd, "tests", "test_images", "image.png")
 
-#     # Act
-#     result = extractor.extract(test_file_path, ChartWithContent, vision=True)
+    # Act
+    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
 
-#     # Assert
-#     assert result is not None
-#     # TODO: For now is sanity to test for errors
+    # Assert
+    assert result is not None
+    # TODO: For now is sanity to test for errors
 
-# def test_vision_content_pdf():
-#     # Arrange
-#     extractor = Extractor()
-#     extractor.load_llm("gpt-4o")
-#     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+def test_vision_content_pdf():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o")
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
-#     # Act
-#     result = extractor.extract(test_file_path, InvoiceContract, vision=True)
+    # Act
+    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
 
-#     # Assert
-#     assert result is not None
-#     # TODO: For now is sanity to test for errors
+    # Assert
+    assert result is not None
+    # TODO: For now is sanity to test for errors
 
 def test_batch_extraction_single_source():
     # Arrange
