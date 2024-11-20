@@ -42,6 +42,8 @@ class DocumentLoader(ABC):
         pass
 
     def load(self, source: Union[str, BytesIO]) -> Any:
+        if not self.can_handle(source):
+            raise ValueError("Unsupported file type or stream.")
         if isinstance(source, str):
             return self.load_content_from_file(source)
         elif isinstance(source, BytesIO):
@@ -69,6 +71,8 @@ class DocumentLoader(ABC):
         pass
 
     def convert_to_images(self, file: Union[str, io.BytesIO], scale: float = 300 / 72) -> Dict[int, bytes]:
+        if not self.can_handle(file):
+            raise ValueError("Unsupported file type or stream.")
         # Determine if the input is a file path or a stream
         if isinstance(file, str):
             return self._convert_file_to_images(file, scale)
