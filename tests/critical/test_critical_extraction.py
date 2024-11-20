@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from extract_thinker import Extractor
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
-from models.invoice import InvoiceContract
+from tests.models.invoice import InvoiceContract
 
 load_dotenv()
 cwd = os.getcwd()
