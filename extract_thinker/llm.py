@@ -22,7 +22,12 @@ class LLM:
     def load_router(self, router: Router) -> None:
         self.router = router
 
-    def request(self, messages: List[Dict[str, str]], response_model: str) -> Any:
+    def request(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Optional[str] = None
+    ) -> Any:
+        # Uncomment the following lines if you need to calculate max_tokens
         # contents = map(lambda message: message['content'], messages)
         # all_contents = ' '.join(contents)
         # max_tokens = num_tokens_from_string(all_contents)
@@ -30,19 +35,28 @@ class LLM:
         if self.router:
             response = self.router.completion(
                 model=self.model,
-                #max_tokens=max_tokens,
+                # max_tokens=max_tokens,
                 messages=messages,
                 response_model=response_model,
             )
         else:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                #max_tokens=max_tokens,
-                messages=messages,
-                response_model=response_model,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version
-            )
+            if response_model:
+                # Use Instructor client for structured responses
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    # max_tokens=max_tokens,
+                    messages=messages,
+                    response_model=response_model,
+                    api_base=self.api_base,
+                    api_key=self.api_key,
+                    api_version=self.api_version
+                )
+            else:
+                # Use LiteLLM client for unstructured responses
+                response = litellm.completion(
+                    model=self.model,
+                    # max_tokens=max_tokens,
+                    messages=messages
+                )
 
         return response
