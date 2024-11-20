@@ -9,12 +9,12 @@ from .document_loader.document_loader_azure_document_intelligence import Documen
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from .document_loader.beautiful_soup_web_loader import DocumentLoaderBeautifulSoup
-from .models import classification, classification_response
+from .models.classification import Classification
+from .models.classification_response import ClassificationResponse
 from .process import Process
 from .splitter import Splitter
 from .image_splitter import ImageSplitter
 from .text_splitter import TextSplitter
-from .models.classification import Classification
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
 from .batch_job import BatchJob
@@ -30,14 +30,13 @@ __all__ = [
     'DocumentLoaderPyPdf',
     'DocumentLoaderPdfPlumber',
     'DocumentLoaderBeautifulSoup',
-    'classification',
-    'classification_response',
+    'Classification',
+    'ClassificationResponse',
     'Process',
     'ClassificationStrategy',
     'Splitter',
     'ImageSplitter',
     'TextSplitter',
-    'Classification',
     'Contract',
     'SplittingStrategy',
 	'BatchJob'
