@@ -313,8 +313,6 @@ Stay updated and connect with the community:
 - [Advanced Document Classification with LLMs](https://medium.com/gitconnected/advanced-document-classification-with-llms-8801eaee3c58?sk=f5a22ee72022eb70e112e3e2d1608e79)
 - [Phi-3 and Azure: PDF Data Extraction | ExtractThinker](https://medium.com/towards-artificial-intelligence/phi-3-and-azure-pdf-data-extraction-extractthinker-cb490a095adb?sk=7be7e625b8f9932768442f87dd0ebcec)
 - [ExtractThinker: Document Intelligence for LLMs](https://medium.com/towards-artificial-intelligence/extractthinker-ai-document-intelligence-with-llms-72cbce1890ef)
-  
-- [GitHub Issues](https://github.com/enoch3712/Open-DocLLM/issues)
 
 ## 📄 License
 
