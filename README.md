@@ -307,7 +307,7 @@ We welcome contributions from the community! To contribute:
 ## 🌟 Community and Support
 
 Stay updated and connect with the community:
-
+- [Scaling Document Extraction with o1, GPT-4o & Mini](https://medium.com/towards-artificial-intelligence/scaling-document-extraction-with-o1-gpt4o-and-mini-extractthinker-8f3340b4e69c)
 - [Claude 3.5 — The King of Document Intelligence](https://medium.com/gitconnected/claude-3-5-the-king-of-document-intelligence-f57bea1d209d?sk=124c5abb30c0e7f04313c5e20e79c2d1)
 - [Classification Tree for LLMs](https://medium.com/gitconnected/classification-tree-for-llms-32b69015c5e0?sk=8a258cf74fe3483e68ab164e6b3aaf4c)
 - [Advanced Document Classification with LLMs](https://medium.com/gitconnected/advanced-document-classification-with-llms-8801eaee3c58?sk=f5a22ee72022eb70e112e3e2d1608e79)
