@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/41d9d151-acb5-44da-9c10-0058f76c2512" alt="Extract Thinker Logo" width="200"/>
+  <img src="https://github.com/enoch3712/Open-DocLLM/assets/9283394/41d9d151-acb5-44da-9c10-0058f76c2512" alt="Extract Thinker Logo" width="200"/> 
 </p>
 <p align="center">
 <img alt="Python Version" src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" />
