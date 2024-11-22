@@ -1,0 +1,50 @@
+site_name: Extract Thinker
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: custom
+      accent: pink
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  font:
+    text: 'Roboto'
+    code: 'Roboto Mono'
+
+# Repository
+repo_name: extract_thinker
+repo_url: https://github.com/enoch3712/ExtractThinker
+edit_uri: ""
+
+# Header link
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/enoch3712/ExtractThinker
+      name: Extract Thinker on GitHub
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+extra_css:
+  - stylesheets/extra.css
