@@ -1,12 +1,13 @@
-site_name: Extract Thinker
+site_name: ""
 theme:
   name: material
   features:
     - navigation.sections
-    - navigation.expand
+    - navigation.indexes
     - search.highlight
     - toc.follow
     - content.code.copy
+    - navigation.collapse
   palette:
     - scheme: default
       primary: custom
@@ -16,6 +17,35 @@ theme:
   font:
     text: 'Roboto'
     code: 'Roboto Mono'
+
+# Set the homepage to getting-started
+docs_dir: docs
+use_directory_urls: true
+strict: true
+
+nav:
+  - "": index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+  - Concepts & Components:
+      - Overview: core-concepts/index.md
+      - Document Loaders: 
+        - Overview: core-concepts/document-loaders/index.md
+        - Tesseract: core-concepts/document-loaders/tesseract.md
+        - Azure Form: core-concepts/document-loaders/azure-form.md
+      - LLM Integration: 
+        - Overview: core-concepts/llm-integration/index.md
+        - Models: core-concepts/llm-integration/models.md
+      - Contracts: 
+        - Overview: core-concepts/contracts/index.md
+        - Basic Usage: core-concepts/contracts/basic-usage.md
+      - Extractors: 
+        - Overview: core-concepts/extractors/index.md
+        - Configuration: core-concepts/extractors/configuration.md
+  - Examples:
+      - Overview: examples/index.md
+      - Basic Examples: examples/basic-examples.md
+      - Advanced Examples: examples/advanced-examples.md
 
 # Repository
 repo_name: extract_thinker
