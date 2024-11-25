@@ -1,4 +1,4 @@
-site_name: ""
+site_name: "ExtractThinker"
 theme:
   name: material
   features:
