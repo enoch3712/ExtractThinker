@@ -97,12 +97,12 @@
 }
 
 .md-sidebar--primary .md-nav__link--active {
-    color: #FF69B4;
+    color: var(--md-primary-fg-color);
     font-weight: 500;
 }
 
 .md-sidebar--primary .md-nav__link:hover {
-    color: #FF69B4;
+    color: var(--md-primary-fg-color--light);
 }
 
 /* Make nested items more compact */
@@ -157,7 +157,7 @@
 }
 
 .md-sidebar--secondary .md-nav__link:hover {
-    color: #FF69B4;
+    color: var(--md-primary-fg-color--light);
 }
 
 /* Typography - Presidio style */
@@ -202,4 +202,82 @@
 /* Remove tabs */
 .md-tabs {
     display: none;
+}
+
+.md-footer {
+    background: linear-gradient(45deg, #FFD1DC, #FF69B4);
+}
+
+.md-footer-meta {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.md-footer__inner {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+}
+
+.md-footer-copyright {
+    color: white;
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.md-footer-generator {
+    color: white;
+    font-size: 0.7rem;
+    opacity: 0.7;
 } 
+
+/* Adjust navigation indentation and spacing */
+.md-nav__item--nested .md-nav__list .md-nav__item {
+    padding-left: 1rem;
+}
+
+.md-nav__item .md-nav__item {
+    padding: 0;
+}
+
+.md-nav__link {
+    margin: 0.1rem 0;
+    color: #666;
+    font-size: 0.7rem;
+    padding: 0.1rem 0;
+    line-height: 1.2;
+}
+
+/* Optional: Add a subtle visual indicator for active items
+.md-nav__item--active {
+    border-left: 2px solid var(--md-accent-fg-color);
+    margin-left: -2px;
+} */
+
+.coming-soon {
+    background-color: #ff69b4;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 8px;
+}
+
+/* Style for disabled/upcoming navigation items */
+.md-nav__item a[href="#"] {
+    color: #999 !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+    text-decoration: none;
+    pointer-events: none;
+    position: relative;
+}
+
+.md-nav__item a[href="#"]:hover {
+    color: #999 !important;
+}
+
+/* Style for the hourglass emoji in disabled items */
+.md-nav__item a[href="#"] span:first-child {
+    opacity: 0.7;
+    filter: grayscale(1);
+}
