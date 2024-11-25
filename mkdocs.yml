@@ -38,7 +38,6 @@ nav:
           - PyPDF: core-concepts/document-loaders/pypdf.md
           - Spreadsheet: core-concepts/document-loaders/spreadsheet.md
           - Web Loader: core-concepts/document-loaders/web-loader.md
-          - Docling: core-concepts/document-loaders/docling.md
           - Adobe PDF Services: '#'
           - ABBYY FineReader: '#'
           - PaddleOCR: '#'
