@@ -12,12 +12,10 @@ from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.llm import LLM
 import os
-
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.batch_job import BatchJob
-
 
 from extract_thinker.utils import (
     encode_image,
