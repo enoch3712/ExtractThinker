@@ -5,7 +5,7 @@ In document intelligence, classification is often the crucial first step. It set
 LLMs may not be the most efficient for this task, but they are agnostic and near-perfect for it.
 
 <div align="center">
-  <img src="../../../assets/classification_overview.png" alt="Classification Overview">
+  <img src="../../assets/classification_image.png" alt="Classification Overview">
 </div>
 
 ## Classification Techniques
@@ -60,20 +60,4 @@ ExtractThinker supports three main classification strategies:
 - **HIGHER_ORDER**: Uses the result with highest confidence
 - **CONSENSUS_WITH_THRESHOLD**: Requires consensus and minimum confidence
 
-## Common Challenges
-
-1. **Large Context Windows**: More classifications mean larger contexts
-2. **Similar Documents**: Distinguishing between similar document types
-3. **Confidence Levels**: Ensuring high confidence in classifications
-4. **Scalability**: Handling growing number of document types
-
-## Best Practices
-
-- Start with basic classification for simple cases
-- Use MoM for critical classifications
-- Implement tree-based approach for similar documents
-- Consider vision classification for complex layouts
-- Set appropriate confidence thresholds
-- Monitor and log classification results
-
-For detailed implementation of each technique, visit their respective pages. 
+For detailed implementation of each technique, visit their respective pages.

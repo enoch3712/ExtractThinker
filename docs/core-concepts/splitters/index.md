@@ -3,7 +3,7 @@
 In document processing, splitting enables the separation of individual documents or sections within a combined file. This task is especially crucial when handling batches of documents where different parts may need distinct processing, and always with Sonnet. This can be done with two strategies: Eager and Lazy.
 
 <div align="center">
-  <img src="../../../assets/splitter_image.png" alt="Splitter Flow">
+  <img src="../../assets/splitter_image.png" alt="Splitter Flow">
 </div>
 
 ### Page-Level Processing

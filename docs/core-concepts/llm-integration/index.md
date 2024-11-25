@@ -6,13 +6,10 @@
 The LLM component in ExtractThinker acts as a bridge between your document processing pipeline and various Language Model providers. It handles request formatting, response parsing, and provider-specific optimizations.
 
 <div align="center">
-  <img src="../../../assets/llm_image.png" alt="LLM Architecture" width="50%">
+  <img src="../../assets/llm_image.png" alt="LLM Architecture" width="50%">
 </div>
 
 The architecture consists of:
-
-- **LLM Provider**: The actual language model service (OpenAI, Anthropic, etc.)
-- **Request Handler**: Manages communication with the LLM provider
 
 - **Parser**: Uses [instructor](https://github.com/jxnl/instructor) for structured outputs with Pydantic
 

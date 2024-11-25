@@ -27,8 +27,7 @@ nav:
   - "": index.md
   - Getting Started:
       - Overview: getting-started/index.md
-  - Concepts & Components:
-      - Overview: core-concepts/index.md
+  - "Concepts & Components":
       - Document Loaders: 
           - Overview: core-concepts/document-loaders/index.md
           - Tesseract: core-concepts/document-loaders/tesseract.md
@@ -65,15 +64,17 @@ nav:
       - Extractors: 
           - Overview: core-concepts/extractors/index.md
           - Batch Processing: core-concepts/extractors/batch.md
-          - Image & Charts: core-concepts/extractors/image_charts.md
       - Splitters: 
           - Overview: core-concepts/splitters/index.md
           - Text Splitter: core-concepts/splitters/text.md
           - Image Splitter: core-concepts/splitters/image.md
-  - Examples:
-      - Overview: examples/index.md
-      - Basic Examples: examples/basic-examples.md
-      - Advanced Examples: examples/advanced-examples.md
+  - "Examples":
+      - Image & Chart Processing: examples/image-chart-processing.md
+      - Resume Processing: examples/resume-processing.md
+      - Azure Document Intelligence: examples/azure-document-intelligence.md
+      - AWS Textract: examples/aws-textract.md
+      - Google Document AI: examples/google-document-ai.md
+      - Local Processing: examples/local-processing.md
 
 # Repository
 repo_name: extract_thinker

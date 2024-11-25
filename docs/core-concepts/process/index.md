@@ -3,7 +3,7 @@
 Process is a component that orchestrates the document processing workflow, allowing you to combine multiple DocumentLoaders and Extractors for complex document processing tasks.
 
 <div align="center">
-  <img src="../../../assets/process_image.png" alt="Process Flow" width="50%">
+  <img src="../../assets/process_image.png" alt="Process Flow">
 </div>
 
 The workflow consists of:

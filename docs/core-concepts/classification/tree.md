@@ -1,5 +1,9 @@
 # Tree-Based Classification
 
+<div align="center">
+  <img src="../../../assets/classification_tree_image.png" alt="Classification Overview">
+</div>
+
 In document intelligence, challenges often arise when dealing with a large number of similar document types. Tree-based classification organizes classifications into a hierarchical structure, breaking down the task into smaller, more manageable batches.
 
 ## Basic Concept
@@ -95,14 +99,3 @@ When implementing tree-based classification, consider contract complexity at eac
       lines: List[LineItem]  # Complete field set
       total_amount: float
   ```
-
-## Best Practices
-
-- Start with broad categories at the root
-- Use minimal contracts for higher levels
-- Increase contract detail at leaf nodes
-- Set appropriate confidence thresholds
-- Consider using vision classification for complex documents
-- Monitor classification performance at each level
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 

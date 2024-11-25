@@ -3,7 +3,7 @@
 Document Loaders are the foundation of ExtractThinker's document processing pipeline. They handle the initial loading and preprocessing of documents, converting them into a standardized format that can be used by other components.
 
 <div align="center">
-  <img src="../../../assets/document_loader.png" alt="Document Loader Flow" width="50%">
+  <img src="../../assets/document_loader.png" alt="Document Loader Flow" width="50%">
 </div>
 
 ## Basic Concept
