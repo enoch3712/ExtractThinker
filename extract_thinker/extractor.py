@@ -56,18 +56,23 @@ class Extractor:
                 "Interceptor must be an instance of LoaderInterceptor or LlmInterceptor"
             )
 
-    def get_document_loader_for_file(self, source: Union[str, IO]) -> DocumentLoader:
-        if self.document_loader and self.document_loader.can_handle(source):
-            return self.document_loader
-        else:
-            for loader in self.document_loaders_by_file_type.values():
-                if loader.can_handle(source):
-                    return loader
-        raise ValueError("No suitable document loader found for the input.")
+    def get_document_loader(self, source: Union[str, IO]) -> Optional[DocumentLoader]:
+        """
+        Retrieve the appropriate document loader for the given source.
 
-    def get_document_loader_for_file(self, file: str) -> DocumentLoader:
-        _, ext = os.path.splitext(file)
-        return self.document_loaders_by_file_type.get(ext, self.document_loader)
+        Args:
+            source (Union[str, IO]): The input source.
+
+        Returns:
+            Optional[DocumentLoader]: The suitable document loader if available.
+        """
+        if isinstance(source, str):
+            _, ext = os.path.splitext(source)
+            return self.document_loaders_by_file_type.get(ext, self.document_loader)
+        elif hasattr(source, 'read'):
+            # Implement logic to determine the loader based on the stream if necessary
+            return self.document_loader
+        return None
 
     def load_document_loader(self, document_loader: DocumentLoader) -> None:
         self.document_loader = document_loader
@@ -107,30 +112,52 @@ class Extractor:
         vision: bool = False,
         content: Optional[str] = None,
     ) -> Any:
+        """
+        Extract information from the provided source.
+
+        Args:
+            source (Union[str, IO, list]): The input source which can be a file path, URL, IO stream, or list of dictionaries.
+            response_model (type[BaseModel]): The Pydantic model to parse the response into.
+            vision (bool, optional): Whether to use vision capabilities. Defaults to False.
+            content (Optional[str], optional): Additional content to include in the extraction. Defaults to None.
+
+        Returns:
+            Any: The extracted information as specified by the response_model.
+
+        Raises:
+            ValueError: If the source type is unsupported or dependencies are not met.
+        """
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
 
-        if vision and not self.get_document_loader_for_file(source):
+        if vision and not self.get_document_loader(source):
             if not litellm.supports_vision(self.llm.model):
-                raise ValueError(f"Model {self.llm.model} does not support vision. Please provide a document loader or a model that supports vision.")
+                raise ValueError(
+                    f"Model {self.llm.model} does not support vision. Please provide a document loader or a model that supports vision."
+                )
             else:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
 
         if isinstance(source, str):
-            # Check if it's a URL (basic check for http/https prefix)
             if source.startswith(('http://', 'https://')):
                 return self.extract_from_file(source, response_model, vision)
-            elif os.path.exists(source):
+            elif os.path.isfile(source):
                 return self.extract_from_file(source, response_model, vision)
             else:
+                # Optionally, you can differentiate between invalid paths and actual content
+                if any(char in source for char in '/\\'):  # Basic check for path-like strings
+                    raise ValueError(f"The file path '{source}' does not exist.")
                 return self.extract_from_content(source, response_model, vision)
-        elif isinstance(source, list) and all(
-            isinstance(item, dict) for item in source
-        ):  # if it's a list of dictionaries
-            return self.extract_from_list(source, response_model, vision)
+        elif isinstance(source, list):
+            if all(isinstance(item, dict) for item in source):
+                return self.extract_from_list(source, response_model, vision)
+            else:
+                raise ValueError("All items in the source list must be dictionaries.")
+        elif hasattr(source, 'read'):
+            return self.extract_from_stream(source, response_model, vision)
         else:
             raise ValueError(
-                "Source must be a file path, a URL, a stream, or a list of dictionaries"
+                "Source must be a file path, a URL, a stream, or a list of dictionaries."
             )
 
     async def extract_async(
@@ -627,14 +654,14 @@ class Extractor:
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
+        # Initialize the content list for the message
+        message_content = []
+
         if vision:
             if not litellm.supports_vision(model=self.llm.model):
                 raise ValueError(
                     f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
                 )
-
-            # Initialize the content list for the message
-            message_content = []
             
             if content is not None:
                 if isinstance(content, dict):
@@ -642,9 +669,10 @@ class Extractor:
                         content = json_to_formatted_string(content.get("data", {}))
                     content = yaml.dump(content, default_flow_style=True)
                 if isinstance(content, str):
-                    messages.append(
-                        {"role": "user", "content": "##Content\n\n" + content}
-                    )
+                    message_content.append({
+                        "type": "text",
+                        "text": "##Content\n\n" + content
+                    })
             
             # Add images
             if isinstance(content, list):  # Assuming content is a list of dicts with 'image' key
@@ -707,6 +735,7 @@ class Extractor:
                     messages.append(
                         {"role": "user", "content": "##Content\n\n" + content}
                     )
+
 
         if self.llm.token_limit:
             max_tokens_per_request = self.llm.token_limit - 1000
