@@ -80,6 +80,26 @@ class Extractor:
         else:
             raise ValueError("Either a model string or an LLM object must be provided.")
 
+    def _validate_dependencies(self, response_model: type[BaseModel], vision: bool) -> None:
+        """
+        Validates that required dependencies (document_loader and llm) are present
+        and that response_model is valid.
+
+        Args:
+            response_model: The Pydantic model to validate
+            vision: Whether the extraction is for a vision model
+        Raises:
+            ValueError: If any validation fails
+        """
+        if self.document_loader is None and not vision:
+            raise ValueError("Document loader is not set. Please set a document loader before extraction.")
+            
+        if self.llm is None:
+            raise ValueError("LLM is not set. Please set an LLM before extraction.")
+            
+        if not issubclass(response_model, BaseModel) and not issubclass(response_model, Contract):
+            raise ValueError("response_model must be a subclass of Pydantic's BaseModel or Contract.")
+
     def extract(
         self,
         source: Union[str, IO, list],
@@ -87,10 +107,8 @@ class Extractor:
         vision: bool = False,
         content: Optional[str] = None,
     ) -> Any:
+        self._validate_dependencies(response_model, vision)
         self.extra_content = content
-
-        if not issubclass(response_model, BaseModel):
-            raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
 
         if vision and not self.get_document_loader_for_file(source):
             if not litellm.supports_vision(self.llm.model):
@@ -618,12 +636,15 @@ class Extractor:
             # Initialize the content list for the message
             message_content = []
             
-            # Add text content if it exists
-            if isinstance(content, str):
-                message_content.append({
-                    "type": "text",
-                    "text": content
-                })
+            if content is not None:
+                if isinstance(content, dict):
+                    if content.get("is_spreadsheet", False):
+                        content = json_to_formatted_string(content.get("data", {}))
+                    content = yaml.dump(content, default_flow_style=True)
+                if isinstance(content, str):
+                    messages.append(
+                        {"role": "user", "content": "##Content\n\n" + content}
+                    )
             
             # Add images
             if isinstance(content, list):  # Assuming content is a list of dicts with 'image' key

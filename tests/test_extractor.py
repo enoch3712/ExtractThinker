@@ -56,10 +56,10 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     extractor = Extractor()
-    extractor.load_document_loader(
-        DocumentLoaderPyPdf()
-    )
+    document_loader = DocumentLoaderPyPdf()
+    extractor.load_document_loader(document_loader)
     extractor.load_llm("gpt-4o-mini")
+    
     # Act
     result = extractor.extract(test_file_path, InvoiceContract)
 
@@ -70,23 +70,10 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     assert result.lines[0].unit_price == 375
     assert result.lines[0].amount == 1125
 
-def test_vision_with_chart():
-    # Arrange
-    extractor = Extractor()
-    extractor.load_llm("gpt-4o")
-    test_file_path = os.path.join(cwd, "tests", "test_images", "image.png")
-
-    # Act
-    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
-
-    # Assert
-    assert result is not None
-    # TODO: For now is sanity to test for errors
-
 def test_vision_content_pdf():
     # Arrange
     extractor = Extractor()
-    extractor.load_llm("gpt-4o")
+    extractor.load_llm("gpt-4o-mini")
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     # Act
@@ -94,7 +81,72 @@ def test_vision_content_pdf():
 
     # Assert
     assert result is not None
-    # TODO: For now is sanity to test for errors
+    
+    # Check invoice details
+    assert result.invoice_number == "00012"
+    assert result.invoice_date == "1/30/23"
+    assert result.total_amount == 1125
+
+    # Check line items
+    assert len(result.lines) == 1
+    line = result.lines[0]
+    assert line.description == "Consultation services"
+    assert line.quantity == 3  # 3.0 hours
+    assert line.unit_price == 375  # Rate per hour
+    assert line.amount == 1125  # Total amount for the line
+
+def test_chart_with_content():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o-mini")
+    test_file_path = os.path.join(cwd, "tests", "files", "eu_tax_chart.png")
+
+    # Act
+    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
+
+    # Assert
+    assert result is not None
+    
+    # Test content
+    assert "In 2022, total tax revenues grew below nominal GDP in 15 Member States" in result.content
+    assert "tax revenues (numerator) did not grow as fast as nominal GDP (denominator)" in result.content
+    
+    # Test chart properties
+    assert result.chart is not None
+    assert result.chart.title == "Figure 3: Tax revenues in the EU since 2009 (nominal terms and percentage of GDP)"
+    assert result.chart.source == "Eurostat [gov_10a_taxag], as of 31 January 2024. Nominal values converted in EUR for non-EA countries."
+    assert result.chart.type == "combination"  # Bar and line chart
+    assert len(result.chart.data_series) == 2
+    assert "Nominal value" in [series.name for series in result.chart.data_series]
+    assert "% GDP" in [series.name for series in result.chart.data_series]
+
+def test_extract_with_loader_and_vision():
+    # Arrange
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+
+    extractor = Extractor()
+    loader = DocumentLoaderPyPdf()
+    extractor.load_document_loader(loader)
+    extractor.load_llm("gpt-4o-mini")
+
+    content = loader.load(test_file_path)
+
+    # Act
+    result = extractor.extract(content, InvoiceContract, vision=True)
+
+    # Assert
+    assert result is not None
+    assert result.invoice_number == "0000001"
+    assert result.invoice_date == "2014-05-07"
+    assert result.total_amount == 2500
+
+    # Check line items
+    assert len(result.lines) == 1
+    line = result.lines[0]
+    assert line.description == "Website Redesign"
+    assert line.quantity == 1
+    assert line.unit_price == 2500
+    assert line.amount == 2500
 
 def test_batch_extraction_single_source():
     # Arrange
