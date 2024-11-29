@@ -61,4 +61,4 @@ Document Intelligence supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`
 - Consider image preprocessing for better accuracy
 - Set appropriate page segmentation mode based on document layout
 
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.
+For more examples and advanced usage, check out the [Local Stack](../../examples/local-processing) in the repository.

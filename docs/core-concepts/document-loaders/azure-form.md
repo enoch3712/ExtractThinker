@@ -61,4 +61,4 @@ Document Intelligence supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`, `HEIF`, 
 - Handle tables and paragraphs separately for better accuracy
 - Process documents page by page for large files
 
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 
+For more examples and implementation details, check out the [Azure Stack](../../examples/azure-form.md) in the repository. 

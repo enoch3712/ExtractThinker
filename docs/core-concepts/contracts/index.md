@@ -30,5 +30,3 @@ class InvoiceContract(Contract):
     ```python
     --8<-- "extract_thinker/models/contract.py"
     ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.

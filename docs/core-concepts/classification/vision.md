@@ -98,5 +98,3 @@ result = process.classify(
     image=True
 )
 ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 

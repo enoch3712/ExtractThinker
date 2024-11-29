@@ -97,15 +97,3 @@ result = extractor.extract("document.pdf", Contract)
    except Exception as e:
        print(f"Processing error: {e}")
    ```
-
-## Performance Comparison
-
-| Aspect | Cloud | Local |
-|--------|-------|-------|
-| Speed | Faster | Depends on hardware |
-| Cost | Pay per use | Free |
-| Privacy | Data leaves network | Complete privacy |
-| Setup | Simple | More complex |
-| Maintenance | None | Required |
-
-For more examples and implementation details, check out the [examples directory](https://github.com/enoch3712/ExtractThinker/tree/main/examples) in the repository. 
