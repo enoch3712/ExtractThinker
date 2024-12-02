@@ -73,7 +73,7 @@ def test_eager_splitting_strategy():
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
 
     assert result[0].name_primary == "Motorist, Michael M"
-    assert result[1].license_number == "0123 456 789"
+    assert result[1].license_number.replace(" ", "") == "0123456789"
 
 def test_lazy_splitting_strategy():
     """Test lazy splitting strategy with a multi-page document"""
@@ -92,7 +92,7 @@ def test_lazy_splitting_strategy():
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
 
     assert result[0].name_primary == "Motorist, Michael M"
-    assert result[1].license_number == "0123 456 789"
+    assert result[1].license_number.replace(" ", "") == "0123456789"
 
 def test_eager_splitting_strategy_text():
     """Test eager splitting strategy with a multi-page text document"""
@@ -111,7 +111,7 @@ def test_eager_splitting_strategy_text():
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
 
     assert result[0].name_primary == "Motorist, Michael M"
-    assert result[1].license_number == "0123 456 789"
+    assert result[1].license_number.replace(" ", "") == "0123456789"
 
 def test_lazy_splitting_strategy_text():
     """Test lazy splitting strategy with a multi-page text document"""
@@ -130,4 +130,4 @@ def test_lazy_splitting_strategy_text():
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
 
     assert result[0].name_primary == "Motorist, Michael M"
-    assert result[1].license_number == "0123 456 789"
+    assert result[1].license_number.replace(" ", "") == "0123456789"

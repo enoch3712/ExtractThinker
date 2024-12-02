@@ -55,6 +55,25 @@ class Extractor:
             raise ValueError(
                 "Interceptor must be an instance of LoaderInterceptor or LlmInterceptor"
             )
+        
+    def get_document_loader_for_file(self, source: Union[str, IO]) -> DocumentLoader:
+        # If source is a string (file path), use extension-based lookup
+        if isinstance(source, str):
+            _, ext = os.path.splitext(source)
+            loader = self.document_loaders_by_file_type.get(ext, self.document_loader)
+            if loader:
+                return loader
+        
+        # Try capability-based lookup
+        if self.document_loader and self.document_loader.can_handle(source):
+            return self.document_loader
+        
+        # Check all registered loaders
+        for loader in self.document_loaders_by_file_type.values():
+            if loader.can_handle(source):
+                return loader
+            
+        raise ValueError("No suitable document loader found for the input.")
 
     def get_document_loader(self, source: Union[str, IO]) -> Optional[DocumentLoader]:
         """
