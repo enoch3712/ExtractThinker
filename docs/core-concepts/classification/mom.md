@@ -93,5 +93,3 @@ result = process.classify(
 - Set appropriate confidence thresholds based on your use case
 - Consider using different model providers for better diversity
 - Monitor and log classification results for each model
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 

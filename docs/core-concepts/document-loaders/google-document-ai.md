@@ -79,4 +79,4 @@ with open("document.pdf", "rb") as f:
 
 Document AI supports PDF, TIFF, GIF, JPEG, PNG with a maximum file size of 20MB or 2000 pages.
 
-For more examples and implementation details, check out the [examples directory](examples/) in the repository. 
+For more examples and implementation details, check out the [Google Stack](../../examples/google-document-ai) in the repository. 

@@ -68,4 +68,4 @@ The loader returns a dictionary with the following structure:
    - Process pages individually for large documents
    - Monitor API quotas and costs
 
-For more examples and implementation details, check out the [examples directory](examples/) in the repository. 
+For more examples and implementation details, check out the [AWS Stack](../../examples/aws-textract) in the repository. 

@@ -67,24 +67,22 @@ print(f"Total: ${result.total_amount}")
         <li>
             <p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"></path></svg></span> <strong>Extraction with Pydantic</strong></p>
             <p>Extract structured data from any document type using Pydantic models for validation, custom features, and prompt engineering capabilities.</p>
-            <p><a href="../examples/extraction"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p>
+            <!-- <p><a href="../examples/extraction"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p> -->
         </li>
         <li>
             <p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg></span> <strong>Classification & Split</strong></p>
             <p>Intelligent document classification and splitting with support for consensus strategies, eager/lazy splitting, and confidence thresholds.</p>
-            <p><a href="../examples/classification"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p>
+            <!-- <p><a href="../examples/classification"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p> -->
         </li>
         <li>
             <p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"></path></svg></span> <strong>PII Detection</strong></p>
             <p>Automatically detect and handle sensitive personal information in documents with privacy-first approach and advanced validation.</p>
-            <p><a href="../examples/pii"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p>
+            <!-- <p><a href="../examples/pii"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p> -->
         </li>
         <li>
             <p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.7 18.6-6.9-6.9q-.275-.275-.637-.425-.363-.15-.763-.15-.425 0-.787.15-.363.15-.638.425L8.1 15.5q-.275.275-.425.638-.15.362-.15.762 0 .425.15.788.15.362.425.637l6.9 6.9q.275.275.638.425.362.15.787.15.425 0 .788-.15.362-.15.637-.425l4.9-4.9q.275-.275.425-.637.15-.363.15-.788 0-.425-.15-.787-.15-.363-.425-.638Z"></path></svg></span> <strong>LLM and OCR Agnostic</strong></p>
             <p>Freedom to choose and switch between different LLM providers and OCR engines based on your needs and cost requirements.</p>
-            <p><a href="../examples/integrations"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p>
+            <!-- <p><a href="../examples/integrations"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06"></path></svg></span> Learn More</a></p> -->
         </li>
     </ul>
 </div>
-
-Check out our [advanced usage guide](./advanced-usage.md) for more complex scenarios like document classification, batch processing, and custom LLM integration.
