@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
@@ -8,6 +10,7 @@ from extract_thinker.document_loader.document_loader_pypdf import DocumentLoader
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
+import pytest
 
 load_dotenv()
 cwd = os.getcwd()
@@ -56,10 +59,10 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     extractor = Extractor()
-    extractor.load_document_loader(
-        DocumentLoaderPyPdf()
-    )
+    document_loader = DocumentLoaderPyPdf()
+    extractor.load_document_loader(document_loader)
     extractor.load_llm("gpt-4o-mini")
+    
     # Act
     result = extractor.extract(test_file_path, InvoiceContract)
 
@@ -70,23 +73,10 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     assert result.lines[0].unit_price == 375
     assert result.lines[0].amount == 1125
 
-def test_vision_with_chart():
-    # Arrange
-    extractor = Extractor()
-    extractor.load_llm("gpt-4o")
-    test_file_path = os.path.join(cwd, "tests", "test_images", "image.png")
-
-    # Act
-    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
-
-    # Assert
-    assert result is not None
-    # TODO: For now is sanity to test for errors
-
 def test_vision_content_pdf():
     # Arrange
     extractor = Extractor()
-    extractor.load_llm("gpt-4o")
+    extractor.load_llm("gpt-4o-mini")
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     # Act
@@ -94,7 +84,75 @@ def test_vision_content_pdf():
 
     # Assert
     assert result is not None
-    # TODO: For now is sanity to test for errors
+    
+    # Check invoice details
+    assert result.invoice_number == "00012"
+    assert result.invoice_date == "1/30/23"
+    assert result.total_amount == 1125
+
+    # Check line items
+    assert len(result.lines) == 1
+    line = result.lines[0]
+    assert line.description == "Consultation services"
+    assert line.quantity == 3  # 3.0 hours
+    assert line.unit_price == 375  # Rate per hour
+    assert line.amount == 1125  # Total amount for the line
+
+def test_chart_with_content():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o-mini")
+    test_file_path = os.path.join(cwd, "tests", "test_images", "eu_tax_chart.png")
+
+    # Act
+    result = extractor.extract(test_file_path, ChartWithContent, vision=True)
+
+    # Assert
+    assert result is not None
+    
+    # Test content
+    assert "In 2022, total tax revenues grew below nominal GDP in 15 Member States" in result.content
+    assert "tax revenues (numerator) did not grow as fast as nominal GDP (denominator)" in result.content
+    
+    # Test chart properties
+    assert result.chart is not None
+
+def test_extract_with_loader_and_vision():
+    # Arrange
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+
+    extractor = Extractor()
+    loader = DocumentLoaderPyPdf()
+    extractor.load_document_loader(loader)
+    extractor.load_llm("gpt-4o-mini")
+
+    # Act
+    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
+
+    # Assert
+    assert result.invoice_number == "00012"
+    assert result.invoice_date == "1/30/23"
+    assert result.total_amount == 1125
+
+    # Check line items
+    assert len(result.lines) == 1
+    line = result.lines[0]
+    assert line.description == "Consultation services"
+    assert line.quantity == 3  # 3.0 hours
+    assert line.unit_price == 375  # Rate per hour
+    assert line.amount == 1125  # Total amount for the line
+
+def test_extract_with_invalid_file_path():
+    # Arrange
+    extractor = Extractor()
+    extractor.load_llm("gpt-4o-mini")
+    invalid_file_path = os.path.join(cwd, "tests", "nonexistent", "fake_file.png")
+
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        extractor.extract(invalid_file_path, InvoiceContract, vision=True)
+    
+    assert "does not exist" in str(exc_info.value)
 
 def test_batch_extraction_single_source():
     # Arrange
@@ -122,7 +180,7 @@ def test_batch_extraction_single_source():
 
 def test_cancel_batch_extraction():
     # Arrange
-    tesseract_path = os.getenv("TESSERACT_PATH")
+    tesseract_path = os.getenv("TESSERACT_PATH") 
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "invoice.png")
     batch_file_path = os.path.join(os.getcwd(), "tests", "batch_input.jsonl")
     output_file_path = os.path.join(os.getcwd(), "tests", "batch_output.jsonl")
