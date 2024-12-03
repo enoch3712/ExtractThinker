@@ -1,9 +1,6 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import asyncio
 from dotenv import load_dotenv
-
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification_node import ClassificationNode
@@ -236,6 +233,3 @@ def test_with_tree():
 
     assert result is not None
     assert result.name == "Invoice"
-
-if __name__ == "__main__":
-    test_with_tree()
