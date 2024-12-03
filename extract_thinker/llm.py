@@ -1,7 +1,8 @@
 from typing import List, Dict, Any, Optional
 import instructor
 import litellm
-from extract_thinker.models.batch_result import BatchResult
+from instructor.exceptions import IncompleteOutputException
+import tiktoken
 from litellm import Router
 
 class LLM:
@@ -10,7 +11,8 @@ class LLM:
                  api_base: str = None,
                  api_key: str = None,
                  api_version: str = None,
-                 token_limit: int = None):
+                 token_limit: int = None,
+                 max_retries: int = 3):
         self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
         self.model = model
         self.router = None
@@ -18,31 +20,65 @@ class LLM:
         self.api_key = api_key
         self.api_version = api_version
         self.token_limit = token_limit
+        self.max_retries = max_retries
+        self.encoding = tiktoken.encoding_for_model(model)
 
     def load_router(self, router: Router) -> None:
         self.router = router
 
-    def request(self, messages: List[Dict[str, str]], response_model: str) -> Any:
-        # contents = map(lambda message: message['content'], messages)
-        # all_contents = ' '.join(contents)
-        # max_tokens = num_tokens_from_string(all_contents)
+    def request(self, messages: List[Dict[str, str]], response_model: Any) -> Any:
+        attempt = 0
+        while attempt < self.max_retries:
+            try:
+                if self.router:
+                    response = self.router.completion(
+                        model=self.model,
+                        messages=messages,
+                        response_model=response_model,
+                    )
+                else:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        response_model=response_model,
+                        api_base=self.api_base,
+                        api_key=self.api_key,
+                        api_version=self.api_version
+                    )
+                return response
+            except IncompleteOutputException as e:
+                print(f"Attempt {attempt + 1}: Incomplete output detected.")
+                if hasattr(e, 'last_completion'):
+                    print(f"Total tokens used: {e.last_completion.usage.total_tokens}")
+                messages = self._adjust_prompt(messages)
+                if not messages:
+                    print("Cannot trim the prompt further.")
+                    break
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                break
+            attempt += 1
+        raise Exception("Failed to get a complete response after retries.")
 
-        if self.router:
-            response = self.router.completion(
-                model=self.model,
-                #max_tokens=max_tokens,
-                messages=messages,
-                response_model=response_model,
-            )
+    def _adjust_prompt(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        if not messages:
+            return []
+            
+        last_message = messages[-1]
+        if "content" not in last_message:
+            return []
+
+        content = last_message["content"]
+        # Try to trim by sentences first
+        if "." in content:
+            sentences = content.split(".")
+            trimmed_content = ".".join(sentences[:-1]) + "."
         else:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                #max_tokens=max_tokens,
-                messages=messages,
-                response_model=response_model,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version
-            )
+            # If no sentences, trim by percentage
+            trimmed_content = content[:int(len(content) * 0.9)]
 
-        return response
+        if trimmed_content.strip():
+            messages[-1]["content"] = trimmed_content
+            print("Prompt has been trimmed to reduce token count.")
+            return messages
+        return []

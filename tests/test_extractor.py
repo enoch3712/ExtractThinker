@@ -1,12 +1,15 @@
 import asyncio
 import os
 import sys
+from typing import List
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from pydantic import Field
 import time
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
@@ -207,3 +210,25 @@ def test_cancel_batch_extraction():
     # Check if files were removed
     assert not os.path.exists(batch_job.file_path), f"Batch input file was not removed: {batch_job.file_path}"
     assert not os.path.exists(batch_job.output_path), f"Batch output file was not removed: {batch_job.output_path}"
+
+class PageContract(Contract):
+    title: str
+    number: int
+    content: str = Field(description="Give me all the content, word for word")
+
+class ReportContract(Contract):
+    title: str
+    pages: List[PageContract]
+
+def test_data_long_text():
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Report-state-regions-and-cities-EN.pdf")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderPyPdf())
+    extractor.load_llm("gpt-4o-mini")
+
+    result = extractor.extract(test_file_path, ReportContract, vision=True, content="RULE: Give me all the pages content")
+    pass
+
+if __name__ == "__main__":
+    test_data_long_text()
