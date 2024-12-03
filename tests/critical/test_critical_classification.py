@@ -9,7 +9,7 @@ from tests.models.driver_license import DriverLicense
 
 load_dotenv()
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-INVOICE_PATH = os.path.join(CURRENT_DIR, '..', 'files', 'invoice.pdf')
+INVOICE_PATH = f"{CURRENT_DIR}/../files/invoice.pdf"
 
 def test_critical_classification():
     """Critical test for basic classification"""
@@ -24,7 +24,7 @@ def test_critical_classification():
     classifications = [
         Classification(
             name="Invoice",
-            description="This is an invoice document",
+            description="This is an invoice document", 
             contract=InvoiceContract
         ),
         Classification(
