@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import asyncio
 from dotenv import load_dotenv
 
@@ -234,3 +236,6 @@ def test_with_tree():
 
     assert result is not None
     assert result.name == "Invoice"
+
+if __name__ == "__main__":
+    test_with_tree()

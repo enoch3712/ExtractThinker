@@ -14,6 +14,11 @@ class DocumentLoader(ABC):
         self.content = content
         self.file_path = None
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
+        self.vision_mode = False
+
+    def set_vision_mode(self, enabled: bool = True) -> None:
+        """Enable or disable vision mode processing."""
+        self.vision_mode = enabled
 
     def can_handle(self, source: Union[str, BytesIO]) -> bool:
         """
@@ -61,14 +66,29 @@ class DocumentLoader(ABC):
         pass
 
     def load(self, source: Union[str, BytesIO]) -> Any:
+        """Enhanced load method that handles vision mode."""
         if not self.can_handle(source):
             raise ValueError("Unsupported file type or stream.")
-        if isinstance(source, str):
-            return self.load_content_from_file(source)
-        elif isinstance(source, BytesIO):
-            return self.load_content_from_stream(source)
+            
+        response = {}
+        
+        if self.vision_mode:
+            if not self.can_handle_vision(source):
+                raise ValueError("Source cannot be processed in vision mode. Only PDFs and images are supported.")
+            
+            # Convert to images and add to response
+            response['images'] = self.convert_to_images(source)
+        
+        # Normal processing
+        content = self.load_content_from_file(source) if isinstance(source, str) else self.load_content_from_stream(source)
+        
+        # Merge content with response
+        if isinstance(content, dict):
+            response.update(content)
         else:
-            raise ValueError("Source must be a file path or a stream.")
+            response['content'] = content
+            
+        return response
 
     def getContent(self) -> Any:
         return self.content
@@ -150,3 +170,32 @@ class DocumentLoader(ABC):
             final_images[page_index] = image_byte_array.getvalue()
             
         return final_images
+
+    def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Checks if the loader can handle the source in vision mode.
+        
+        Args:
+            source: Either a file path (str) or a BytesIO stream
+            
+        Returns:
+            bool: True if the loader can handle the source in vision mode
+        """
+        try:
+            if isinstance(source, str):
+                ext = get_file_extension(source).lower()
+                return ext in ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp']
+            elif isinstance(source, BytesIO):
+                try:
+                    Image.open(source)
+                    return True
+                except:
+                    # Try to load as PDF
+                    try:
+                        pdfium.PdfDocument(source)
+                        return True
+                    except:
+                        return False
+            return False
+        except Exception:
+            return False

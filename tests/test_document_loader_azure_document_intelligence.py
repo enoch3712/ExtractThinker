@@ -23,3 +23,20 @@ def test_load_content_from_file():
     assert firstPage is not None
     assert firstPage["paragraphs"][0] == "Invoice 0000001"
     assert len(firstPage["tables"][0]) == 4
+
+def test_load_content_from_file_vision_mode():
+    # Arrange
+    loader = DocumentLoaderAzureForm(subscription_key, endpoint)
+    loader.set_vision_mode(True)
+
+    # Act
+    result = loader.load(test_file_path)
+
+    # Assert
+    assert isinstance(result, dict)
+    assert "images" in result
+    assert len(result["images"]) > 0
+    # Verify each image is bytes
+    for page_num, image_data in result["images"].items():
+        assert isinstance(page_num, int)
+        assert isinstance(image_data, bytes)

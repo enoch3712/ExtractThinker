@@ -149,6 +149,10 @@ class Extractor:
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
 
+        # Set vision mode on document loader if available
+        if vision and self.document_loader:
+            self.document_loader.set_vision_mode(True)
+
         if vision and not self.get_document_loader(source):
             if not litellm.supports_vision(self.llm.model):
                 raise ValueError(
@@ -156,6 +160,7 @@ class Extractor:
                 )
             else:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
+                self.document_loader.set_vision_mode(True)
 
         if isinstance(source, str):
             if source.startswith(('http://', 'https://')):

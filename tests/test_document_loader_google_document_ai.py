@@ -55,3 +55,25 @@ def test_load_content_file_as_stream():
     firstPage = content["pages"][0]
     assert "johndoe@example.com" in firstPage["content"]
     assert "React Professional Certification" in firstPage["content"]
+
+def test_load_content_from_file_vision_mode():
+    # Arrange
+    loader = DocumentLoaderDocumentAI(
+        credentials=google_credentials,
+        location=location,
+        processor_name=processor_name
+    )
+    loader.set_vision_mode(True)
+    test_file_path = os.path.join(cwd, "tests", "files", "CV_Candidate.pdf")
+
+    # Act
+    result = loader.load(test_file_path)
+
+    # Assert
+    assert isinstance(result, dict)
+    assert "images" in result
+    assert len(result["images"]) > 0
+    # Verify each image is bytes
+    for page_num, image_data in result["images"].items():
+        assert isinstance(page_num, int)
+        assert isinstance(image_data, bytes)
