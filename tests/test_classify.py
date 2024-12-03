@@ -1,7 +1,6 @@
 import os
 import asyncio
 from dotenv import load_dotenv
-
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification_node import ClassificationNode
