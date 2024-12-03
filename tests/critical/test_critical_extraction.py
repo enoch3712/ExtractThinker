@@ -1,4 +1,6 @@
 import os
+from typing import Union
+from pathlib import Path
 from dotenv import load_dotenv
 from extract_thinker import Extractor
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
@@ -9,7 +11,7 @@ cwd = os.getcwd()
 
 def test_critical_extract_with_pypdf():
     """Critical test for basic extraction functionality"""
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+    test_file_path = f"{cwd}/tests/files/invoice.pdf"
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderPyPdf())
