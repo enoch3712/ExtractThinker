@@ -12,20 +12,22 @@ class DocumentLoaderLLMImage(CachedDocumentLoader, ABC):
         self.llm = llm
 
     def load_content_from_file(self, file_path: str) -> Union[str, object]:
-        images = self.convert_to_images(file_path)
-        results = []
-        for _, image_bytes in images.items():
-            image_stream = BytesIO(image_bytes)
-            results.append({"image": image_stream})
-        return results
+        pass
+        # images = self.convert_to_images(file_path)
+        # results = []
+        # for _, image_bytes in images.items():
+        #     image_stream = BytesIO(image_bytes)
+        #     results.append({"image": image_stream})
+        # return results
 
     def load_content_from_stream(self, stream: BytesIO) -> Union[str, object]:
-        images = self.convert_to_images(stream)
-        results = []
-        for _, image_bytes in images.items():
-            image_stream = BytesIO(image_bytes)
-            results.append({"image": image_stream})
-        return results
+        pass
+        # images = self.convert_to_images(stream)
+        # results = []
+        # for _, image_bytes in images.items():
+        #     image_stream = BytesIO(image_bytes)
+        #     results.append({"image": image_stream})
+        # return results
 
     def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
         return self.load_content_from_stream(stream)

@@ -12,12 +12,12 @@ from typing import Union
 import sys
 from typing import List
 
-def encode_image(image_source: Union[str, BytesIO]) -> str:
+def encode_image(image_source: Union[str, BytesIO, bytes, Image.Image]) -> str:
     """
-    Encode an image to base64 string from either a file path or BytesIO stream.
+    Encode an image to base64 string from various sources.
 
     Args:
-        image_source (Union[str, BytesIO]): The image source, either a file path or BytesIO stream
+        image_source (Union[str, BytesIO, bytes, PIL.Image.Image]): The image source.
 
     Returns:
         str: Base64 encoded string of the image
@@ -27,17 +27,20 @@ def encode_image(image_source: Union[str, BytesIO]) -> str:
             with open(image_source, "rb") as image_file:
                 return base64.b64encode(image_file.read()).decode("utf-8")
         elif isinstance(image_source, BytesIO):
-            # Save current position
             current_position = image_source.tell()
-            # Move to start of stream
             image_source.seek(0)
-            # Encode stream content
             encoded = base64.b64encode(image_source.read()).decode("utf-8")
-            # Restore original position
             image_source.seek(current_position)
             return encoded
+        elif isinstance(image_source, bytes):
+            return base64.b64encode(image_source).decode("utf-8")
+        elif isinstance(image_source, Image.Image):
+            buffer = BytesIO()
+            image_source.save(buffer, format='JPEG')
+            buffer.seek(0)
+            return base64.b64encode(buffer.read()).decode("utf-8")
         else:
-            raise ValueError("Image source must be either a file path (str) or BytesIO stream")
+            raise ValueError("Image source must be a file path (str), BytesIO stream, bytes, or PIL Image")
     except Exception as e:
         raise Exception(f"Failed to encode image: {str(e)}")
 
