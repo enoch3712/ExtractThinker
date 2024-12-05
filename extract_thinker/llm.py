@@ -1,8 +1,7 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import instructor
 import litellm
 from instructor.exceptions import IncompleteOutputException
-import tiktoken
 from litellm import Router
 
 class LLM:
@@ -21,7 +20,6 @@ class LLM:
         self.api_version = api_version
         self.token_limit = token_limit
         self.max_retries = max_retries
-        self.encoding = tiktoken.encoding_for_model(model)
 
     def load_router(self, router: Router) -> None:
         self.router = router
@@ -43,7 +41,8 @@ class LLM:
                         response_model=response_model,
                         api_base=self.api_base,
                         api_key=self.api_key,
-                        api_version=self.api_version
+                        api_version=self.api_version,
+                        max_tokens=500
                     )
                 return response
             except IncompleteOutputException as e:
