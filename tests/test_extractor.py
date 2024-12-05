@@ -225,7 +225,7 @@ def test_data_long_text():
     extractor.load_document_loader(DocumentLoaderPyPdf())
     extractor.load_llm("gpt-4o-mini")
 
-    result = extractor.extract(test_file_path, ReportContract, vision=False, content="RULE: Give me all the pages content")
+    result = extractor.extract(test_file_path, ReportContract, vision=False, content="RULE: Give me all the pages content, all 62 pages")
     pass
 
 if __name__ == "__main__":
