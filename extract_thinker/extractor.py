@@ -207,27 +207,37 @@ class Extractor:
         if self.document_loader is None:
             raise ValueError("Document loader is not set")
 
-        content = "\n".join(
-            [
+        # Prepare the structured content
+        processed_data = {
+            "content": "\n".join(
                 f"#{k}:\n{v}"
                 for d in data
                 for k, v in d.items()
                 if k != "image"
+            )
+        }
+
+        if vision:
+            processed_data["images"] = [
+                d["image"] for d in data 
+                if "image" in d
             ]
-        )
-        return self._extract(content, data, response_model, vision, is_stream=False)
+
+        return self._extract(processed_data, response_model, vision) #, is_stream=False)
 
     def extract_from_file(
         self, file: str, response_model: type[BaseModel], vision: bool = False
     ) -> str:
         if self.document_loader is not None:
-            content = self.document_loader.load_content_from_file(file)
+            # content = self.document_loader.load_content_from_file(file)
+            content = self.document_loader.load(file)
         else:
             document_loader = self.get_document_loader_for_file(file)
             if document_loader is None:
                 raise ValueError("No suitable document loader found for file type")
-            content = document_loader.load_content_from_file(file)
-        return self._extract(content, file, response_model, vision)
+            # content = document_loader.load_content_from_file(file)
+            content = self.document_loader.load(file)
+        return self._extract(content, response_model, vision)
 
     def extract_from_stream(
         self, stream: IO, response_model: type[BaseModel], vision: bool = False
@@ -237,7 +247,7 @@ class Extractor:
             raise ValueError("Document loader is not set")
 
         content = self.document_loader.load(stream)
-        return self._extract(content, stream, response_model, vision, is_stream=True)
+        return self._extract(content, stream, response_model, vision) #, is_stream=True)
 
     def classify_from_image(
         self, image: Any, classifications: List[Classification]
@@ -668,119 +678,242 @@ class Extractor:
 
     def _extract(
         self,
-        content,
-        file_or_stream,
-        response_model,
-        vision=False,
-        is_stream=False,
-    ):
-        # Call all the llm interceptors before calling the llm
+        content: Optional[Union[Dict[str, Any], List[Any], str]],
+        response_model: Any,
+        vision: bool = False,
+    ) -> Any:
+        """
+        Extract information from the content using the LLM.
+
+        Args:
+            content: The content to process, which can be a dict, list, or string.
+            response_model: The model to format the response.
+            vision: Whether to process vision content.
+
+        Returns:
+            The response from the LLM.
+        """
+        # Call all the LLM interceptors before calling the LLM
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
-
-        # Initialize the content list for the message
-        message_content = []
 
         if vision:
             if not litellm.supports_vision(model=self.llm.model):
                 raise ValueError(
                     f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
                 )
-            
-            if content is not None:
-                if isinstance(content, dict):
-                    if content.get("is_spreadsheet", False):
-                        content = json_to_formatted_string(content.get("data", {}))
-                    content = yaml.dump(content, default_flow_style=True)
-                if isinstance(content, str):
-                    message_content.append({
-                        "type": "text",
-                        "text": "##Content\n\n" + content
-                    })
-            
-            # Add images
-            if isinstance(content, list):  # Assuming content is a list of dicts with 'image' key
-                for page in content:
-                    if 'image' in page:
-                        base64_image = encode_image(page['image'])
-                        message_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        })
 
-            # Create the messages array with the correct structure
+        # Build the message content
+        message_content = self._build_message_content(content, vision)
+
+        # Build the messages
+        messages = self._build_messages(message_content, vision)
+
+        # Add extra content if it exists
+        if self.extra_content is not None:
+            self._add_extra_content(messages)
+
+        # Send the request
+        response = self.llm.request(messages, response_model)
+        return response
+
+    def _build_message_content(
+        self,
+        content: Optional[Union[Dict[str, Any], List[Any], str]],
+        vision: bool,
+    ) -> Union[List[Dict[str, Any]], List[str]]:
+        """
+        Build the message content based on the content and vision flag.
+
+        Args:
+            content: The content to process.
+            vision: Whether to process vision content.
+
+        Returns:
+            A list representing the message content.
+        """
+        message_content: Union[List[Dict[str, Any]], List[str]] = []
+
+        if content is None:
+            return message_content
+
+        if vision:
+            content_data = self._process_content_data(content)
+            if content_data:
+                message_content.append({
+                    "type": "text",
+                    "text": "##Content\n\n" + content_data
+                })
+            self._add_images_to_message_content(content, message_content)
+        else:
+            content_str = self._convert_content_to_string(content)
+            if content_str:
+                message_content.append("##Content\n\n" + content_str)
+
+        return message_content
+
+    def _process_content_data(
+        self,
+        content: Union[Dict[str, Any], List[Any], str],
+    ) -> Optional[str]:
+        """
+        Process content data by filtering out images and converting to a string.
+
+        Args:
+            content: The content to process.
+
+        Returns:
+            A string representation of the content.
+        """
+        if isinstance(content, dict):
+            filtered_content = {
+                k: v for k, v in content.items()
+                if k != 'images' and not hasattr(v, 'read')
+            }
+            if filtered_content.get("is_spreadsheet", False):
+                content_str = json_to_formatted_string(filtered_content.get("data", {}))
+            else:
+                content_str = yaml.dump(filtered_content, default_flow_style=True)
+            return content_str
+        return None
+
+    def _add_images_to_message_content(
+        self,
+        content: Union[Dict[str, Any], List[Any]],
+        message_content: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Add images to the message content.
+
+        Args:
+            content: The content containing images.
+            message_content: The message content to append images to.
+        """
+        if isinstance(content, list):
+            for page in content:
+                if isinstance(page, dict) and ('image' in page or 'images' in page):
+                    image_data = page.get('image') or page.get('images')
+                    self._append_images(image_data, message_content)
+        elif isinstance(content, dict):
+            image_data = content.get('image') or content.get('images')
+            self._append_images(image_data, message_content)
+
+    def _append_images(
+        self,
+        image_data: Union[Dict[str, Any], List[Any], Any],
+        message_content: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Append images to the message content.
+
+        Args:
+            image_data: The image data to process.
+            message_content: The message content to append images to.
+        """
+        if not image_data:
+            return
+
+        if isinstance(image_data, dict):
+            images_list = image_data.values()
+        elif isinstance(image_data, list):
+            images_list = image_data
+        else:
+            images_list = [image_data]
+
+        for img in images_list:
+            base64_image = encode_image(img)
+            message_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+            })
+
+    def _build_messages(
+        self,
+        message_content: Union[List[Dict[str, Any]], List[str]],
+        vision: bool,
+    ) -> List[Dict[str, Any]]:
+        """
+        Build the messages to send to the LLM.
+
+        Args:
+            message_content: The content of the message.
+            vision: Whether vision is enabled.
+
+        Returns:
+            A list of messages.
+        """
+        system_message = {
+            "role": "system",
+            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+        }
+
+        if vision:
             messages = [
-                {
-                    "role": "system",
-                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                },
+                system_message,
                 {
                     "role": "user",
                     "content": message_content
                 }
             ]
-
-            # Add extra content if it exists
-            if self.extra_content is not None:
-                if isinstance(self.extra_content, dict):
-                    self.extra_content = yaml.dump(self.extra_content)
-                messages.insert(1, {
+        else:
+            messages = [system_message]
+            if message_content:
+                messages.append({
                     "role": "user",
-                    "content": [{"type": "text", "text": "##Extra Content\n\n" + self.extra_content}]
+                    "content": "".join(message_content)
                 })
 
+        return messages
+
+    def _add_extra_content(
+        self,
+        messages: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Add extra content to the messages.
+
+        Args:
+            messages: The list of messages to modify.
+        """
+        if isinstance(self.extra_content, dict):
+            extra_content_str = yaml.dump(self.extra_content)
         else:
-            # Non-vision logic remains the same
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                },
-            ]
+            extra_content_str = self.extra_content
 
-            if self.extra_content is not None:
-                if isinstance(self.extra_content, dict):
-                    self.extra_content = yaml.dump(self.extra_content)
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": "##Extra Content\n\n" + self.extra_content,
-                    }
-                )
+        extra_message = {
+            "role": "user",
+            "content": "##Extra Content\n\n" + extra_content_str
+        }
 
-            if content is not None:
-                if isinstance(content, dict):
-                    if content.get("is_spreadsheet", False):
-                        content = json_to_formatted_string(content.get("data", {}))
-                    content = yaml.dump(content, default_flow_style=True)
-                if isinstance(content, str):
-                    messages.append(
-                        {"role": "user", "content": "##Content\n\n" + content}
-                    )
+        # Insert the extra content after the system message
+        messages.insert(1, extra_message)
 
+    def _convert_content_to_string(
+        self,
+        content: Union[Dict[str, Any], List[Any], str]
+    ) -> Optional[str]:
+        """
+        Convert content to a string representation.
 
-        if self.llm.token_limit:
-            max_tokens_per_request = self.llm.token_limit - 1000
-            content_tokens = num_tokens_from_string(str(content))
+        Args:
+            content: The content to convert.
 
-            if content_tokens > max_tokens_per_request:
-                return self._extract_with_splitting(
-                    content,
-                    file_or_stream,
-                    response_model,
-                    vision,
-                    is_stream,
-                    max_tokens_per_request,
-                    messages,
-                )
+        Returns:
+            A string representation of the content.
+        """
+        if isinstance(content, dict):
+            if content.get("is_spreadsheet", False):
+                return json_to_formatted_string(content.get("data", {}))
             else:
-                response = self.llm.request(messages, response_model)
-                return response
+                return yaml.dump(content, default_flow_style=True)
+        elif isinstance(content, list):
+            return yaml.dump(content, default_flow_style=True)
+        elif isinstance(content, str):
+            return content
         else:
-            response = self.llm.request(messages, response_model)
-            return response
+            return None
 
     def loadfile(self, file):
         self.file = file

@@ -69,9 +69,20 @@ class DocumentLoader(ABC):
         """Enhanced load method that handles vision mode."""
         if not self.can_handle(source):
             raise ValueError("Unsupported file type or stream.")
-            
+        
         response = {}
         
+        # Always process text content
+        content = self.load_content_from_file(source) if isinstance(source, str) else self.load_content_from_stream(source)
+        
+        # Merge content with response
+        if content is not None:
+            if isinstance(content, dict):
+                response.update(content)
+            else:
+                response['content'] = content
+        
+        # If vision mode is enabled, add images
         if self.vision_mode:
             if not self.can_handle_vision(source):
                 raise ValueError("Source cannot be processed in vision mode. Only PDFs and images are supported.")
@@ -79,15 +90,6 @@ class DocumentLoader(ABC):
             # Convert to images and add to response
             response['images'] = self.convert_to_images(source)
         
-        # Normal processing
-        content = self.load_content_from_file(source) if isinstance(source, str) else self.load_content_from_stream(source)
-        
-        # Merge content with response
-        if isinstance(content, dict):
-            response.update(content)
-        else:
-            response['content'] = content
-            
         return response
 
     def getContent(self) -> Any:

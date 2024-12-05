@@ -18,6 +18,7 @@ class LLM:
         self.api_key = api_key
         self.api_version = api_version
         self.token_limit = token_limit
+        # self.encoding = tiktoken.encoding_for_model(model)
 
     def load_router(self, router: Router) -> None:
         self.router = router
