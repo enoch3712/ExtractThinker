@@ -186,7 +186,7 @@ class Process:
     def where(self, condition):
         pass
 
-    def extract(self) -> List[Any]:
+    def extract(self, vision: bool = False) -> List[Any]:
         if self.doc_groups is None:
             raise ValueError("Document groups have not been initialized")
 
@@ -219,7 +219,7 @@ class Process:
             # get the content of the pages, add them together and extract the data
 
             pages_content = [content[i - 1] for i in doc_group.pages]
-            return await extractor.extract_async(pages_content, contract)
+            return await extractor.extract_async(pages_content, contract, vision)
 
         doc_groups = self.doc_groups
 
