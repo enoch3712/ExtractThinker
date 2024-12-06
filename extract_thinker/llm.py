@@ -1,8 +1,10 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import instructor
 import litellm
 from instructor.exceptions import IncompleteOutputException
 from litellm import Router
+
+litellm.set_verbose=True
 
 class LLM:
     def __init__(self,
@@ -26,58 +28,158 @@ class LLM:
 
     def request(self, messages: List[Dict[str, str]], response_model: Any) -> Any:
         attempt = 0
+        use_raw_litellm = False
+        
         while attempt < self.max_retries:
             try:
-                if self.router:
-                    response = self.router.completion(
-                        model=self.model,
-                        messages=messages,
-                        response_model=response_model,
-                    )
+                if use_raw_litellm:
+                    # Use raw litellm for large responses
+                    if self.router:
+                        raw_response = self.router.completion(
+                            model=self.model,
+                            messages=messages
+                        )
+                    else:
+                        raw_response = litellm.completion(
+                            model=self.model,
+                            messages=messages,
+                            api_base=self.api_base,
+                            api_key=self.api_key,
+                            api_version=self.api_version,
+                            max_tokens=self.token_limit or 500
+                        )
+                    # Cast raw response to pydantic model
+                    content = raw_response.choices[0].message.content
+                    return instructor.patch(response_model).from_json(content)
                 else:
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        response_model=response_model,
-                        api_base=self.api_base,
-                        api_key=self.api_key,
-                        api_version=self.api_version,
-                        max_tokens=500
-                    )
-                return response
-            except IncompleteOutputException as e:
-                print(f"Attempt {attempt + 1}: Incomplete output detected.")
-                if hasattr(e, 'last_completion'):
-                    print(f"Total tokens used: {e.last_completion.usage.total_tokens}")
-                messages = self._adjust_prompt(messages)
-                if not messages:
-                    print("Cannot trim the prompt further.")
-                    break
+                    # Try with instructor first
+                    if self.router:
+                        return self.router.completion(
+                            model=self.model,
+                            messages=messages,
+                            response_model=response_model
+                        )
+                    else:
+                        return self.client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            response_model=response_model,
+                            api_base=self.api_base,
+                            api_key=self.api_key,
+                            api_version=self.api_version,
+                            max_tokens=self.token_limit or 500,
+                            max_retries=1
+                        )
+                    
             except Exception as e:
-                print(f"An error occurred: {e}")
-                break
+                print(f"Attempt {attempt + 1}")
+                actual_exception = e.args[0] if e.args else e
+                
+                if isinstance(actual_exception, IncompleteOutputException):
+                    messages = self._adjust_prompt(
+                        messages,
+                        actual_exception.last_completion.choices[0].message.content
+                    )
+                    use_raw_litellm = True
+                    if not messages:
+                        print("Cannot process the response.")
+                        break
+                else:
+                    print(f"An error occurred: {actual_exception}")
+                    break
+                
             attempt += 1
         raise Exception("Failed to get a complete response after retries.")
-
-    def _adjust_prompt(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        if not messages:
-            return []
+    
+    def _adjust_prompt(self, messages: List[Dict[str, str]], content: str) -> List[Dict[str, str]]:
+        """
+        Rebuilds messages with type-structured content for continuation requests.
+        
+        Args:
+            messages: Original message list
+            content: Partial content from incomplete response
             
-        last_message = messages[-1]
-        if "content" not in last_message:
-            return []
-
-        content = last_message["content"]
-        # Try to trim by sentences first
-        if "." in content:
-            sentences = content.split(".")
-            trimmed_content = ".".join(sentences[:-1]) + "."
-        else:
-            # If no sentences, trim by percentage
-            trimmed_content = content[:int(len(content) * 0.9)]
-
-        if trimmed_content.strip():
-            messages[-1]["content"] = trimmed_content
-            print("Prompt has been trimmed to reduce token count.")
-            return messages
-        return []
+        Returns:
+            Restructured messages list with content types
+        """
+        # Concatenate all system and user messages
+        system_content = ""
+        user_content = ""
+        images = []
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                system_content += msg["content"] + "\n"
+            elif msg["role"] == "user":
+                # Handle structured content with images
+                if isinstance(msg["content"], list):
+                    for item in msg["content"]:
+                        if item.get("type") == "text":
+                            user_content += item["text"] + "\n"
+                        elif item.get("type") == "image_url":
+                            images.append(item)
+                # Handle plain text content
+                elif isinstance(msg["content"], str):
+                    user_content += msg["content"] + "\n"
+        
+        # Build the structured messages
+        structured_messages = [
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"You are a server API that receives document information and returns specific fields in JSON format.\n\n##Extra Content\n\nRULE: Give me all the pages content"
+                    }
+                ]
+            }
+        ]
+        
+        # Build user message content list
+        user_message_content = []
+        
+        # Add text content if present
+        if user_content:
+            user_message_content.append({
+                "type": "text",
+                "text": user_content.strip()
+            })
+        
+        # Add images if present
+        user_message_content.extend(images)
+        
+        # Add JSON marker
+        user_message_content.append({
+            "type": "text",
+            "text": "\n##JSON"
+        })
+        
+        # Add user message with combined content
+        structured_messages.append({
+            "role": "user",
+            "content": user_message_content
+        })
+        
+        # Add the assistant's partial response
+        structured_messages.append({
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": content
+                }
+            ]
+        })
+        
+        # Add continuation prompt
+        structured_messages.append({
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "## CONTINUE JSON,"
+                }
+            ]
+        })
+        
+        return structured_messages

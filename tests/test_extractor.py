@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
@@ -219,13 +220,20 @@ class ReportContract(Contract):
     pages: List[PageContract]
 
 def test_data_long_text():
-    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Report-state-regions-and-cities-EN.pdf")
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderPyPdf())
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     extractor.load_llm("gpt-4o-mini")
 
-    result = extractor.extract(test_file_path, ReportContract, vision=False, content="RULE: Give me all the pages content, all 62 pages")
+    result = extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        content="RULE: Give me all the pages content",
+        completion_strategy=CompletionStrategy.CONCATENATE
+    )
     pass
 
 if __name__ == "__main__":

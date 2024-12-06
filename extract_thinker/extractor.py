@@ -17,6 +17,7 @@ from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.batch_job import BatchJob
 
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
     encode_image,
     json_to_formatted_string,
@@ -130,6 +131,7 @@ class Extractor:
         response_model: type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
+        completion_strategy: Optional[CompletionStrategy] = None
     ) -> Any:
         """
         Extract information from the provided source.
@@ -148,7 +150,7 @@ class Extractor:
         """
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
-
+        self.completion_strategy = completion_strategy
         # Set vision mode on document loader if available
         if vision and self.document_loader:
             self.document_loader.set_vision_mode(True)
