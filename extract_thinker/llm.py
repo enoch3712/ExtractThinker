@@ -29,6 +29,7 @@ class LLM:
     def request(self, messages: List[Dict[str, str]], response_model: Any) -> Any:
         attempt = 0
         use_raw_litellm = False
+        self.json_parts = []
         
         while attempt < self.max_retries:
             try:
@@ -50,7 +51,8 @@ class LLM:
                         )
                     # Cast raw response to pydantic model
                     content = raw_response.choices[0].message.content
-                    return instructor.patch(response_model).from_json(content)
+                    self.json_parts.append(content)  # Add the content to json_parts
+                    return self._process_json_response(self.json_parts, response_model)
                 else:
                     # Try with instructor first
                     if self.router:
@@ -76,9 +78,13 @@ class LLM:
                 actual_exception = e.args[0] if e.args else e
                 
                 if isinstance(actual_exception, IncompleteOutputException):
+                    # Save the partial JSON response
+                    partial_content = actual_exception.last_completion.choices[0].message.content
+                    self.json_parts.append(partial_content)
+                    
                     messages = self._adjust_prompt(
                         messages,
-                        actual_exception.last_completion.choices[0].message.content
+                        partial_content
                     )
                     use_raw_litellm = True
                     if not messages:
@@ -177,9 +183,63 @@ class LLM:
             "content": [
                 {
                     "type": "text",
-                    "text": "## CONTINUE JSON,"
+                    "text": "## CONTINUE JSON"
                 }
             ]
         })
         
         return structured_messages
+    
+    def _process_json_response(self, json_parts: List[str], response_model: Any) -> Any:
+        """
+        Process and concatenate JSON response parts, then parse into the response model.
+        
+        Args:
+            json_parts: List of JSON content strings to process
+            response_model: The Pydantic model to parse the response into
+            
+        Returns:
+            Parsed response model instance
+        """
+        # Initialize storage for JSON parts
+        processed_parts = []
+        
+        for content in json_parts:
+            # Clean up the content by removing markdown code blocks
+            cleaned_content = content.replace('```json', '').replace('```', '').strip()
+            if cleaned_content:
+                processed_parts.append(cleaned_content)
+        
+        if not processed_parts:
+            raise ValueError("No valid JSON content found in the response")
+        
+        # For the first part, we expect the start of the complete JSON structure
+        combined_json = processed_parts[0]
+        
+        # For subsequent parts, we need to carefully merge them
+        if len(processed_parts) > 1:
+            for part in processed_parts[1:]:
+                # If the current combined_json ends with a partial array or object
+                if combined_json.rstrip().endswith(','):
+                    # Remove any leading braces/brackets from the next part
+                    while part.startswith('{') or part.startswith('['):
+                        part = part[1:]
+                    combined_json = combined_json + part
+                else:
+                    # If we're continuing content within an object/array
+                    if combined_json.rstrip().endswith('"'):
+                        # We're in the middle of a string value
+                        combined_json = combined_json.rstrip()[:-1] + part
+                    else:
+                        # Just append the part
+                        combined_json += part
+        
+        # Clean up any duplicate closing braces/brackets
+        while '}}]}' in combined_json:
+            combined_json = combined_json.replace('}}]}', '}]}')
+        
+        try:
+            # Parse the combined JSON using instructor
+            return instructor.patch(response_model).from_json(combined_json)
+        except Exception as e:
+            raise ValueError(f"Failed to parse combined JSON: {e}\nJSON content: {combined_json}")
