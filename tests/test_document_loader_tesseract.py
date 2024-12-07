@@ -51,3 +51,12 @@ def test_queue_load():
         content = loader.load_content_from_file(test_file_path)
         # Assert
         assert "0000001" in content
+
+def test_load_content_from_file_list():
+    # Act
+    content = loader.load_content_list(test_file_path)
+    # Assert
+    assert "0000001" in content
+
+if __name__ == "__main__":
+    test_load_content_from_file_list()  

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import copy
 from io import BytesIO
 from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
 from instructor.batch import BatchJob
@@ -22,9 +23,12 @@ from extract_thinker.utils import (
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
+    make_all_fields_optional,
 )
 import yaml
 from copy import deepcopy
+from extract_thinker.models.pagination_handler import PaginationHandler
+from instructor.exceptions import IncompleteOutputException
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -684,40 +688,38 @@ class Extractor:
         response_model: Any,
         vision: bool = False,
     ) -> Any:
-        """
-        Extract information from the content using the LLM.
-
-        Args:
-            content: The content to process, which can be a dict, list, or string.
-            response_model: The model to format the response.
-            vision: Whether to process vision content.
-
-        Returns:
-            The response from the LLM.
-        """
+        """Extract information from the content using the LLM."""
         # Call all the LLM interceptors before calling the LLM
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
-        if vision:
-            if not litellm.supports_vision(model=self.llm.model):
-                raise ValueError(
-                    f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-                )
+        if vision and not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
+            )
 
-        # Build the message content
-        message_content = self._build_message_content(content, vision)
-
-        # Build the messages
-        messages = self._build_messages(message_content, vision)
-
-        # Add extra content if it exists
+        # Build messages
+        messages = self._build_messages(self._build_message_content(content, vision), vision)
         if self.extra_content is not None:
             self._add_extra_content(messages)
 
-        # Send the request
-        response = self.llm.request(messages, response_model)
-        return response
+        try:
+            # Create request function that captures the current context
+            request_fn = lambda msgs, model: self.llm.request(msgs, model)
+            
+            if self.completion_strategy == CompletionStrategy.PAGINATE:
+                handler = PaginationHandler(self.llm)
+                return handler.handle(messages, response_model, request_fn)
+            elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                raise ValueError('FORBIDDEN completion strategy is not allowed.')
+            else:  # Default to CONCATENATE
+                return request_fn(messages, response_model)
+            
+        except IncompleteOutputException as e:
+            if self.completion_strategy == CompletionStrategy.PAGINATE:
+                handler = PaginationHandler(self.llm)
+                return handler.handle(messages, response_model, request_fn)
+            raise e
 
     def _build_message_content(
         self,

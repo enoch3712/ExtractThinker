@@ -232,7 +232,7 @@ def test_data_long_text():
         ReportContract,
         vision=True,
         content="RULE: Give me all the pages content",
-        completion_strategy=CompletionStrategy.CONCATENATE
+        completion_strategy=CompletionStrategy.PAGINATE
     )
     pass
 
