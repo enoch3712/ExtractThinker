@@ -1,0 +1,283 @@
+:root {
+  --md-primary-fg-color: #FF69B4;
+  --md-primary-fg-color--light: #FFB6C1;
+  --md-primary-fg-color--dark: #BA55D3;
+  --md-accent-fg-color: #FF6EB4;
+}
+
+.md-header {
+    background: linear-gradient(45deg, #FFD1DC, #FF69B4);
+    color: white;
+}
+
+.md-header__title {
+    display: none;
+}
+
+.md-header__inner {
+    display: flex;
+    justify-content: flex-start;
+    padding: 0 0.2rem;
+}
+
+.md-header__button.md-logo {
+    padding: 0.4rem;
+    margin: 0.2rem;
+    background-color: transparent;
+    margin-right: auto;
+}
+
+.md-header__button.md-logo img {
+    height: 2rem;
+    width: auto;
+}
+
+.md-search {
+    margin: 0;
+    padding-right: 2rem;
+    flex: 0 0 auto;
+    position: relative;
+}
+
+.md-search__form {
+    background-color: rgba(255,255,255,0.3);
+    width: 12rem;
+}
+
+.md-header__source {
+    background-color: transparent;
+    position: relative;
+    margin-right: 1rem;
+}
+
+/* Content layout */
+.md-grid {
+    max-width: 1440px;
+}
+
+.md-main {
+    background-color: white;
+}
+
+/* Left Navigation styling - More compact like Presidio */
+.md-sidebar--primary {
+    padding: 1rem 0;
+}
+
+.md-sidebar--primary .md-nav__title {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: bold;
+    padding: 0;
+    margin-bottom: 0.5rem;
+}
+
+.md-sidebar--primary .md-nav__list {
+    padding-left: 0;
+}
+
+.md-sidebar--primary .md-nav__item {
+    padding: 0;
+    margin: 0;
+}
+
+.md-sidebar--primary .md-nav__link {
+    margin: 0.1rem 0;
+    color: #666;
+    font-size: 0.7rem;
+    padding: 0.1rem 0;
+    line-height: 1.2;
+}
+
+.md-sidebar--primary .md-nav__link .md-ellipsis {
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.md-sidebar--primary .md-nav__link--active {
+    color: var(--md-primary-fg-color);
+    font-weight: 500;
+}
+
+.md-sidebar--primary .md-nav__link:hover {
+    color: var(--md-primary-fg-color--light);
+}
+
+/* Make nested items more compact */
+.md-nav__item .md-nav__item {
+    padding: 0;
+}
+
+.md-nav__item .md-nav__item .md-nav__link {
+    padding-left: 1rem;
+    font-size: 0.65rem;
+}
+
+/* Arrow for expandable items - smaller and more subtle */
+.md-nav__toggle {
+    color: #666;
+    opacity: 0.7;
+}
+
+/* Main content */
+.md-content {
+    padding: 1rem 2rem;
+}
+
+.md-content__inner {
+    margin: 0;
+    padding: 1rem 0;
+}
+
+/* Right sidebar - Table of contents */
+.md-sidebar--secondary {
+    padding: 1.5rem 0;
+}
+
+.md-sidebar--secondary .md-nav__title {
+    font-size: 0.7rem;
+    color: #666;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 0;
+    margin-bottom: 0.6rem;
+}
+
+.md-sidebar--secondary .md-nav__list {
+    font-size: 0.7rem;
+}
+
+.md-sidebar--secondary .md-nav__link {
+    padding: 0.1rem 0;
+    color: #666;
+    margin: 0.2rem 0;
+    line-height: 1.2;
+}
+
+.md-sidebar--secondary .md-nav__link:hover {
+    color: var(--md-primary-fg-color--light);
+}
+
+/* Typography - Presidio style */
+.md-typeset h1 {
+    color: #666;
+    font-weight: normal;
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+}
+
+.md-typeset h2 {
+    color: #666;
+    font-weight: normal;
+    font-size: 1.4rem;
+    margin: 1.5rem 0 1rem;
+}
+
+.md-typeset h3 {
+    color: #666;
+    font-weight: normal;
+    font-size: 1.2rem;
+    margin: 1rem 0;
+}
+
+.md-typeset p {
+    color: #666;
+    line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+/* Code blocks */
+.md-typeset code {
+    background-color: #F5F5F5;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+.md-typeset pre > code {
+    padding: 1rem;
+}
+
+/* Remove tabs */
+.md-tabs {
+    display: none;
+}
+
+.md-footer {
+    background: linear-gradient(45deg, #FFD1DC, #FF69B4);
+}
+
+.md-footer-meta {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.md-footer__inner {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+}
+
+.md-footer-copyright {
+    color: white;
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.md-footer-generator {
+    color: white;
+    font-size: 0.7rem;
+    opacity: 0.7;
+} 
+
+/* Adjust navigation indentation and spacing */
+.md-nav__item--nested .md-nav__list .md-nav__item {
+    padding-left: 1rem;
+}
+
+.md-nav__item .md-nav__item {
+    padding: 0;
+}
+
+.md-nav__link {
+    margin: 0.1rem 0;
+    color: #666;
+    font-size: 0.7rem;
+    padding: 0.1rem 0;
+    line-height: 1.2;
+}
+
+/* Optional: Add a subtle visual indicator for active items
+.md-nav__item--active {
+    border-left: 2px solid var(--md-accent-fg-color);
+    margin-left: -2px;
+} */
+
+.coming-soon {
+    background-color: #ff69b4;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 8px;
+}
+
+/* Style for disabled/upcoming navigation items */
+.md-nav__item a[href="#"] {
+    color: #999 !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+    text-decoration: none;
+    pointer-events: none;
+    position: relative;
+}
+
+.md-nav__item a[href="#"]:hover {
+    color: #999 !important;
+}
+
+/* Style for the hourglass emoji in disabled items */
+.md-nav__item a[href="#"] span:first-child {
+    opacity: 0.7;
+    filter: grayscale(1);
+}
