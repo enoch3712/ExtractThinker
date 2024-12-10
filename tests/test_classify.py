@@ -2,6 +2,7 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
+from extract_thinker.document_loader.document_loader_txt import DocumentLoaderTxt
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.classification_tree import ClassificationTree
@@ -116,7 +117,7 @@ def test_classify_consensus():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
-
+ 
 
 def test_classify_higher_order():
     """Test classification using higher order strategy."""
@@ -229,7 +230,69 @@ def test_with_tree():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     pdf_path = os.path.join(current_dir, 'files','invoice.pdf')
 
-    result = process.classify(pdf_path, classification_tree, threshold=0.8)
+    result = process.classify(pdf_path, classification_tree, threshold=7)
 
     assert result is not None
     assert result.name == "Invoice"
+
+def test_mom_classification_layers():
+    """Test Mixture of Models (MoM) classification with multiple layers."""
+    # Arrange
+    document_loader = DocumentLoaderTxt()
+    
+    # Get test file path 
+    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+    CREDIT_NOTE_PATH = os.path.join(CURRENT_DIR, "files", "ambiguous_credit_note.txt")
+    
+    # Create ambiguous classifications
+    test_classifications = [
+        Classification(
+            name="Receipt",
+            description="A document showing payment received for goods or services, typically including items purchased, amounts, and payment method",
+            contract=InvoiceContract
+        ),
+        Classification(
+            name="Credit Note",
+            description="A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice",
+            contract=CreditNoteContract
+        )
+    ]
+    
+    # Initialize extractors with different models
+    # Layer 1: Small models that might disagree
+    gpt35_extractor = Extractor(document_loader)
+    gpt35_extractor.load_llm("gpt-3.5-turbo")
+    
+    claude_haiku_extractor = Extractor(document_loader)
+    claude_haiku_extractor.load_llm("claude-3-haiku-20240307")
+    
+    # Layer 2: More capable models for resolution
+    gpt4_extractor = Extractor(document_loader)
+    gpt4_extractor.load_llm("gpt-4o")
+    sonnet_extractor = Extractor(document_loader)
+    sonnet_extractor.load_llm("claude-3-5-sonnet-20241022")
+    
+    # Create process with multiple layers
+    process = Process()
+    process.add_classify_extractor([
+        [gpt35_extractor, claude_haiku_extractor],  # Layer 1: Small models
+        [gpt4_extractor, sonnet_extractor]          # Layer 2: Resolution model
+    ])
+    
+    # Test full MoM process (should resolve using Layer 2)
+    final_result = process.classify(
+        CREDIT_NOTE_PATH,
+        test_classifications,
+        strategy=ClassificationStrategy.CONSENSUS_WITH_THRESHOLD,
+        threshold=8
+    )
+    
+    # Print results for debugging
+    print("\nMoM Classification Results:")
+    print(f"Final Classification: {final_result.name}")
+    print(f"Confidence: {final_result.confidence}")
+    
+    # Assertions
+    assert final_result is not None, "MoM should produce a result"
+    assert final_result.name == "Credit Note", "Final classification should be Credit Note"
+    assert final_result.confidence >= 8, "Final confidence should be high"
