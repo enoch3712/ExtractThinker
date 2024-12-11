@@ -3,14 +3,13 @@ import json
 import re
 import yaml
 from PIL import Image
-import tiktoken
 from pydantic import BaseModel
 import typing
 import os
 from io import BytesIO
-from typing import Union
 import sys
-from typing import List
+from typing import Optional, Any, Union, get_origin, get_args
+from pydantic import BaseModel, create_model
 
 def encode_image(image_source: Union[str, BytesIO, bytes, Image.Image]) -> str:
     """
@@ -229,3 +228,24 @@ def json_to_formatted_string(data):
         for row in rows:
             result.append(','.join(map(str, row)))
     return '\n'.join(result)
+
+def make_all_fields_optional(model: Any) -> Any:
+    """Convert all fields of a Pydantic model to Optional."""
+    if not issubclass(model, BaseModel):
+        raise ValueError("model must be a subclass of BaseModel")
+
+    fields = {}
+    for field_name, field in model.model_fields.items():
+        annotation = field.annotation
+        # Check if field is already optional
+        if get_origin(annotation) is not Union or type(None) not in get_args(annotation):
+            fields[field_name] = (Optional[field.annotation], None)
+        else:
+            fields[field_name] = (field.annotation, None)
+
+    NewModel = create_model(
+        model.__name__ + "Optional",
+        __base__=model,
+        **fields
+    )
+    return NewModel

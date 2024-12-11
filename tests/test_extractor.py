@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from extract_thinker.llm import LLM
 from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
@@ -219,6 +220,21 @@ class ReportContract(Contract):
     title: str
     pages: List[PageContract]
 
+class PaginateContract(Contract):
+    us_state: str
+    driver_license_number: str
+    expiration_date: str
+    registered_for_personal_use: bool
+
+class CountryGDP(Contract):
+    country: str
+    location: str
+    gdp_real: float
+
+class PaginateContractTwo(Contract):
+    regional_gdp: list[CountryGDP]
+    total_gdp: float
+
 def test_data_long_text():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
     tesseract_path = os.getenv("TESSERACT_PATH")
@@ -232,9 +248,58 @@ def test_data_long_text():
         ReportContract,
         vision=True,
         content="RULE: Give me all the pages content",
-        completion_strategy=CompletionStrategy.PAGINATE
+        completion_strategy=CompletionStrategy.FORBIDDEN
     )
     pass
 
+def test_forbidden_strategy_with_token_limit():
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+
+    llm = LLM("gpt-4o-mini", token_limit=10)
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm(llm)
+
+    # Should raise ValueError due to FORBIDDEN strategy
+    with pytest.raises(ValueError, match="Incomplete output received and FORBIDDEN strategy is set"):
+        extractor.extract(
+            test_file_path,
+            ReportContract,
+            vision=False,
+            content="RULE: Give me all the pages content",
+            completion_strategy=CompletionStrategy.FORBIDDEN
+        )
+
+def test_pagination_handler():
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018.pdf")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm("gpt-4o-mini")
+
+    result_1 = extractor.extract(
+        test_file_path, 
+        PaginateContractTwo, 
+        vision=True, 
+        completion_strategy=CompletionStrategy.PAGINATE
+    )
+
+    result_2 = extractor.extract(
+        test_file_path, 
+        PaginateContractTwo, 
+        vision=True, 
+        completion_strategy=CompletionStrategy.FORBIDDEN
+    )
+
+    assert result_1.total_gdp == result_2.total_gdp
+    assert len(result_1.regional_gdp) == len(result_2.regional_gdp)
+    
+    pass
+
 if __name__ == "__main__":
-    test_data_long_text()
+    # test_data_long_text()
+    # test_forbidden_strategy_with_token_limit()
+    test_pagination_handler()

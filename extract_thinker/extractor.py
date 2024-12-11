@@ -23,11 +23,10 @@ from extract_thinker.utils import (
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
-    make_all_fields_optional,
 )
 import yaml
 from copy import deepcopy
-from extract_thinker.models.pagination_handler import PaginationHandler
+from extract_thinker.pagination_handler import PaginationHandler
 from instructor.exceptions import IncompleteOutputException
 
 class Extractor:
@@ -135,7 +134,7 @@ class Extractor:
         response_model: type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
-        completion_strategy: Optional[CompletionStrategy] = None
+        completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
         """
         Extract information from the provided source.
@@ -145,16 +144,17 @@ class Extractor:
             response_model (type[BaseModel]): The Pydantic model to parse the response into.
             vision (bool, optional): Whether to use vision capabilities. Defaults to False.
             content (Optional[str], optional): Additional content to include in the extraction. Defaults to None.
-
+            completion_strategy (Optional[CompletionStrategy], optional): The completion strategy to use. Defaults to CompletionStrategy.FORBIDDEN.
         Returns:
             Any: The extracted information as specified by the response_model.
-
         Raises:
             ValueError: If the source type is unsupported or dependencies are not met.
         """
+
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
         self.completion_strategy = completion_strategy
+
         # Set vision mode on document loader if available
         if vision and self.document_loader:
             self.document_loader.set_vision_mode(True)
@@ -167,6 +167,9 @@ class Extractor:
             else:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
                 self.document_loader.set_vision_mode(True)
+
+        if completion_strategy is not CompletionStrategy.FORBIDDEN:
+            return self.extract_with_strategy(source, response_model, vision, completion_strategy)
 
         if isinstance(source, str):
             if source.startswith(('http://', 'https://')):
@@ -230,6 +233,44 @@ class Extractor:
             ]
 
         return self._extract(processed_data, response_model, vision) #, is_stream=False)
+    
+    def extract_with_strategy(
+        self, 
+        source: Union[str, IO, list], 
+        response_model: type[BaseModel], 
+        vision: bool, 
+        completion_strategy: CompletionStrategy
+    ) -> Any:
+        """
+        Extract information using a specific completion strategy.
+        
+        Args:
+            source: Input source (file path, stream, or list)
+            response_model: Pydantic model for response parsing
+            vision: Whether to use vision capabilities
+            completion_strategy: Strategy for handling completions
+            
+        Returns:
+            Parsed response matching response_model
+        """
+        # Get appropriate document loader
+        document_loader = self.get_document_loader(source)
+        if document_loader is None:
+            raise ValueError("No suitable document loader found for the input.")
+
+        # Load content using list method
+        content = document_loader.load_content_list(source)
+
+        # Handle based on strategy
+        if completion_strategy == CompletionStrategy.PAGINATE:
+            handler = PaginationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
+        elif completion_strategy == CompletionStrategy.CONCATENATE:
+            # For concatenate strategy, we still use PaginationHandler but merge results
+            handler = PaginationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
+        else:
+            raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
 
     def extract_from_file(
         self, file: str, response_model: type[BaseModel], vision: bool = False
@@ -695,31 +736,41 @@ class Extractor:
 
         if vision and not litellm.supports_vision(model=self.llm.model):
             raise ValueError(
-                f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
+                f"Model {self.llm.model} is not supported for vision."
             )
 
         # Build messages
         messages = self._build_messages(self._build_message_content(content, vision), vision)
+
         if self.extra_content is not None:
             self._add_extra_content(messages)
 
         try:
-            # Create request function that captures the current context
             request_fn = lambda msgs, model: self.llm.request(msgs, model)
             
             if self.completion_strategy == CompletionStrategy.PAGINATE:
                 handler = PaginationHandler(self.llm)
                 return handler.handle(messages, response_model, request_fn)
             elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
-                raise ValueError('FORBIDDEN completion strategy is not allowed.')
-            else:  # Default to CONCATENATE
                 return request_fn(messages, response_model)
+            else:
+                return request_fn(messages, response_model)
+                
+        except Exception as e:
+            actual_exception = e.args[0] if e.args else e
             
-        except IncompleteOutputException as e:
-            if self.completion_strategy == CompletionStrategy.PAGINATE:
-                handler = PaginationHandler(self.llm)
-                return handler.handle(messages, response_model, request_fn)
-            raise e
+            if isinstance(actual_exception, IncompleteOutputException):
+                if self.completion_strategy == CompletionStrategy.PAGINATE:
+                    # Get partial content from the exception
+                    partial_content = actual_exception.last_completion.choices[0].message.content
+                    handler = PaginationHandler(self.llm)
+                    return handler.handle(messages, response_model, request_fn)
+                elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                    raise ValueError("Incomplete output received and FORBIDDEN strategy is set. If you want to continue processing, change the completion strategy to PAGINATE or CONCATENATE.")
+                else:
+                    raise actual_exception
+            else:
+                raise e
 
     def _build_message_content(
         self,

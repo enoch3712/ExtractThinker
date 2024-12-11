@@ -8,8 +8,20 @@ class CompletionHandler(ABC):
         
     @abstractmethod
     def handle(self, 
-               messages: List[Dict[str, Any]], 
+               content: Any,
                response_model: type[BaseModel],
-               partial_content: str) -> Any:
-        """Handle completion strategy when IncompleteOutputException occurs"""
+               vision: bool = False,
+               extra_content: Optional[str] = None) -> Any:
+        """
+        Handle completion strategy for content processing
+        
+        Args:
+            content: The content to process
+            response_model: Pydantic model class for response
+            vision: Whether to use vision capabilities
+            extra_content: Additional content to include
+            
+        Returns:
+            Parsed response matching response_model
+        """
         pass 
