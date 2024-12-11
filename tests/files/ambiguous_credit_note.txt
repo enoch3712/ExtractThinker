@@ -1,0 +1,21 @@
+CREDIT NOTE / RECEIPT
+No: CN-2024-001
+Date: 2024-04-10
+
+Original Invoice: INV-2024-123
+Customer: John Smith
+Address: 123 Main St
+
+Items Returned:
+1. Product A         $50.00
+2. Product B         $75.00
+                    -------
+Subtotal            $125.00
+Tax (10%)            $12.50
+                    -------
+Total Credit        $137.50
+
+Payment Method: Store Credit
+Reason: Customer Dissatisfaction
+
+Thank you for your business! 
