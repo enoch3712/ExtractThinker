@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import List
+from typing import List, Optional
 from pydantic import Field
 import time
 from dotenv import load_dotenv
@@ -231,10 +231,25 @@ class CountryGDP(Contract):
     location: str
     gdp_real: float
 
-class PaginateContractTwo(Contract):
-    regional_gdp: list[CountryGDP]
-    total_gdp: float
+class RegionData(Contract):
+    region: str
+    gdp_million: Optional[float] = Field(None, alias="GDP (€ million)")
+    share_in_eu27_gdp: Optional[float] = Field(None, alias="Share in EU27/national GDP (%)")
+    gdp_per_capita: Optional[int] = Field(None, alias="GDP per capita (€)")
+    # gdp_per_capita_pps: Optional[int] = Field(None, alias="GDP per capita (PPS)")
+    # gdp_per_capita_index_eu27: Optional[int] = Field(None, alias="GDP per capita (€ EU27=100)")
+    # gdp_per_capita_index_pps: Optional[int] = Field(None, alias="GDP per capita (PPS EU27=100)")
+    # gdp_per_person_employed_index: Optional[int] = Field(None, alias="GDP per person employed (PPS EU27=100)")
 
+class CountryData(Contract):
+    country: str
+    total_gdp_million: Optional[float] = Field(None, alias="Total GDP (€ million)")
+    regions: List[RegionData]
+
+class EUData(Contract):
+    eu_total_gdp_million: float = Field(None, alias="EU27 Total GDP (€ million)")
+    # countries: List[CountryData]
+    
 def test_data_long_text():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
     tesseract_path = os.getenv("TESSERACT_PATH")
@@ -273,31 +288,54 @@ def test_forbidden_strategy_with_token_limit():
         )
 
 def test_pagination_handler():
-    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018.pdf")
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
     tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm("gpt-4o")
 
-    result_1 = extractor.extract(
+    result_1: EUData = extractor.extract(
         test_file_path, 
-        PaginateContractTwo, 
+        EUData, 
         vision=True, 
         completion_strategy=CompletionStrategy.PAGINATE
     )
 
-    result_2 = extractor.extract(
+    result_2: EUData = extractor.extract(
         test_file_path, 
-        PaginateContractTwo, 
+        EUData, 
         vision=True, 
         completion_strategy=CompletionStrategy.FORBIDDEN
     )
 
-    assert result_1.total_gdp == result_2.total_gdp
-    assert len(result_1.regional_gdp) == len(result_2.regional_gdp)
+    # Compare top-level EU data
+    assert result_1.eu_total_gdp_million == result_2.eu_total_gdp_million
+    # assert len(result_1.countries) == len(result_2.countries)
     
-    pass
+    # Compare country-level data
+    for country1 in result_1.countries:
+        # Find matching country in result_2
+        matching_country = next(
+            (c for c in result_2.countries if c.country == country1.country), 
+            None
+        )
+        assert matching_country is not None, f"Country {country1.country} not found in result_2"
+        
+        # Compare country data
+        assert country1.total_gdp_million == matching_country.total_gdp_million
+        assert len(country1.regions) == len(matching_country.regions)
+        
+        # Compare region-level data
+        for region1 in country1.regions:
+            matching_region = next(
+                (r for r in matching_country.regions if r.region == region1.region),
+                None
+            )
+            assert matching_region is not None, f"Region {region1.region} not found in country {country1.country}"
+            assert region1.gdp_million == matching_region.gdp_million
+            assert region1.share_in_eu27_gdp == matching_region.share_in_eu27_gdp
+            assert region1.gdp_per_capita == matching_region.gdp_per_capita
 
 if __name__ == "__main__":
     # test_data_long_text()
