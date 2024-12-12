@@ -1,5 +1,5 @@
 import copy
-from typing import Any, Dict, List, Optional, get_origin, Union
+from typing import Any, Dict, List, Optional, get_origin, get_args, Union
 from pydantic import BaseModel, Field
 from instructor.exceptions import IncompleteOutputException
 from extract_thinker.completion_handler import CompletionHandler
@@ -92,13 +92,8 @@ class PaginationHandler(CompletionHandler):
             non_null_values = [v for v in values if v is not None]
 
             if field_type and get_origin(field_type) is list:
-                # Merge lists
-                merged_list = []
-                for v in values:
-                    if isinstance(v, list):
-                        merged_list.extend(v)
-                    elif v is not None:
-                        merged_list.append(v)
+                # Merge lists using a more sophisticated approach
+                merged_list = self._merge_list_field(field_name, values, field_type)
                 merged[field_name] = merged_list
             else:
                 # Scalar field handling
@@ -124,6 +119,86 @@ class PaginationHandler(CompletionHandler):
 
         # Now that conflicts are resolved and cleaned, instantiate the response model
         return response_model(**merged)
+
+    def _merge_list_field(self, field_name: str, values: List[Any], field_type: Any) -> List[Any]:
+        """
+        Merge list fields from multiple pages. If the list is a list of Pydantic models,
+        we try to merge based on a unique key field (e.g. `country` for countries, `region` for regions).
+        If it's not a list of models or no unique key is found, we just concatenate and
+        rely on conflict resolution later.
+        """
+        # Flatten all lists
+        flattened = []
+        for v in values:
+            if isinstance(v, list):
+                flattened.extend(v)
+            elif v is not None:
+                flattened.append(v)
+
+        # Attempt to detect if we're dealing with a Pydantic model list
+        args = get_args(field_type)
+        if args:
+            model_type = args[0]
+            if hasattr(model_type, '__fields__'):
+                # We have a Pydantic model class in the list
+                # Identify a unique key to merge on. 
+                candidate_keys = ['country', 'region', 'id', 'name']
+                unique_key = None
+                for ck in candidate_keys:
+                    if ck in model_type.__fields__:
+                        unique_key = ck
+                        break
+
+                if unique_key:
+                    # Merge by unique key
+                    merged_by_key = {}
+                    for item in flattened:
+                        if hasattr(item, 'model_dump'):
+                            item_dict = item.model_dump()
+                        else:
+                            item_dict = item
+                        key_val = item_dict.get(unique_key)
+                        if key_val is not None:
+                            if key_val in merged_by_key:
+                                merged_by_key[key_val] = self._merge_two_models(
+                                    merged_by_key[key_val],
+                                    item_dict
+                                )
+                            else:
+                                merged_by_key[key_val] = item_dict
+                        else:
+                            # If no unique key found for this item, just store it uniquely
+                            merged_by_key[f"no_key_{len(merged_by_key)}"] = item_dict
+
+                    return list(merged_by_key.values())
+                else:
+                    # No unique key found, just return flattened list
+                    return flattened
+            else:
+                # Not a pydantic model list
+                return flattened
+        else:
+            # Not a parametrized list type
+            return flattened
+
+    def _merge_two_models(self, existing: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge two dictionaries representing the same entity. For scalar values,
+        prefer the existing if both are non-null or prefer non-null values.
+        For lists, combine them.
+        """
+        merged = existing.copy()
+        for k, v in new.items():
+            if k not in merged or merged[k] is None:
+                merged[k] = v
+            else:
+                if isinstance(merged[k], list) and isinstance(v, list):
+                    # Extend lists
+                    merged[k].extend(v)
+                # If there's a scalar conflict, we can keep the first non-null,
+                # or implement custom conflict handling here.
+                # For now, do nothing if both have a value, keep existing.
+        return merged
 
     def _clean_merged_dict(self, merged: Dict[str, Any], response_model: type[BaseModel]) -> Dict[str, Any]:
         """Clean the merged dictionary after conflict resolution to remove any leftover special structures 
@@ -152,11 +227,8 @@ class PaginationHandler(CompletionHandler):
             if isinstance(field_value, dict) and field_value.get("_conflict"):
                 return True
             
-            # Check list field duplicates
-            if field_type and get_origin(field_type) is list and isinstance(field_value, list):
-                if len(field_value) > 1:
-                    if len(set(str(x) for x in field_value)) < len(field_value):
-                        return True
+            # Check list field duplicates (if needed)
+            # Here you could implement more robust checks if required.
         return False
 
     def _identify_conflicts(self, result_dict: Dict[str, Any], response_model: type[BaseModel]) -> Dict[str, Any]:
@@ -170,12 +242,7 @@ class PaginationHandler(CompletionHandler):
             # Scalar conflict
             if isinstance(field_value, dict) and field_value.get("_conflict"):
                 conflicts[field_name] = field_value["candidates"]
-            # List conflict (duplicates)
-            elif field_type and get_origin(field_type) is list and isinstance(field_value, list):
-                if len(field_value) > 1:
-                    # Check if duplicates exist
-                    if len(set(str(x) for x in field_value)) < len(field_value):
-                        conflicts[field_name] = field_value
+            # Could add checks for list conflicts if needed.
         return conflicts
 
     def _resolve_conflicts(self, result_dict: Dict[str, Any], response_model: type[BaseModel],

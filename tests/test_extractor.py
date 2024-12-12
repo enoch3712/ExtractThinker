@@ -5,6 +5,7 @@ from pydantic import Field
 import time
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
+from extract_thinker.document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
@@ -232,15 +233,18 @@ class CountryGDP(Contract):
     location: str
     gdp_real: float
 
+class ProvinceData(Contract):
+    name: str
+    gdp_million: Optional[float] = Field(None, description="GDP (€ million)")
+    share_in_eu27_gdp: Optional[float] = Field(None, description="Share in EU27/national GDP (%)")
+    gdp_per_capita: Optional[int] = Field(None, description="GDP per capita (€)")
+
 class RegionData(Contract):
     region: str
     gdp_million: Optional[float] = Field(None, description="GDP (€ million)")
     share_in_eu27_gdp: Optional[float] = Field(None, description="Share in EU27/national GDP (%)")
     gdp_per_capita: Optional[int] = Field(None, description="GDP per capita (€)")
-    # gdp_per_capita_pps: Optional[int] = Field(None, alias="GDP per capita (PPS)")
-    # gdp_per_capita_index_eu27: Optional[int] = Field(None, alias="GDP per capita (€ EU27=100)")
-    # gdp_per_capita_index_pps: Optional[int] = Field(None, alias="GDP per capita (PPS EU27=100)")
-    # gdp_per_person_employed_index: Optional[int] = Field(None, alias="GDP per person employed (PPS EU27=100)")
+    provinces: List[ProvinceData] = Field(default_factory=list)
 
 class CountryData(Contract):
     country: str
@@ -294,24 +298,20 @@ def test_pagination_handler():
     tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderAWSTextract(
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        region_name=os.getenv('AWS_DEFAULT_REGION')
-    ))
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     extractor.load_llm("gpt-4o")
 
     result_1: EUData = extractor.extract(
         test_file_path,
         EUData,
-        vision=False, 
+        vision=True, 
         completion_strategy=CompletionStrategy.PAGINATE
     )
 
     result_2: EUData = extractor.extract(
         test_file_path,
         EUData,
-        vision=False, 
+        vision=True, 
         completion_strategy=CompletionStrategy.FORBIDDEN
     )
 
@@ -319,8 +319,6 @@ def test_pagination_handler():
     assert result_1.eu_total_gdp_million_27 == result_2.eu_total_gdp_million_27
     assert result_1.eu_total_gdp_million_28 == result_2.eu_total_gdp_million_28
 
-    # assert len(result_1.countries) == len(result_2.countries)
-    
     # Compare country-level data
     for country1 in result_1.countries:
         # Find matching country in result_2
@@ -341,9 +339,25 @@ def test_pagination_handler():
                 None
             )
             assert matching_region is not None, f"Region {region1.region} not found in country {country1.country}"
+            
+            # Compare region data
             assert region1.gdp_million == matching_region.gdp_million
             assert region1.share_in_eu27_gdp == matching_region.share_in_eu27_gdp
             assert region1.gdp_per_capita == matching_region.gdp_per_capita
+            
+            # Compare province-level data
+            assert len(region1.provinces) == len(matching_region.provinces)
+            for province1 in region1.provinces:
+                matching_province = next(
+                    (p for p in matching_region.provinces if p.name == province1.name),
+                    None
+                )
+                assert matching_province is not None, f"Province {province1.name} not found in region {region1.region}"
+                
+                # Compare province data
+                assert province1.gdp_million == matching_province.gdp_million
+                assert province1.share_in_eu27_gdp == matching_province.share_in_eu27_gdp
+                assert province1.gdp_per_capita == matching_province.gdp_per_capita
 
 if __name__ == "__main__":
     # test_data_long_text()
