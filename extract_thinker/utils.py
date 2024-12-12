@@ -221,13 +221,26 @@ def get_file_extension(file_path):
         return None
 
 
-def json_to_formatted_string(data):
-    result = []
-    for sheet, rows in data.items():
-        result.append(f"##{sheet}")
-        for row in rows:
-            result.append(','.join(map(str, row)))
-    return '\n'.join(result)
+def json_to_formatted_string(data: dict) -> str:
+    """
+    Converts JSON/dict data into a formatted string representation.
+    Particularly useful for spreadsheet data.
+    
+    Args:
+        data: Dictionary containing the data to format
+        
+    Returns:
+        A formatted string representation of the data
+    """
+    if not data:
+        return ""
+        
+    # For spreadsheet-like data, create a tabular format
+    if isinstance(data, dict):
+        # Convert to yaml for readable output
+        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+    
+    return str(data)
 
 def make_all_fields_optional(model: Any) -> Any:
     """Convert all fields of a Pydantic model to Optional."""

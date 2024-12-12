@@ -1,11 +1,17 @@
 import copy
-from typing import Any, Dict, List, Optional, get_origin
-from pydantic import BaseModel
+from typing import Any, Dict, List, Optional, get_origin, Union
+from pydantic import BaseModel, Field
 from instructor.exceptions import IncompleteOutputException
 from extract_thinker.completion_handler import CompletionHandler
-from extract_thinker.utils import encode_image, make_all_fields_optional
+from extract_thinker.utils import encode_image, json_to_formatted_string, make_all_fields_optional
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+class ConflictResolution(BaseModel):
+    resolved_fields: Dict[str, Dict[str, Any]] = Field(
+        description="Dictionary of resolved field values with confidence scores",
+        default_factory=dict
+    )
 
 class PaginationHandler(CompletionHandler):
     def __init__(self, llm):
@@ -46,11 +52,13 @@ class PaginationHandler(CompletionHandler):
                     # Log error but continue processing other pages
                     print(f"Error processing page: {str(e)}")
                     
-        # Merge results from all pages
         if not results:
             raise ValueError("No valid results obtained from any page")
+        
+        # Pair up the pages with their results for context
+        pages_data = list(zip(content, results))
             
-        return self._merge_results(results, response_model)
+        return self._merge_results(results, response_model, pages_data)
 
     def _process_page(self, messages: List[Dict[str, Any]], response_model: type[BaseModel]) -> Any:
         """Process a single page with retry logic for incomplete responses"""
@@ -59,27 +67,24 @@ class PaginationHandler(CompletionHandler):
         except IncompleteOutputException as e:
             # Handle partial response
             partial_result = self._handle_partial_response(e, messages, response_model)
-            
-            # Check if we need to resolve any conflicts
             partial_dict = partial_result.model_dump()
             if self._has_conflicts(partial_dict, response_model):
-                resolved_dict = self._resolve_conflicts(partial_dict, response_model)
-                return response_model(**resolved_dict)
-                
+                # We'll resolve conflicts later after merging all pages
+                return partial_result
             return partial_result
 
-    def _merge_results(self, results: List[Any], response_model: type[BaseModel]) -> Any:
+    def _merge_results(self, results: List[Any], response_model: type[BaseModel], pages_data: List[Any]) -> Any:
         """Merge results from multiple pages into a dictionary, detect conflicts, resolve if needed, then return model."""
         
-        # First, collect all values for each field from all results
+        # Collect all values for each field
         field_values = {}
-        for result in results:
+        for _, result in pages_data:
             result_dict = result.model_dump()
             for field_name, field_value in result_dict.items():
                 if field_name not in field_values:
                     field_values[field_name] = []
                 field_values[field_name].append(field_value)
-        
+
         # Merge fields
         merged = {}
         for field_name, values in field_values.items():
@@ -94,7 +99,6 @@ class PaginationHandler(CompletionHandler):
                         merged_list.extend(v)
                     elif v is not None:
                         merged_list.append(v)
-                # Check for duplicates if needed later
                 merged[field_name] = merged_list
             else:
                 # Scalar field handling
@@ -113,10 +117,29 @@ class PaginationHandler(CompletionHandler):
 
         # Check for conflicts and resolve if necessary
         if self._has_conflicts(merged, response_model):
-            merged = self._resolve_conflicts(merged, response_model)
+            merged = self._resolve_conflicts(merged, response_model, pages_data, field_values)
         
-        # Now that conflicts are resolved, instantiate the response model
+        # Clean merged dictionary to ensure it's compatible with the response model
+        merged = self._clean_merged_dict(merged, response_model)
+
+        # Now that conflicts are resolved and cleaned, instantiate the response model
         return response_model(**merged)
+
+    def _clean_merged_dict(self, merged: Dict[str, Any], response_model: type[BaseModel]) -> Dict[str, Any]:
+        """Clean the merged dictionary after conflict resolution to remove any leftover special structures 
+        and ensure values are compatible with the response model."""
+        cleaned = {}
+        for field_name, field_value in merged.items():
+            # If there's still a conflict structure, remove it or handle it
+            if isinstance(field_value, dict) and field_value.get("_conflict"):
+                # If somehow unresolved (shouldn't happen), just pick one candidate or None
+                candidates = field_value.get("candidates", [])
+                cleaned[field_name] = candidates[0] if candidates else None
+            else:
+                cleaned[field_name] = field_value
+        
+        # Pydantic will do additional type coercion upon instantiation
+        return cleaned
 
     def _has_conflicts(self, result_dict: Dict[str, Any], response_model: type[BaseModel]) -> bool:
         """Check if result dictionary has any conflicting fields."""
@@ -131,10 +154,7 @@ class PaginationHandler(CompletionHandler):
             
             # Check list field duplicates
             if field_type and get_origin(field_type) is list and isinstance(field_value, list):
-                # If we detect duplicates for a list that might indicate a conflict
-                # (e.g., multiple identical answers that should be distinct or need verification)
                 if len(field_value) > 1:
-                    # Check for real duplicates
                     if len(set(str(x) for x in field_value)) < len(field_value):
                         return True
         return False
@@ -147,64 +167,164 @@ class PaginationHandler(CompletionHandler):
                 continue
             field_type = response_model.model_fields[field_name].annotation
 
-            # Check scalar conflicts
+            # Scalar conflict
             if isinstance(field_value, dict) and field_value.get("_conflict"):
                 conflicts[field_name] = field_value["candidates"]
-            # Check list conflicts (duplicates)
+            # List conflict (duplicates)
             elif field_type and get_origin(field_type) is list and isinstance(field_value, list):
                 if len(field_value) > 1:
-                    # If duplicates exist, consider it a conflict
+                    # Check if duplicates exist
                     if len(set(str(x) for x in field_value)) < len(field_value):
                         conflicts[field_name] = field_value
         return conflicts
 
-    def _resolve_conflicts(self, result_dict: Dict[str, Any], response_model: type[BaseModel]) -> Dict[str, Any]:
+    def _resolve_conflicts(self, result_dict: Dict[str, Any], response_model: type[BaseModel],
+                           pages_data: List[Any], field_values: Dict[str, List[Any]]) -> Dict[str, Any]:
         """Resolve conflicts in the dictionary using the LLM."""
         conflicts = self._identify_conflicts(result_dict, response_model)
         
         if not conflicts:
             return result_dict
             
-        resolved = self._request_conflict_resolution(conflicts)
+        resolved = self._request_conflict_resolution(conflicts, pages_data, field_values)
         return self._merge_resolved_conflicts(result_dict, resolved, response_model)
 
     def _request_conflict_resolution(
         self,
-        conflicts: Dict[str, List[Any]]
+        conflicts: Dict[str, List[Any]],
+        pages_data: List[Any],
+        field_values: Dict[str, List[Any]]
     ) -> Dict[str, Dict[str, Any]]:
         """Request LLM to resolve conflicts."""
-        prompt = self._build_conflict_resolution_prompt(conflicts)
+        message_content = self._build_conflict_resolution_prompt(conflicts, pages_data, field_values)
         
         messages = [
             {
                 "role": "system",
-                "content": "You are a server API that resolves field conflicts."
+                "content": "You are a server API that resolves field conflicts. You have access to the original page contents and the conflicting values extracted from them."
             },
             {
                 "role": "user",
-                "content": prompt
+                "content": message_content
             }
         ]
         
         try:
-            response = self.llm.request(messages, dict)
-            return response.get("resolved_fields", {})
+            response: ConflictResolution = self.llm.request(messages, ConflictResolution)
+            return response.resolved_fields
         except Exception as e:
-            raise ValueError(f"Failed to resolve conflicts: {str(e)}")
+            raise ValueError(f"Failed to resolve conflicts: {str(e)}. This may happen if the context was too big or the LLM couldn't resolve the conflicts.")
 
-    def _build_conflict_resolution_prompt(self, conflicts: Dict[str, List[Any]]) -> str:
-        """Build prompt for conflict resolution."""
-        return (
-            "Please resolve conflicts in these fields by choosing the correct value "
-            "and providing a confidence score (1-10).\n\n"
-            "Return JSON in this format:\n"
-            "{\n"
-            '  "resolved_fields": {\n'
-            '    "field_name": {"value": "chosen_value", "confidence": 9}\n'
-            "  }\n"
-            "}\n\n"
-            f"Conflicts to resolve:\n{conflicts}"
+    def _build_conflict_resolution_prompt(
+        self,
+        conflicts: Dict[str, List[Any]],
+        pages_data: List[Any],
+        field_values: Dict[str, List[Any]]
+    ) -> Union[str, List[Dict[str, Any]]]:
+        """Build prompt for conflict resolution with context from all pages."""
+        # Check if any page has vision content
+        has_vision_content = any(
+            isinstance(page_content, dict) and ('image' in page_content or 'images' in page_content)
+            for page_content, _ in pages_data
         )
+        
+        if has_vision_content:
+            # Build vision-compatible message content
+            message_content = []
+            
+            # Add initial text content
+            intro_text = [
+                "Please resolve conflicts in these fields by choosing the correct value and providing a confidence score (1-10).",
+                "You have the contents of each page that contributed data, and the conflicting values they produced.",
+                "Return JSON in this format:\n{\n  \"resolved_fields\": {\n    \"field_name\": {\"value\": \"chosen_value\", \"confidence\": 9}\n  }\n}\n",
+                "Conflicts to resolve:",
+                str(conflicts),
+                "\nHere are the original pages and their extracted values:"
+            ]
+            
+            message_content.append({
+                "type": "text",
+                "text": "\n".join(intro_text)
+            })
+            
+            # Add each page's content and images
+            for i, (page_content, page_result) in enumerate(pages_data):
+                page_text = [f"\n--- Page {i+1} ---", "Original page content:"]
+                
+                if isinstance(page_content, dict):
+                    # Add text content if available
+                    content_data = self._process_content_data(page_content)
+                    if content_data:
+                        page_text.append(content_data)
+                    
+                    # Add extracted values
+                    page_text.append("Extracted values for all fields on this page:")
+                    for field_name, values_for_field in field_values.items():
+                        page_value = values_for_field[i] if i < len(values_for_field) else None
+                        page_text.append(f"{field_name}: {page_value}")
+                    
+                    message_content.append({
+                        "type": "text",
+                        "text": "\n".join(page_text)
+                    })
+                    
+                    # Add images if present
+                    if 'image' in page_content:
+                        message_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encode_image(page_content['image'])}"
+                            }
+                        })
+                    elif 'images' in page_content:
+                        for img in page_content['images']:
+                            message_content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{encode_image(img)}"
+                                }
+                            })
+            
+            return message_content
+        else:
+            # Build regular text prompt
+            prompt_parts = []
+            prompt_parts.extend([
+                "Please resolve conflicts in these fields by choosing the correct value and providing a confidence score (1-10).",
+                "You have the contents of each page that contributed data, and the conflicting values they produced.",
+                "Return JSON in this format:\n{\n  \"resolved_fields\": {\n    \"field_name\": {\"value\": \"chosen_value\", \"confidence\": 9}\n  }\n}\n",
+                "Conflicts to resolve:",
+                str(conflicts),
+                "\nHere are the original pages and their extracted values:"
+            ])
+            
+            for i, (page_content, page_result) in enumerate(pages_data):
+                prompt_parts.extend([
+                    f"\n--- Page {i+1} ---",
+                    "Original page content:",
+                    yaml.dump(page_content) if isinstance(page_content, dict) else str(page_content),
+                    "Extracted values for all fields on this page:"
+                ])
+                
+                for field_name, values_for_field in field_values.items():
+                    page_value = values_for_field[i] if i < len(values_for_field) else None
+                    prompt_parts.append(f"{field_name}: {page_value}")
+            
+            return "\n".join(prompt_parts)
+
+    def _process_content_data(self, content: Union[Dict[str, Any], List[Any], str]) -> Optional[str]:
+        """Process content data by filtering out images and converting to a string."""
+        if isinstance(content, dict):
+            filtered_content = {
+                k: v for k, v in content.items()
+                if k not in ('images', 'image') and not hasattr(v, 'read')
+            }
+            if filtered_content.get("is_spreadsheet", False):
+                content_str = json_to_formatted_string(filtered_content.get("data", {}))
+            else:
+                content_str = yaml.dump(filtered_content, default_flow_style=True)
+            return content_str
+        return None
 
     def _merge_resolved_conflicts(
         self,

@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import Field
 import time
 from dotenv import load_dotenv
+from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
@@ -233,9 +234,9 @@ class CountryGDP(Contract):
 
 class RegionData(Contract):
     region: str
-    gdp_million: Optional[float] = Field(None, alias="GDP (€ million)")
-    share_in_eu27_gdp: Optional[float] = Field(None, alias="Share in EU27/national GDP (%)")
-    gdp_per_capita: Optional[int] = Field(None, alias="GDP per capita (€)")
+    gdp_million: Optional[float] = Field(None, description="GDP (€ million)")
+    share_in_eu27_gdp: Optional[float] = Field(None, description="Share in EU27/national GDP (%)")
+    gdp_per_capita: Optional[int] = Field(None, description="GDP per capita (€)")
     # gdp_per_capita_pps: Optional[int] = Field(None, alias="GDP per capita (PPS)")
     # gdp_per_capita_index_eu27: Optional[int] = Field(None, alias="GDP per capita (€ EU27=100)")
     # gdp_per_capita_index_pps: Optional[int] = Field(None, alias="GDP per capita (PPS EU27=100)")
@@ -243,12 +244,13 @@ class RegionData(Contract):
 
 class CountryData(Contract):
     country: str
-    total_gdp_million: Optional[float] = Field(None, alias="Total GDP (€ million)")
+    total_gdp_million: Optional[float] = Field(None, description="Total GDP (€ million)")
     regions: List[RegionData]
 
 class EUData(Contract):
-    eu_total_gdp_million: float = Field(None, alias="EU27 Total GDP (€ million)")
-    # countries: List[CountryData]
+    eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
+    eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
+    countries: List[CountryData]
     
 def test_data_long_text():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
@@ -292,25 +294,31 @@ def test_pagination_handler():
     tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_document_loader(DocumentLoaderAWSTextract(
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=os.getenv('AWS_DEFAULT_REGION')
+    ))
     extractor.load_llm("gpt-4o")
 
     result_1: EUData = extractor.extract(
-        test_file_path, 
-        EUData, 
-        vision=True, 
+        test_file_path,
+        EUData,
+        vision=False, 
         completion_strategy=CompletionStrategy.PAGINATE
     )
 
     result_2: EUData = extractor.extract(
-        test_file_path, 
-        EUData, 
-        vision=True, 
+        test_file_path,
+        EUData,
+        vision=False, 
         completion_strategy=CompletionStrategy.FORBIDDEN
     )
 
     # Compare top-level EU data
-    assert result_1.eu_total_gdp_million == result_2.eu_total_gdp_million
+    assert result_1.eu_total_gdp_million_27 == result_2.eu_total_gdp_million_27
+    assert result_1.eu_total_gdp_million_28 == result_2.eu_total_gdp_million_28
+
     # assert len(result_1.countries) == len(result_2.countries)
     
     # Compare country-level data
