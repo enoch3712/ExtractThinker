@@ -19,6 +19,7 @@ from extract_thinker.batch_job import BatchJob
 
 from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
+    add_classification_structure,
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
@@ -334,23 +335,6 @@ class Extractor:
             content = self.document_loader.load_content_from_stream(path)
         return self._classify(content, classifications)
 
-    def _add_classification_structure(self, classification: Classification) -> str:
-        content = ""
-        if classification.contract:
-            content = "\tContract Structure:\n"
-            # Iterate over the fields of the contract attribute if it's not None
-            for name, field in classification.contract.model_fields.items():
-                # Extract the type and required status from the field's string representation
-                field_str = str(field)
-                field_type = field_str.split('=')[1].split(' ')[0]  # Extracts the type
-                required = 'required' in field_str  # Checks if 'required' is in the string
-                # Creating a string representation of the field attributes
-                attributes = f"required={required}"
-                # Append each field's details to the content string
-                field_details = f"\t\tName: {name}, Type: {field_type}, Attributes: {attributes}"
-                content += field_details + "\n"
-        return content
-
     def _classify(
         self, content: Any, classifications: List[Classification], image: Optional[Any] = None
     ):
@@ -364,7 +348,7 @@ class Extractor:
 
         # Common classification structure for both image and non-image cases
         classification_info = "\n".join(
-            f"{c.name}: {c.description} \n{self._add_classification_structure(c)}"
+            f"{c.name}: {c.description} \n{add_classification_structure(c)}"
             for c in classifications
         )
 
