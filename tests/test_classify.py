@@ -178,9 +178,9 @@ def test_with_tree():
     process = setup_process_with_gpt4_extractor()
 
     financial_docs = ClassificationNode(
-        name="Financial Documents",
+        name="Financial Document",
         classification=Classification(
-            name="Financial Documents",
+            name="Financial Document",
             description="This is a financial document",
             contract=FinancialContract,
         ),
