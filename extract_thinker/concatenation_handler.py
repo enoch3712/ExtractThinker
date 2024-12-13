@@ -1,5 +1,6 @@
 import copy
 import yaml
+import json
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from extract_thinker.completion_handler import CompletionHandler
@@ -35,54 +36,44 @@ class ConcatenationHandler(CompletionHandler):
             except ValueError:
                 # If JSON is invalid, continue with the conversation
                 messages = self._build_continuation_messages(messages, response)
-
+    
     def _process_json_parts(self, response_model: type[BaseModel]) -> Any:
         """Process collected JSON parts into a complete response."""
         if not self.json_parts:
             raise ValueError("No JSON content collected")
-            
-        # Clean and combine parts
+        
         processed_parts = []
         for content in self.json_parts:
-            cleaned = content.replace('```json', '').replace('```', '').strip()
+            # Remove code fences and extraneous formatting artifacts
+            cleaned = (content
+                       .replace('```json', '')
+                       .replace('```', '')
+                       .replace('\njson', '')
+                       .replace('\n', ' ')
+                       .strip())
+
+            # If there's still something left after cleaning, keep it
             if cleaned:
                 processed_parts.append(cleaned)
-                
+            
         if not processed_parts:
             raise ValueError("No valid JSON content found in the response")
-        
-        combined_json = processed_parts[0]
-        
-        if len(processed_parts) > 1:
-            for part in processed_parts[1:]:
-                if combined_json.rstrip().endswith(','):
-                    while part.startswith('{') or part.startswith('['):
-                        part = part[1:]
-                    combined_json = combined_json + part
-                else:
-                    if combined_json.rstrip().endswith('"'):
-                        combined_json = combined_json.rstrip()[:-1] + part
-                    else:
-                        combined_json += part
-        
-        while '}}]}' in combined_json:
-            combined_json = combined_json.replace('}}]}', '}]}')
-        
+
+        # Combine all cleaned parts into one string
+        combined_json = "".join(processed_parts)
+
+        # Attempt to parse the combined JSON
         try:
-            # First attempt: Handle common escape sequences
-            try:
-                # Convert \x escapes to \u escapes
-                decoded_json = combined_json.encode('raw_unicode_escape').decode('utf-8')
-                # Handle any remaining escape sequences
-                decoded_json = decoded_json.encode('utf-8').decode('unicode_escape')
-                return response_model.model_validate(decoded_json)
-            except Exception as e:
-                # Fallback: Try direct ASCII with replacement
-                decoded_json = combined_json.encode('ascii', errors='replace').decode('ascii')
-                return response_model.model_validate(decoded_json)
-        except Exception as e:
+            parsed = json.loads(combined_json)
+        except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse combined JSON: {str(e)}\nJSON: {combined_json}")
-            
+
+        # Validate the parsed JSON against the Pydantic model
+        try:
+            return response_model.model_validate(parsed)
+        except Exception as e:
+            raise ValueError(f"Failed to validate parsed JSON: {str(e)}\nJSON: {combined_json}")
+		
     def _build_continuation_messages(
         self,
         messages: List[Dict[str, Any]],
