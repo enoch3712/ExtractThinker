@@ -1,6 +1,5 @@
 import json
 
-
 def remove_json_format(json_string: str) -> str:
     replace = json_string.replace("```json", "")
     replace = replace.replace("```", "")
