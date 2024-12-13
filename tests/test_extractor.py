@@ -1,16 +1,21 @@
 import asyncio
 import os
-from typing import List
+from typing import List, Optional
 from pydantic import Field
 import time
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from extract_thinker.llm import LLM
+from extract_thinker.models.completion_strategy import CompletionStrategy
+from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 import pytest
+import numpy as np
+from litellm import embedding
 
 load_dotenv()
 cwd = os.getcwd()
@@ -207,3 +212,213 @@ def test_cancel_batch_extraction():
     # Check if files were removed
     assert not os.path.exists(batch_job.file_path), f"Batch input file was not removed: {batch_job.file_path}"
     assert not os.path.exists(batch_job.output_path), f"Batch output file was not removed: {batch_job.output_path}"
+
+class PageContract(Contract):
+    title: str
+    number: int
+    content: str = Field(description="Give me all the content, word for word")
+
+class ReportContract(Contract):
+    title: str
+    pages: List[PageContract]
+
+class PaginateContract(Contract):
+    us_state: str
+    driver_license_number: str
+    expiration_date: str
+    registered_for_personal_use: bool
+
+class CountryGDP(Contract):
+    country: str
+    location: str
+    gdp_real: float
+
+class ProvinceData(Contract):
+    name: str
+    gdp_million: Optional[float] = Field(None, description="GDP (€ million)")
+    share_in_eu27_gdp: Optional[float] = Field(None, description="Share in EU27/national GDP (%)")
+    gdp_per_capita: Optional[int] = Field(None, description="GDP per capita (€)")
+
+class RegionData(Contract):
+    region: str
+    gdp_million: Optional[float] = Field(None, description="GDP (€ million)")
+    share_in_eu27_gdp: Optional[float] = Field(None, description="Share in EU27/national GDP (%)")
+    gdp_per_capita: Optional[int] = Field(None, description="GDP per capita (€)")
+    provinces: List[ProvinceData] = Field(default_factory=list)
+
+class CountryData(Contract):
+    country: str
+    total_gdp_million: Optional[float] = Field(None, description="Total GDP (€ million)")
+    regions: List[RegionData]
+
+class EUData(Contract):
+    eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
+    eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
+    countries: List[CountryData]
+    
+def test_data_long_text():
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm("gpt-4o-mini")
+
+    result = extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        content="RULE: Give me all the pages content",
+        completion_strategy=CompletionStrategy.FORBIDDEN
+    )
+    pass
+
+def test_forbidden_strategy_with_token_limit():
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+
+    llm = LLM("gpt-4o-mini", token_limit=10)
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm(llm)
+
+    # Should raise ValueError due to FORBIDDEN strategy
+    with pytest.raises(ValueError, match="Incomplete output received and FORBIDDEN strategy is set"):
+        extractor.extract(
+            test_file_path,
+            ReportContract,
+            vision=False,
+            content="RULE: Give me all the pages content",
+            completion_strategy=CompletionStrategy.FORBIDDEN
+        )
+
+def test_pagination_handler():
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    extractor.load_llm("gpt-4o")
+
+    result_1: EUData = extractor.extract(
+        test_file_path,
+        EUData,
+        vision=True,
+        completion_strategy=CompletionStrategy.PAGINATE
+    )
+
+    result_2: EUData = extractor.extract(
+        test_file_path,
+        EUData,
+        vision=True, 
+        completion_strategy=CompletionStrategy.FORBIDDEN
+    )
+
+    # Compare top-level EU data
+    assert result_1.eu_total_gdp_million_27 == result_2.eu_total_gdp_million_27
+    assert result_1.eu_total_gdp_million_28 == result_2.eu_total_gdp_million_28
+
+    # Compare country count
+    assert len(result_1.countries) == len(result_2.countries)
+
+    # Compare regions count for each country
+    for country1 in result_1.countries:
+        matching_country = next(
+            (c for c in result_2.countries if c.country == country1.country), 
+            None
+        )
+        assert matching_country is not None, f"Country {country1.country} not found in result_2"
+        assert len(country1.regions) == len(matching_country.regions)
+
+    # Keeping detailed comparison code commented for future reference
+    #     # Compare region-level data
+    #     for region1 in country1.regions:
+    #         matching_region = next(
+    #             (r for r in matching_country.regions if r.region == region1.region),
+    #             None
+    #         )
+    #         assert matching_region is not None, f"Region {region1.region} not found in country {country1.country}"
+    #         
+    #         # Compare region data
+    #         assert region1.gdp_million == matching_region.gdp_million
+    #         assert region1.share_in_eu27_gdp == matching_region.share_in_eu27_gdp
+    #         assert region1.gdp_per_capita == matching_region.gdp_per_capita
+    #         
+    #         # Compare province-level data
+    #         assert len(region1.provinces) == len(matching_region.provinces)
+    #         for province1 in region1.provinces:
+    #             matching_province = next(
+    #                 (p for p in matching_region.provinces if p.name == province1.name),
+    #                 None
+    #             )
+    #             assert matching_province is not None, f"Province {province1.name} not found in region {region1.region}"
+    #             
+    #             # Compare province data
+    #             assert province1.gdp_million == matching_province.gdp_million
+    #             assert province1.share_in_eu27_gdp == matching_province.share_in_eu27_gdp
+    #             assert province1.gdp_per_capita == matching_province.gdp_per_capita
+
+def get_embedding(text, model="text-embedding-ada-002"):
+    text = text.replace("\n", " ")
+    response = embedding(
+        model=model,  # OpenAI's embedding model
+        input=[text]
+    )
+    return response.data[0]['embedding']
+
+def cosine_similarity(v1, v2):
+    # Convert to numpy arrays if they aren't already
+    v1, v2 = np.array(v1), np.array(v2)
+    # Calculate cosine similarity
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+def semantically_similar(text1, text2, threshold=0.9):
+    # Normalize texts
+    text1 = text1.lower().strip()
+    text2 = text2.lower().strip()
+    
+    # Get embeddings
+    embedding1 = get_embedding(text1)
+    embedding2 = get_embedding(text2)
+    
+    # Calculate similarity
+    similarity = cosine_similarity(embedding1, embedding2)
+    return similarity >= threshold
+
+def test_concatenation_handler():
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    llm_first = LLM("gpt-4o", token_limit=500)
+    extractor.load_llm(llm_first)
+
+    result_1: ReportContract = extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        completion_strategy=CompletionStrategy.CONCATENATE
+    )
+
+    second_extractor = Extractor()
+    second_extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    second_extractor.load_llm("gpt-4o")
+
+    result_2: ReportContract = second_extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        completion_strategy=CompletionStrategy.FORBIDDEN
+    )
+
+    assert semantically_similar(
+        result_1.title,
+        result_2.title
+    ), "Titles are not semantically similar enough (threshold: 90%)"
+
+    assert result_1.pages[0].number == result_2.pages[0].number
+    assert semantically_similar(
+        result_1.pages[0].content, 
+        result_2.pages[0].content
+    ), "Page contents are not semantically similar enough (threshold: 90%)"

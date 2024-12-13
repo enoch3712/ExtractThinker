@@ -1,11 +1,11 @@
 import asyncio
 import base64
-from io import BytesIO
-from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
 from instructor.batch import BatchJob
 import uuid
 import litellm
 from pydantic import BaseModel
+from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
 from extract_thinker.models.classification import Classification
@@ -17,13 +17,17 @@ from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.batch_job import BatchJob
 
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
+    add_classification_structure,
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
 )
 import yaml
 from copy import deepcopy
+from extract_thinker.pagination_handler import PaginationHandler
+from instructor.exceptions import IncompleteOutputException
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -130,6 +134,7 @@ class Extractor:
         response_model: type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
+        completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
         """
         Extract information from the provided source.
@@ -139,15 +144,16 @@ class Extractor:
             response_model (type[BaseModel]): The Pydantic model to parse the response into.
             vision (bool, optional): Whether to use vision capabilities. Defaults to False.
             content (Optional[str], optional): Additional content to include in the extraction. Defaults to None.
-
+            completion_strategy (Optional[CompletionStrategy], optional): The completion strategy to use. Defaults to CompletionStrategy.FORBIDDEN.
         Returns:
             Any: The extracted information as specified by the response_model.
-
         Raises:
             ValueError: If the source type is unsupported or dependencies are not met.
         """
+
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
+        self.completion_strategy = completion_strategy
 
         # Set vision mode on document loader if available
         if vision and self.document_loader:
@@ -161,6 +167,9 @@ class Extractor:
             else:
                 self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
                 self.document_loader.set_vision_mode(True)
+
+        if completion_strategy is not CompletionStrategy.FORBIDDEN:
+            return self.extract_with_strategy(source, response_model, vision, completion_strategy)
 
         if isinstance(source, str):
             if source.startswith(('http://', 'https://')):
@@ -224,6 +233,44 @@ class Extractor:
             ]
 
         return self._extract(processed_data, response_model, vision) #, is_stream=False)
+    
+    def extract_with_strategy(
+        self, 
+        source: Union[str, IO, list], 
+        response_model: type[BaseModel], 
+        vision: bool, 
+        completion_strategy: CompletionStrategy
+    ) -> Any:
+        """
+        Extract information using a specific completion strategy.
+        
+        Args:
+            source: Input source (file path, stream, or list)
+            response_model: Pydantic model for response parsing
+            vision: Whether to use vision capabilities
+            completion_strategy: Strategy for handling completions
+            
+        Returns:
+            Parsed response matching response_model
+        """
+        # Get appropriate document loader
+        document_loader = self.get_document_loader(source)
+        if document_loader is None:
+            raise ValueError("No suitable document loader found for the input.")
+
+        # Load content using list method
+        content = document_loader.load_content_list(source)
+
+        # Handle based on strategy
+        if completion_strategy == CompletionStrategy.PAGINATE:
+            handler = PaginationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
+        elif completion_strategy == CompletionStrategy.CONCATENATE:
+            # For concatenate strategy, we still use PaginationHandler but merge results
+            handler = ConcatenationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
+        else:
+            raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
 
     def extract_from_file(
         self, file: str, response_model: type[BaseModel], vision: bool = False
@@ -288,23 +335,6 @@ class Extractor:
             content = self.document_loader.load_content_from_stream(path)
         return self._classify(content, classifications)
 
-    def _add_classification_structure(self, classification: Classification) -> str:
-        content = ""
-        if classification.contract:
-            content = "\tContract Structure:\n"
-            # Iterate over the fields of the contract attribute if it's not None
-            for name, field in classification.contract.model_fields.items():
-                # Extract the type and required status from the field's string representation
-                field_str = str(field)
-                field_type = field_str.split('=')[1].split(' ')[0]  # Extracts the type
-                required = 'required' in field_str  # Checks if 'required' is in the string
-                # Creating a string representation of the field attributes
-                attributes = f"required={required}"
-                # Append each field's details to the content string
-                field_details = f"\t\tName: {name}, Type: {field_type}, Attributes: {attributes}"
-                content += field_details + "\n"
-        return content
-
     def _classify(
         self, content: Any, classifications: List[Classification], image: Optional[Any] = None
     ):
@@ -318,7 +348,7 @@ class Extractor:
 
         # Common classification structure for both image and non-image cases
         classification_info = "\n".join(
-            f"{c.name}: {c.description} \n{self._add_classification_structure(c)}"
+            f"{c.name}: {c.description} \n{add_classification_structure(c)}"
             for c in classifications
         )
 
@@ -702,40 +732,33 @@ class Extractor:
         response_model: Any,
         vision: bool = False,
     ) -> Any:
-        """
-        Extract information from the content using the LLM.
-
-        Args:
-            content: The content to process, which can be a dict, list, or string.
-            response_model: The model to format the response.
-            vision: Whether to process vision content.
-
-        Returns:
-            The response from the LLM.
-        """
+        """Extract information from the content using the LLM."""
         # Call all the LLM interceptors before calling the LLM
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
-        if vision:
-            if not litellm.supports_vision(model=self.llm.model):
-                raise ValueError(
-                    f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-                )
+        if vision and not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} is not supported for vision."
+            )
 
-        # Build the message content
-        message_content = self._build_message_content(content, vision)
+        # Build messages
+        messages = self._build_messages(self._build_message_content(content, vision), vision)
 
-        # Build the messages
-        messages = self._build_messages(message_content, vision)
-
-        # Add extra content if it exists
         if self.extra_content is not None:
             self._add_extra_content(messages)
 
-        # Send the request
-        response = self.llm.request(messages, response_model)
-        return response
+        # Handle based on completion strategy
+        if self.completion_strategy == CompletionStrategy.PAGINATE:
+            handler = PaginationHandler(self.llm)
+            return handler.handle(messages, response_model, vision, self.extra_content)
+        elif self.completion_strategy == CompletionStrategy.CONCATENATE:
+            handler = ConcatenationHandler(self.llm)
+            return handler.handle(messages, response_model, vision, self.extra_content)
+        elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+            return self.llm.request(messages, response_model)
+        else:
+            raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
 
     def _build_message_content(
         self,
