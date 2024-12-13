@@ -1,24 +1,18 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import instructor
 import litellm
-from extract_thinker.models.batch_result import BatchResult
 from litellm import Router
 
 class LLM:
+    TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
+
     def __init__(self,
                  model: str,
-                 api_base: str = None,
-                 api_key: str = None,
-                 api_version: str = None,
                  token_limit: int = None):
         self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
         self.model = model
         self.router = None
-        self.api_base = api_base
-        self.api_key = api_key
-        self.api_version = api_version
         self.token_limit = token_limit
-        # self.encoding = tiktoken.encoding_for_model(model)
 
     def load_router(self, router: Router) -> None:
         self.router = router
@@ -31,19 +25,16 @@ class LLM:
         if self.router:
             response = self.router.completion(
                 model=self.model,
-                #max_tokens=max_tokens,
                 messages=messages,
                 response_model=response_model,
+                temperature=self.TEMPERATURE,
             )
         else:
             response = self.client.chat.completions.create(
                 model=self.model,
-                #max_tokens=max_tokens,
                 messages=messages,
+                temperature=self.TEMPERATURE,
                 response_model=response_model,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version,
                 max_retries=1,
                 max_tokens=self.token_limit
             )
@@ -61,9 +52,6 @@ class LLM:
             raw_response = litellm.completion(
                 model=self.model,
                 messages=messages,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version,
                 max_tokens=self.token_limit
             )
         return raw_response.choices[0].message.content
