@@ -160,17 +160,17 @@ def test_with_image():
     """Test classification using both consensus and higher order strategies with a threshold."""
     process = setup_process_with_gpt4_extractor()
 
-    COMMON_CLASSIFICATIONS[0].contract = InvoiceContract
-    COMMON_CLASSIFICATIONS[1].contract = DriverLicense
+    COMMON_CLASSIFICATIONS[0].contract = DriverLicense
+    COMMON_CLASSIFICATIONS[1].contract = InvoiceContract
 
-    COMMON_CLASSIFICATIONS[0].image = INVOICE_FILE_PATH
-    COMMON_CLASSIFICATIONS[1].image = DRIVER_LICENSE_FILE_PATH
+    COMMON_CLASSIFICATIONS[0].image = DRIVER_LICENSE_FILE_PATH
+    COMMON_CLASSIFICATIONS[1].image = INVOICE_FILE_PATH
 
-    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
+    result = process.classify(DRIVER_LICENSE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
-    assert result.name == "Invoice"
+    assert result.name == COMMON_CLASSIFICATIONS[0].name
 
 
 def test_with_tree():

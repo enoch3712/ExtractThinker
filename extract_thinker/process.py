@@ -135,7 +135,7 @@ class Process:
 
             if classification.confidence < threshold:
                 raise ValueError(
-                    f"Classification confidence {classification.confidence}"
+                    f"Classification confidence {classification.confidence} "
                     f"for '{classification.name}' is below the threshold of {threshold}."
                 )
 

@@ -252,9 +252,10 @@ class Extractor:
     def classify_from_image(
         self, image: Any, classifications: List[Classification]
     ):
-        # requires no content extraction from loader
+        # Encode the image using the utility function
+        encoded_image = encode_image(image)
         content = {
-            "image": image,
+            "image": encoded_image,
         }
         return self._classify(content, classifications, image)
 
@@ -315,23 +316,24 @@ class Extractor:
             },
         ]
 
+        # Common classification structure for both image and non-image cases
+        classification_info = "\n".join(
+            f"{c.name}: {c.description} \n{self._add_classification_structure(c)}"
+            for c in classifications
+        )
+
         if self.is_classify_image:
             input_data = (
-                f"##Take the first image, and compare to the several images provided. Then classify according to the classification attached to the image\n"
+                f"##Take the last image, and compare to the several images provided. Then classify according to the classification attached to the image\n"
+                f"##Classifications\n{classification_info}\n"
                 + "Output Example: \n"
                 + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
                 + "\n\n##ClassificationResponse JSON Output\n"
             )
-
         else:
             input_data = (
                 f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
-                + "\n".join(
-                    [
-                        f"{c.name}: {c.description} \n{self._add_classification_structure(c)}"
-                        for c in classifications
-                    ]
-                )
+                f"{classification_info}\n"
                 + "#Don't use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
                 + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
                 + "\n\n##ClassificationResponse JSON Output\n"
@@ -378,6 +380,24 @@ class Extractor:
                         f"Image required for classification '{classification.name}' but not found."
                     )
 
+            # Add the first image to be classified with context
+            if 'image' in content:
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "##classify",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/png;base64," + content['image']
+                            },
+                        },
+                    ],
+                })
+
             response = self.llm.request(messages, ClassificationResponse)
         else:
             messages.append({"role": "user", "content": input_data})
@@ -391,12 +411,12 @@ class Extractor:
         classifications: List[Classification],
         image: bool = False,
     ):
+        document_loader = self.get_document_loader_for_file(input)
         self.is_classify_image = image
 
         if image:
+            document_loader.set_vision_mode(True)
             return self.classify_from_image(input, classifications)
-
-        document_loader = self.get_document_loader_for_file(input)
         if document_loader is None:
             raise ValueError("No suitable document loader found for the input.")
 
