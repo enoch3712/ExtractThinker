@@ -1,11 +1,10 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import instructor
 import litellm
-from extract_thinker.models.batch_result import BatchResult
 from litellm import Router
 
 class LLM:
-    TEMPERATURE = 0  # Always zero for deterministic outputs
+    TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
 
     def __init__(self,
                  model: str,
