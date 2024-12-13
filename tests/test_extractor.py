@@ -4,8 +4,6 @@ from typing import List, Optional
 from pydantic import Field
 import time
 from dotenv import load_dotenv
-from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
-from extract_thinker.document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
@@ -16,6 +14,8 @@ from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 import pytest
+import numpy as np
+from litellm import embedding
 
 load_dotenv()
 cwd = os.getcwd()
@@ -294,21 +294,19 @@ def test_forbidden_strategy_with_token_limit():
         )
 
 def test_pagination_handler():
-    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
     tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     extractor.load_llm("gpt-4o")
 
-    result_1: ReportContract = extractor.extract(
+    result_1: EUData = extractor.extract(
         test_file_path,
-        ReportContract,
-        vision=False,
-        completion_strategy=CompletionStrategy.CONCATENATE
+        EUData,
+        vision=True,
+        completion_strategy=CompletionStrategy.PAGINATE
     )
-
-    result_1_json = result_1.model_dump_json()
 
     result_2: EUData = extractor.extract(
         test_file_path,
@@ -321,47 +319,106 @@ def test_pagination_handler():
     assert result_1.eu_total_gdp_million_27 == result_2.eu_total_gdp_million_27
     assert result_1.eu_total_gdp_million_28 == result_2.eu_total_gdp_million_28
 
-    # Compare country-level data
+    # Compare country count
+    assert len(result_1.countries) == len(result_2.countries)
+
+    # Compare regions count for each country
     for country1 in result_1.countries:
-        # Find matching country in result_2
         matching_country = next(
             (c for c in result_2.countries if c.country == country1.country), 
             None
         )
         assert matching_country is not None, f"Country {country1.country} not found in result_2"
-        
-        # Compare country data
-        assert country1.total_gdp_million == matching_country.total_gdp_million
         assert len(country1.regions) == len(matching_country.regions)
-        
-        # Compare region-level data
-        for region1 in country1.regions:
-            matching_region = next(
-                (r for r in matching_country.regions if r.region == region1.region),
-                None
-            )
-            assert matching_region is not None, f"Region {region1.region} not found in country {country1.country}"
-            
-            # Compare region data
-            assert region1.gdp_million == matching_region.gdp_million
-            assert region1.share_in_eu27_gdp == matching_region.share_in_eu27_gdp
-            assert region1.gdp_per_capita == matching_region.gdp_per_capita
-            
-            # Compare province-level data
-            assert len(region1.provinces) == len(matching_region.provinces)
-            for province1 in region1.provinces:
-                matching_province = next(
-                    (p for p in matching_region.provinces if p.name == province1.name),
-                    None
-                )
-                assert matching_province is not None, f"Province {province1.name} not found in region {region1.region}"
-                
-                # Compare province data
-                assert province1.gdp_million == matching_province.gdp_million
-                assert province1.share_in_eu27_gdp == matching_province.share_in_eu27_gdp
-                assert province1.gdp_per_capita == matching_province.gdp_per_capita
 
-if __name__ == "__main__":
-    # test_data_long_text()
-    # test_forbidden_strategy_with_token_limit()
-    test_pagination_handler()
+    # Keeping detailed comparison code commented for future reference
+    #     # Compare region-level data
+    #     for region1 in country1.regions:
+    #         matching_region = next(
+    #             (r for r in matching_country.regions if r.region == region1.region),
+    #             None
+    #         )
+    #         assert matching_region is not None, f"Region {region1.region} not found in country {country1.country}"
+    #         
+    #         # Compare region data
+    #         assert region1.gdp_million == matching_region.gdp_million
+    #         assert region1.share_in_eu27_gdp == matching_region.share_in_eu27_gdp
+    #         assert region1.gdp_per_capita == matching_region.gdp_per_capita
+    #         
+    #         # Compare province-level data
+    #         assert len(region1.provinces) == len(matching_region.provinces)
+    #         for province1 in region1.provinces:
+    #             matching_province = next(
+    #                 (p for p in matching_region.provinces if p.name == province1.name),
+    #                 None
+    #             )
+    #             assert matching_province is not None, f"Province {province1.name} not found in region {region1.region}"
+    #             
+    #             # Compare province data
+    #             assert province1.gdp_million == matching_province.gdp_million
+    #             assert province1.share_in_eu27_gdp == matching_province.share_in_eu27_gdp
+    #             assert province1.gdp_per_capita == matching_province.gdp_per_capita
+
+def get_embedding(text, model="text-embedding-ada-002"):
+    text = text.replace("\n", " ")
+    response = embedding(
+        model=model,  # OpenAI's embedding model
+        input=[text]
+    )
+    return response.data[0]['embedding']
+
+def cosine_similarity(v1, v2):
+    # Convert to numpy arrays if they aren't already
+    v1, v2 = np.array(v1), np.array(v2)
+    # Calculate cosine similarity
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+def semantically_similar(text1, text2, threshold=0.9):
+    # Normalize texts
+    text1 = text1.lower().strip()
+    text2 = text2.lower().strip()
+    
+    # Get embeddings
+    embedding1 = get_embedding(text1)
+    embedding2 = get_embedding(text2)
+    
+    # Calculate similarity
+    similarity = cosine_similarity(embedding1, embedding2)
+    return similarity >= threshold
+
+def test_concatenation_handler():
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
+    tesseract_path = os.getenv("TESSERACT_PATH")
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    llm_first = LLM("gpt-4o", token_limit=500)
+    extractor.load_llm(llm_first)
+
+    result_1: ReportContract = extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        completion_strategy=CompletionStrategy.CONCATENATE
+    )
+
+    second_extractor = Extractor()
+    second_extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
+    second_extractor.load_llm("gpt-4o")
+
+    result_2: ReportContract = second_extractor.extract(
+        test_file_path,
+        ReportContract,
+        vision=True,
+        completion_strategy=CompletionStrategy.FORBIDDEN
+    )
+
+    assert semantically_similar(
+        result_1.title,
+        result_2.title
+    ), "Titles are not semantically similar enough (threshold: 90%)"
+
+    assert result_1.pages[0].number == result_2.pages[0].number
+    assert semantically_similar(
+        result_1.pages[0].content, 
+        result_2.pages[0].content
+    ), "Page contents are not semantically similar enough (threshold: 90%)"

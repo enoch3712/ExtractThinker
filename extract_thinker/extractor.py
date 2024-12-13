@@ -744,32 +744,17 @@ class Extractor:
         if self.extra_content is not None:
             self._add_extra_content(messages)
 
-        try:
-            request_fn = lambda msgs, model: self.llm.request(msgs, model)
-            
-            if self.completion_strategy == CompletionStrategy.PAGINATE:
-                handler = PaginationHandler(self.llm)
-                return handler.handle(messages, response_model, request_fn)
-            elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
-                return request_fn(messages, response_model)
-            else:
-                return request_fn(messages, response_model)
-                
-        except Exception as e:
-            actual_exception = e.args[0] if e.args else e
-            
-            if isinstance(actual_exception, IncompleteOutputException):
-                if self.completion_strategy == CompletionStrategy.PAGINATE:
-                    # Get partial content from the exception
-                    partial_content = actual_exception.last_completion.choices[0].message.content
-                    handler = PaginationHandler(self.llm)
-                    return handler.handle(messages, response_model, request_fn)
-                elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
-                    raise ValueError("Incomplete output received and FORBIDDEN strategy is set. If you want to continue processing, change the completion strategy to PAGINATE or CONCATENATE.")
-                else:
-                    raise actual_exception
-            else:
-                raise e
+        # Handle based on completion strategy
+        if self.completion_strategy == CompletionStrategy.PAGINATE:
+            handler = PaginationHandler(self.llm)
+            return handler.handle(messages, response_model, vision, self.extra_content)
+        elif self.completion_strategy == CompletionStrategy.CONCATENATE:
+            handler = ConcatenationHandler(self.llm)
+            return handler.handle(messages, response_model, vision, self.extra_content)
+        elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+            return self.llm.request(messages, response_model)
+        else:
+            raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
 
     def _build_message_content(
         self,

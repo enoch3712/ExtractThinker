@@ -11,30 +11,49 @@ class ConcatenationHandler(CompletionHandler):
         super().__init__(llm)
         self.json_parts = []
         
-    def handle(self, 
-               content: Any,
-               response_model: type[BaseModel],
-               vision: bool = False,
-               extra_content: Optional[str] = None) -> Any:
-        """Handle completion by concatenating partial JSON responses."""
+    def _is_valid_json_continuation(self, response: str) -> bool:
+        """Check if the response is a valid JSON continuation."""
+        cleaned_response = response.strip()
+        
+        # Check if response contains JSON markers
+        has_json_markers = (
+            "```json" in cleaned_response or 
+            "{" in cleaned_response or 
+            "[" in cleaned_response
+        )
+        
+        return has_json_markers
+
+    def handle(self, content: Any, response_model: type[BaseModel], vision: bool = False, extra_content: Optional[str] = None) -> Any:
         self.json_parts = []
         messages = self._build_messages(content, vision, response_model)
         
         if extra_content:
             self._add_extra_content(messages, extra_content)
             
-        # Keep requesting completions until we have valid JSON
+        retry_count = 0
+        max_retries = 3
         while True:
-            # Get raw completion
-            response = self.llm.raw_completion(messages)
-            self.json_parts.append(response)
-            
             try:
+                response = self.llm.raw_completion(messages)
+                
+                # Validate if it's a proper JSON continuation
+                if not self._is_valid_json_continuation(response):
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        raise ValueError("Maximum retries reached with invalid JSON continuations")
+                    continue
+                
+                self.json_parts.append(response)
+                
                 # Try to process and validate the JSON
                 result = self._process_json_parts(response_model)
                 return result
-            except ValueError:
-                # If JSON is invalid, continue with the conversation
+                
+            except ValueError as e:
+                if retry_count >= max_retries:
+                    raise ValueError(f"Maximum retries reached: {str(e)}")
+                retry_count += 1
                 messages = self._build_continuation_messages(messages, response)
     
     def _process_json_parts(self, response_model: type[BaseModel]) -> Any:

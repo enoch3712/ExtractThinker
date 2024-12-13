@@ -64,6 +64,6 @@ class LLM:
                 api_base=self.api_base,
                 api_key=self.api_key,
                 api_version=self.api_version,
-                max_tokens=500
+                max_tokens=self.token_limit
             )
         return raw_response.choices[0].message.content
