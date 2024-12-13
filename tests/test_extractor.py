@@ -294,19 +294,21 @@ def test_forbidden_strategy_with_token_limit():
         )
 
 def test_pagination_handler():
-    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
+    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
     tesseract_path = os.getenv("TESSERACT_PATH")
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     extractor.load_llm("gpt-4o")
 
-    result_1: EUData = extractor.extract(
+    result_1: ReportContract = extractor.extract(
         test_file_path,
-        EUData,
-        vision=True, 
-        completion_strategy=CompletionStrategy.PAGINATE
+        ReportContract,
+        vision=False,
+        completion_strategy=CompletionStrategy.CONCATENATE
     )
+
+    result_1_json = result_1.model_dump_json()
 
     result_2: EUData = extractor.extract(
         test_file_path,

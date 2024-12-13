@@ -8,7 +8,7 @@ import typing
 import os
 from io import BytesIO
 import sys
-from typing import Optional, Any, Union, get_origin, get_args
+from typing import Optional, Any, Union, get_origin, get_args, List, Dict
 from pydantic import BaseModel, create_model
 
 def encode_image(image_source: Union[str, BytesIO, bytes, Image.Image]) -> str:
@@ -262,3 +262,65 @@ def make_all_fields_optional(model: Any) -> Any:
         **fields
     )
     return NewModel
+
+def add_classification_structure(response_model: type[BaseModel], indent: int = 1) -> str:
+    """
+    Creates a string representation of the model's structure to help guide LLM responses.
+    Handles nested Pydantic models recursively.
+    
+    Args:
+        response_model: The Pydantic model to analyze
+        indent: Current indentation level (for recursive calls)
+        
+    Returns:
+        str: A formatted string describing the model structure
+    """
+    content = "\tResponse Structure:\n" if indent == 1 else ""
+    tab = "\t" * indent
+
+    # Iterate over the fields of the model
+    for name, field in response_model.model_fields.items():
+        # Extract the type and required status
+        field_str = str(field)
+        field_type = field.annotation
+        required = 'required' in field_str
+
+        # Get base type string
+        type_str = str(field_type)
+        if hasattr(field_type, "__name__"):
+            type_str = field_type.__name__
+
+        # Handle container types (List, Dict, etc.)
+        origin = get_origin(field_type)
+        if origin is not None:
+            args = get_args(field_type)
+            if origin in (list, List):
+                type_str = f"List[{args[0].__name__ if hasattr(args[0], '__name__') else str(args[0])}]"
+            elif origin in (dict, Dict):
+                key_type = args[0].__name__ if hasattr(args[0], '__name__') else str(args[0])
+                value_type = args[1].__name__ if hasattr(args[1], '__name__') else str(args[1])
+                type_str = f"Dict[{key_type}, {value_type}]"
+
+        # Add the field details
+        field_details = f"{tab}Name: {name}, Type: {type_str}, Attributes: required={required}"
+        content += field_details + "\n"
+
+        # Recursively handle nested Pydantic models
+        if hasattr(field_type, "model_fields"):
+            # It's a nested Pydantic model
+            content += f"{tab}Nested structure for {name}:\n"
+            content += add_classification_structure(field_type, indent + 1)
+        elif origin in (list, List):
+            # Check if list contains a Pydantic model
+            item_type = args[0]
+            if hasattr(item_type, "model_fields"):
+                content += f"{tab}Nested structure for {name} items:\n"
+                content += add_classification_structure(item_type, indent + 1)
+        elif origin in (dict, Dict):
+            # Check if dict value type is a Pydantic model
+            value_type = args[1]
+            if hasattr(value_type, "model_fields"):
+                content += f"{tab}Nested structure for {name} values:\n"
+                content += add_classification_structure(value_type, indent + 1)
+
+    return content

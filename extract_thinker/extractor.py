@@ -1,12 +1,11 @@
 import asyncio
 import base64
-import copy
-from io import BytesIO
-from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
 from instructor.batch import BatchJob
 import uuid
 import litellm
 from pydantic import BaseModel
+from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
 from extract_thinker.models.classification import Classification
@@ -267,7 +266,7 @@ class Extractor:
             return handler.handle(content, response_model, vision, self.extra_content)
         elif completion_strategy == CompletionStrategy.CONCATENATE:
             # For concatenate strategy, we still use PaginationHandler but merge results
-            handler = PaginationHandler(self.llm)
+            handler = ConcatenationHandler(self.llm)
             return handler.handle(content, response_model, vision, self.extra_content)
         else:
             raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
