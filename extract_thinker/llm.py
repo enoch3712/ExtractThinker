@@ -35,9 +35,6 @@ class LLM:
                 messages=messages,
                 temperature=self.TEMPERATURE,
                 response_model=response_model,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version,
                 max_retries=1,
                 max_tokens=self.token_limit
             )
@@ -55,9 +52,6 @@ class LLM:
             raw_response = litellm.completion(
                 model=self.model,
                 messages=messages,
-                api_base=self.api_base,
-                api_key=self.api_key,
-                api_version=self.api_version,
                 max_tokens=self.token_limit
             )
         return raw_response.choices[0].message.content

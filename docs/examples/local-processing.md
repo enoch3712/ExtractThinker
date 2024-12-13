@@ -23,10 +23,11 @@ extractor.load_document_loader(
     DocumentLoaderTesseract(os.getenv("TESSERACT_PATH"))
 )
 
+os.environ["API_BASE"] = "http://localhost:11434"
+
 # Configure Ollama
 llm = LLM(
     "ollama/phi3",
-    api_base="http://localhost:11434"
 )
 extractor.load_llm(llm)
 
