@@ -23,12 +23,11 @@ cwd = os.getcwd()
 def test_extract_with_tessaract_and_gpt4o_mini():
 
     # Arrange
-    tesseract_path = os.getenv("TESSERACT_PATH")
-    test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     extractor = Extractor()
     extractor.load_document_loader(
-        DocumentLoaderTesseract(tesseract_path)
+        DocumentLoaderPyPdf()
     )
     extractor.load_llm("gpt-4o-mini")
 
@@ -422,3 +421,8 @@ def test_concatenation_handler():
         result_1.pages[0].content, 
         result_2.pages[0].content
     ), "Page contents are not semantically similar enough (threshold: 90%)"
+
+
+if __name__ == "__main__":
+    test_vision_content_pdf()
+    #test_extract_with_tessaract_and_gpt4o_mini()

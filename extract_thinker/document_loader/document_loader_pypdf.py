@@ -1,42 +1,63 @@
+import os
 import io
 from typing import Any, Dict, List, Union
+from io import BytesIO
 from pypdf import PdfReader
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+import pypdfium2 as pdfium
+from PIL import Image
 
-class DocumentLoaderPyPdf(CachedDocumentLoader):
+from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.utils import get_file_extension
+
+
+class DocumentLoaderPyPdf(DocumentLoader):
+    """Loader for PDFs using PyPDF (pypdf) to extract text, and pypdfium2 to extract images if vision mode is enabled."""
     SUPPORTED_FORMATS = ['pdf']
-    
-    def __init__(self, content: Any = None, cache_ttl: int = 300):
-        super().__init__(content, cache_ttl)
 
-    def load_content_from_file(self, file_path: str) -> Union[str, Dict[str, Any]]:
-        reader = PdfReader(file_path)
-        return self.extract_data_from_pdf(reader)
+    def load(self, source: Union[str, BytesIO]) -> Any:
+        """
+        Load the PDF from a file path or a BytesIO stream.
+        Return a list of dictionaries, each representing one page:
+          - "content": extracted text
+          - "image": (bytes) rendered image of the page if vision_mode is True
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
 
-    def load_content_from_stream(self, stream: io.BytesIO) -> Union[str, Dict[str, Any]]:
-        reader = PdfReader(stream)
-        return self.extract_data_from_pdf(reader)
+        # Read the PDF pages using pypdf
+        if isinstance(source, str):
+            reader = PdfReader(source)
+        else:
+            # BytesIO
+            source.seek(0)
+            reader = PdfReader(source)
 
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[Any]:
-        return [self.load_content_from_file(file_path) for file_path in file_paths]
+        pages_data = []
+        num_pages = len(reader.pages)
 
-    def load_content_from_stream_list(self, streams: List[io.BytesIO]) -> List[Any]:
-        return [self.load_content_from_stream(stream) for stream in streams]
+        # Extract text for each page
+        for page_index in range(num_pages):
+            pdf_page = reader.pages[page_index]
+            page_text = pdf_page.extract_text() or ''
+            page_dict = {"content": page_text}
 
-    def extract_data_from_pdf(self, reader: PdfReader) -> Union[str, Dict[str, Any]]:
-        document_data = {
-            "text": []
-        }
+            # If vision_mode is enabled, convert page to an image
+            if self.vision_mode:
+                # We'll rely on convert_to_images (inherited from DocumentLoader),
+                # which calls pypdfium2 to render each page as images (page-index keyed)
+                pass
 
-        for page in reader.pages:
-            # Extract text and split by newline characters
-            page_text = page.extract_text()
-            document_data["text"].extend(page_text.split('\n'))
+            pages_data.append(page_dict)
 
-        # Skip image extraction for now. TODO
-        # for img_index, image in enumerate(page.images):
-        #     image_data = self.extract_image_content(io.BytesIO(image["data"]))
-        #     if image_data:
-        #         document_data["images"].append(image_data)
+        # If vision_mode is enabled, convert entire PDF into a dictionary of images keyed by page number
+        # and attach them to the corresponding page dictionary
+        if self.vision_mode:
+            # Use the same approach as in base class: convert_to_images
+            # This tries PDF conversion if it's not a raw image
+            images_dict = self.convert_to_images(source)
+            # images_dict is a dict {page_index: image_bytes}
+            for idx, page_dict in enumerate(pages_data):
+                if idx in images_dict:
+                    page_dict["image"] = images_dict[idx]
 
-        return document_data
+        return pages_data
