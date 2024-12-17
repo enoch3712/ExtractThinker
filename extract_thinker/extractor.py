@@ -284,48 +284,19 @@ class Extractor:
         else:
             raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
 
-    def classify_from_image(
-        self, image: Any, classifications: List[Classification]
-    ):
-        # Encode the image using the utility function
-        encoded_image = encode_image(image)
-        content = {
-            "image": encoded_image,
-        }
-        return self._classify(content, classifications, image)
-
-    def classify_from_path(
-        self, path: str, classifications: List[Classification]
-    ):
-        content = (
-            self.document_loader.load_content_from_file_list(path)
-            if self.is_classify_image
-            else self.document_loader.load_content_from_file(path)
-        )
-        return self._classify(content, classifications)
-
-    def classify_from_stream(
-        self, stream: IO, classifications: List[Classification]
-    ):
-        content = (
-            self.document_loader.load_content_from_stream_list(stream)
-            if self.is_classify_image
-            else self.document_loader.load_content_from_stream(stream)
-        )
-        self._classify(content, classifications)
-
-    def classify_from_excel(
-        self, path: Union[str, IO], classifications: List[Classification]
-    ):
-        if isinstance(path, str):
-            content = self.document_loader.load_content_from_file(path)
-        else:
-            content = self.document_loader.load_content_from_stream(path)
-        return self._classify(content, classifications)
-
     def _classify(
-        self, content: Any, classifications: List[Classification], image: Optional[Any] = None
+        self, content: Any, classifications: List[Classification]
     ):
+        """
+        Internal method to perform classification using LLM.
+        
+        Args:
+            content: The content to classify
+            classifications: List of Classification objects
+            
+        Returns:
+            ClassificationResponse object
+        """
         messages = [
             {
                 "role": "system",
@@ -348,27 +319,19 @@ class Extractor:
                 + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
                 + "\n\n##ClassificationResponse JSON Output\n"
             )
-        else:
-            input_data = (
-                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
-                f"{classification_info}\n"
-                + "#Don't use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
-                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
-                + "\n\n##ClassificationResponse JSON Output\n"
-            )
+            
+            # Add input data as first message
+            messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": input_data,
+                    },
+                ],
+            })
 
-        if self.is_classify_image:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": input_data,
-                        },
-                    ],
-                }
-            )
+            # Add classification images if present
             for classification in classifications:
                 if classification.image:
                     if not litellm.supports_vision(model=self.llm.model):
@@ -376,30 +339,28 @@ class Extractor:
                             f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
                         )
 
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": f"{classification.name}: {classification.description}",
+                    messages.append({
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"{classification.name}: {classification.description}",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": "data:image/png;base64," + encode_image(classification.image)
                                 },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": "data:image/png;base64," + encode_image(classification.image)
-                                    },
-                                },
-                            ],
-                        }
-                    )
+                            },
+                        ],
+                    })
                 else:
                     raise ValueError(
                         f"Image required for classification '{classification.name}' but not found."
                     )
 
-            # Add the first image to be classified with context
-            if 'image' in content:
+            # Add the content image to be classified
+            if isinstance(content, dict) and 'image' in content:
                 messages.append({
                     "role": "user",
                     "content": [
@@ -415,36 +376,68 @@ class Extractor:
                         },
                     ],
                 })
-
-            response = self.llm.request(messages, ClassificationResponse)
         else:
+            input_data = (
+                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
+                f"{classification_info}\n"
+                + "#Don't use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
+                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                + "\n\n##ClassificationResponse JSON Output\n"
+            )
             messages.append({"role": "user", "content": input_data})
-            response = self.llm.request(messages, ClassificationResponse)
 
-        return response
+        return self.llm.request(messages, ClassificationResponse)
 
     def classify(
         self,
         input: Union[str, IO],
         classifications: List[Classification],
-        image: bool = False,
-    ):
+        vision: bool = False,
+    ) -> ClassificationResponse:
+        """
+        Classify the input using the provided classifications.
+        
+        Args:
+            input: The input to classify (file path, stream, or image data)
+            classifications: List of Classification objects
+            vision: Whether to use vision capabilities for classification
+            
+        Returns:
+            ClassificationResponse object
+        """
+        # Get appropriate document loader and configure it
         document_loader = self.get_document_loader_for_file(input)
-        self.is_classify_image = image
-
-        if image:
-            document_loader.set_vision_mode(True)
-            return self.classify_from_image(input, classifications)
         if document_loader is None:
             raise ValueError("No suitable document loader found for the input.")
-
+            
+        self.is_classify_image = vision
+        if vision:
+            document_loader.set_vision_mode(True)
+            
+        # Load and process the content
         content = document_loader.load(input)
+        
+        # For vision mode, ensure we have image data
+        if vision and isinstance(content, dict) and 'image' not in content:
+            content = {'image': encode_image(input)}
+            
         return self._classify(content, classifications)
 
     async def classify_async(
-        self, input: Union[str, IO], classifications: List[Classification]
-    ):
-        return await asyncio.to_thread(self.classify, input, classifications)
+        self, input: Union[str, IO], classifications: List[Classification], vision: bool = False
+    ) -> ClassificationResponse:
+        """
+        Asynchronously classify the input using the provided classifications.
+        
+        Args:
+            input: The input to classify (file path, stream, or image data)
+            classifications: List of Classification objects
+            vision: Whether to use vision capabilities for classification
+            
+        Returns:
+            ClassificationResponse object
+        """
+        return await asyncio.to_thread(self.classify, input, classifications, vision)
 
     def _extract_with_splitting(
             self,
