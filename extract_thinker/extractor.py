@@ -46,6 +46,7 @@ class Extractor:
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
         self.is_classify_image: bool = False
+        self._skip_loading: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -127,6 +128,10 @@ class Extractor:
         if not issubclass(response_model, BaseModel) and not issubclass(response_model, Contract):
             raise ValueError("response_model must be a subclass of Pydantic's BaseModel or Contract.")
 
+    def set_skip_loading(self, skip: bool = True) -> None:
+        """Internal method to control content loading behavior"""
+        self._skip_loading = skip
+
     def extract(
         self,
         source: Union[str, IO, list],
@@ -153,25 +158,24 @@ class Extractor:
         self.extra_content = content
         self.completion_strategy = completion_strategy
 
-        # Configure vision mode if needed
         if vision:
             self._handle_vision_mode(source)
 
-        # If a completion strategy is specified, delegate
         if completion_strategy is not CompletionStrategy.FORBIDDEN:
             return self.extract_with_strategy(source, response_model, vision, completion_strategy)
 
-        # Get appropriate document loader
-        loader = self.get_document_loader(source)
-        if not loader:
-            raise ValueError("No suitable document loader found for the input.")
-
-        # Load content using unified loader
         try:
-            loaded_content = loader.load(source)
-            # Map loaded content to a universal format
-            unified_content = self._map_to_universal_format(loaded_content, vision)
-            # Extract information using the unified content
+            if self._skip_loading:
+                # Skip loading if flag is set (content from splitting)
+                unified_content = self._map_to_universal_format(source, vision)
+            else:
+                # Normal loading path
+                loader = self.get_document_loader(source)
+                if not loader:
+                    raise ValueError("No suitable document loader found for the input.")
+                loaded_content = loader.load(source)
+                unified_content = self._map_to_universal_format(loaded_content, vision)
+
             return self._extract(unified_content, response_model, vision)
         except Exception as e:
             raise ValueError(f"Failed to extract from source: {str(e)}")
@@ -626,7 +630,13 @@ class Extractor:
 
         def get_messages():
             for idx, src in enumerate(sources):
-                # Prepare content for each source
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                    }
+                ]
+
                 if vision:
                     # Handle vision content
                     if isinstance(src, str):
@@ -642,6 +652,7 @@ class Extractor:
 
                     encoded_image = base64.b64encode(image_data).decode("utf-8")
                     image_content = f"data:image/jpeg;base64,{encoded_image}"
+                    
                     message_content = [
                         {
                             "type": "image_url",
@@ -652,6 +663,11 @@ class Extractor:
                     ]
                     if self.extra_content:
                         message_content.insert(0, {"type": "text", "text": self.extra_content})
+                    
+                    messages.append({
+                        "role": "user",
+                        "content": message_content
+                    })
                 else:
                     # Handle regular content
                     if isinstance(src, str):
@@ -666,12 +682,17 @@ class Extractor:
                     else:
                         raise ValueError("Invalid source type.")
 
-                    message_content = f"##Content\n\n{content_data}"
+                    message_text = f"##Content\n\n{content_data}"
                     if self.extra_content:
-                        message_content = f"##Extra Content\n\n{self.extra_content}\n\n" + message_content
+                        message_text = f"##Extra Content\n\n{self.extra_content}\n\n" + message_text
 
-                yield message_content
-
+                    messages.append({
+                        "role": "user",
+                        "content": message_text
+                    })
+            
+                yield messages  # Yield the complete messages list
+        
         # Create batch job with the message generator
         batch_job = BatchJob(
             messages_batch=get_messages(),

@@ -65,14 +65,14 @@ class DocumentLoader(ABC):
     def getContent(self) -> Any:
         return self.content
 
-    def convert_to_images(self, file: Union[str, io.BytesIO], scale: float = 300 / 72) -> Dict[int, bytes]:
+    def convert_to_images(self, file: Union[str, io.BytesIO, io.BufferedReader], scale: float = 300 / 72) -> Dict[int, bytes]:
         # Determine if the input is a file path or a stream
         if isinstance(file, str):
             return self._convert_file_to_images(file, scale)
-        elif isinstance(file, io.BytesIO):
+        elif isinstance(file, (io.BytesIO, io.BufferedReader)):  # Accept both BytesIO and BufferedReader
             return self._convert_stream_to_images(file, scale)
         else:
-            raise TypeError("file must be a file path (str) or a BytesIO stream")
+            raise TypeError("file must be a file path (str) or a file-like stream")
 
     def _convert_file_to_images(self, file_path: str, scale: float) -> Dict[int, bytes]:
         # Check if the file is already an image

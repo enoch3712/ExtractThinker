@@ -424,5 +424,5 @@ def test_concatenation_handler():
 
 
 if __name__ == "__main__":
-    test_batch_extraction_single_source()
+    test_data_long_text()
     #test_extract_with_tessaract_and_gpt4o_mini()
