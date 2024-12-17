@@ -3,53 +3,59 @@ from typing import Any, Dict, List, Union
 
 import pdfplumber
 
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.utils import get_file_extension
 
-class DocumentLoaderPdfPlumber(CachedDocumentLoader):
+
+class DocumentLoaderPdfPlumber(DocumentLoader):
+    """Loader for PDFs using pdfplumber, supporting text and table extraction."""
     SUPPORTED_FORMATS = ['pdf']
 
     def __init__(self, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
 
-    def load_content_from_file(self, file_path: str) -> Union[str, Dict[str, Any]]:
+    def load(self, source: Union[str, io.BytesIO]) -> List[Dict[str, Any]]:
+        """
+        Load a PDF and extract text and tables from each page.
+        Returns a list of pages, each containing:
+        - content: The text content of the page
+        - tables: Any tables found on the page
+        - image: The rendered page image (if vision_mode is True)
+        
+        Args:
+            source: Either a file path or BytesIO stream
+            
+        Returns:
+            List[Dict[str, Any]]: List of pages with content and optional images
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
+
         try:
-            if get_file_extension(file_path).lower() not in self.SUPPORTED_FORMATS:
-                raise Exception(f"Unsupported file type: {file_path}")
+            # Open PDF with pdfplumber
+            with pdfplumber.open(source) as pdf:
+                pages = []
+                for page_num, page in enumerate(pdf.pages):
+                    # Extract text and tables for this page
+                    page_dict = {
+                        "content": page.extract_text() or "",
+                        "tables": [table for table in page.extract_tables()]
+                    }
 
-            with pdfplumber.open(file_path) as pdf:
-                return self.extract_data_from_pdf(pdf)
+                    # If vision mode is enabled, add page image
+                    if self.vision_mode:
+                        # Use the base class's convert_to_images method
+                        images_dict = self.convert_to_images(source)
+                        if page_num in images_dict:
+                            page_dict["image"] = images_dict[page_num]
+
+                    pages.append(page_dict)
+
+                return pages
+
         except Exception as e:
-            raise Exception(f"Error processing file: {e}") from e
+            raise ValueError(f"Error processing PDF: {str(e)}")
 
-    def load_content_from_stream(self, stream: io.BytesIO) -> Union[str, Dict[str, Any]]:
-        try:
-            with pdfplumber.open(stream) as pdf:
-                return self.extract_data_from_pdf(pdf)
-        except Exception as e:
-            raise Exception(f"Error processing stream: {e}") from e
-
-    def extract_data_from_pdf(self, pdf: pdfplumber.PDF) -> Dict[str, Any]:
-        document_data = {
-            "text": [],
-            "tables": []
-        }
-
-        for page in pdf.pages:
-            # Extract text
-            page_text = page.extract_text()
-            if page_text:
-                document_data["text"].extend(page_text.split('\n'))
-
-            # Extract tables
-            tables = page.extract_tables()
-            for table in tables:
-                document_data["tables"].append(table)
-
-        return document_data
-
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[Dict[str, Any]]:
-        return [self.load_content_from_file(file_path) for file_path in file_paths]
-
-    def load_content_from_stream_list(self, streams: List[io.BytesIO]) -> List[Dict[str, Any]]:
-        return [self.load_content_from_stream(stream) for stream in streams]
+    def can_handle_vision(self, source: Union[str, io.BytesIO]) -> bool:
+        """Check if this loader can handle the source in vision mode."""
+        return self.can_handle(source)

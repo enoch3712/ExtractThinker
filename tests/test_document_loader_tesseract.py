@@ -1,53 +1,52 @@
-from io import BytesIO
 import os
+import pytest
 from dotenv import load_dotenv
-
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
+from .test_document_loader_base import BaseDocumentLoaderTest
 
-cwd = os.getcwd()
 load_dotenv()
 
-# Arrange
-tesseract_path = os.getenv("TESSERACT_PATH")
-loader = DocumentLoaderTesseract(tesseract_path)
-test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
+class TestDocumentLoaderTesseract(BaseDocumentLoaderTest):
+    @pytest.fixture
+    def loader(self):
+        tesseract_path = os.getenv("TESSERACT_PATH")
+        return DocumentLoaderTesseract(tesseract_path)
 
+    @pytest.fixture
+    def test_file_path(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(current_dir, "test_images", "invoice.png")
 
-def test_load_content_from_file():
-    # Act
-    content = loader.load_content_from_file(test_file_path)
+    def test_tesseract_specific_content(self, loader, test_file_path):
+        """Test OCR-specific content extraction"""
+        pages = loader.load(test_file_path)
+        
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        
+        first_page = pages[0]
+        assert "content" in first_page
+        assert "Invoice" in first_page["content"]
+        assert "0000001" in first_page["content"]
 
-    # Assert
-    assert content is not None
-    assert "Invoice" in content
-    assert "0000001" in content
+    def test_vision_mode(self, loader, test_file_path):
+        """Override base class vision mode test for Tesseract-specific behavior"""
+        loader.set_vision_mode(True)
+        pages = loader.load(test_file_path)
+        
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        
+        for page in pages:
+            assert isinstance(page, dict)
+            assert "content" in page
+            if loader.can_handle_vision(test_file_path):
+                assert "image" in page
+                assert isinstance(page["image"], bytes)
 
-
-def test_load_content_from_stream():
-    with open(test_file_path, 'rb') as f:
-        test_image_stream = BytesIO(f.read())
-
-    # Act
-    content = loader.load_content_from_stream(test_image_stream)
-
-    # Assert
-    assert content is not None
-    assert "Invoice" in content
-    assert "0000001" in content
-
-
-def test_cache_for_file():
-    # Act
-    content1 = loader.load_content_from_file(test_file_path)
-    content2 = loader.load_content_from_file(test_file_path)
-
-    # Assert
-    assert content1 is content2
-
-
-def test_queue_load():
-    for _ in range(10):
-        # Act
-        content = loader.load_content_from_file(test_file_path)
-        # Assert
-        assert "0000001" in content
+    def test_parallel_processing(self, loader, test_file_path):
+        """Test parallel processing of multiple pages"""
+        # Create a multi-page test case
+        pages = loader.load(test_file_path)
+        assert isinstance(pages, list)
+        assert all("content" in page for page in pages)

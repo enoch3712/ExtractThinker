@@ -20,7 +20,7 @@ from litellm import embedding
 load_dotenv()
 cwd = os.getcwd()
 
-def test_extract_with_tessaract_and_gpt4o_mini():
+def test_extract_with_pypdf_and_gpt4o_mini():
 
     # Arrange
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
@@ -156,7 +156,7 @@ def test_extract_with_invalid_file_path():
     with pytest.raises(ValueError) as exc_info:
         extractor.extract(invalid_file_path, InvoiceContract, vision=True)
     
-    assert "does not exist" in str(exc_info.value)
+    assert "Failed to extract from source" in str(exc_info.value.args[0])
 
 def test_batch_extraction_single_source():
     # Arrange
@@ -424,5 +424,5 @@ def test_concatenation_handler():
 
 
 if __name__ == "__main__":
-    test_vision_content_pdf()
+    test_batch_extraction_single_source()
     #test_extract_with_tessaract_and_gpt4o_mini()

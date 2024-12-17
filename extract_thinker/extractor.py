@@ -652,25 +652,17 @@ class Extractor:
                     ]
                     if self.extra_content:
                         message_content.insert(0, {"type": "text", "text": self.extra_content})
-
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
                 else:
+                    # Handle regular content
                     if isinstance(src, str):
                         if os.path.exists(src):
-                            content_data = self.document_loader.load_content_from_file(src)
+                            pages = self.document_loader.load(src)
+                            content_data = self._format_pages_to_content(pages)
                         else:
                             content_data = src  # Assume src is the text content
                     elif isinstance(src, IO):
-                        content_data = self.document_loader.load_content_from_stream(src)
+                        pages = self.document_loader.load(src)
+                        content_data = self._format_pages_to_content(pages)
                     else:
                         raise ValueError("Invalid source type.")
 
@@ -678,17 +670,7 @@ class Extractor:
                     if self.extra_content:
                         message_content = f"##Extra Content\n\n{self.extra_content}\n\n" + message_content
 
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
-                yield messages
+                yield message_content
 
         # Create batch job with the message generator
         batch_job = BatchJob(
@@ -997,3 +979,22 @@ class Extractor:
     
         self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
         self.document_loader.set_vision_mode(True)
+
+    def _format_pages_to_content(self, pages: List[Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+        """
+        Convert pages to content format.
+        Returns either a string for regular content or a dict for spreadsheet data.
+        """
+        if not pages:
+            return ""
+            
+        # Handle spreadsheet data specially
+        if any(page.get("is_spreadsheet") for page in pages):
+            data = {}
+            for page in pages:
+                if "sheet_name" in page and "data" in page:
+                    data[page["sheet_name"]] = page["data"]
+            return {"data": data, "is_spreadsheet": True}
+            
+        # For regular content, join all page contents
+        return "\n\n".join(page.get("content", "") for page in pages)
