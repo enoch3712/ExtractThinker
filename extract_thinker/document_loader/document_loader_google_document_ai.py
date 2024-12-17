@@ -2,17 +2,15 @@ import json
 import os
 import re
 import mimetypes
-from typing import Optional, Any, List, Union, Sequence
+from typing import Optional, Any, Dict, List, Union, Sequence
 from pydantic import BaseModel, Field
 from io import BytesIO
-from operator import attrgetter
-from cachetools import cachedmethod
-from cachetools.keys import hashkey
 from google.api_core.client_options import ClientOptions
 from google.cloud import documentai_v1 as documentai
 from google.oauth2 import service_account
 
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+from extract_thinker.document_loader.document_loader import DocumentLoader
+
 
 class Config(BaseModel):
     enable_native_pdf_parsing: bool = Field(
@@ -22,7 +20,10 @@ class Config(BaseModel):
         default=None, description="The page range to process"
     )
 
-class DocumentLoaderDocumentAI(CachedDocumentLoader):
+
+class DocumentLoaderDocumentAI(DocumentLoader):
+    """Loader for documents using Google Document AI."""
+    
     PROCESSOR_NAME_PATTERN = r"projects\/[0-9]+\/locations\/[a-z\-0-9]+\/processors\/[a-z0-9]+"
 
     def __init__(
@@ -39,6 +40,70 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
         self.processor_name = processor_name
         self.location = location
         self.client = self._create_client()
+
+    def load(self, source: Union[str, BytesIO], config: Optional[Config] = None) -> List[Dict[str, Any]]:
+        """
+        Load and analyze a document using Google Document AI.
+        Returns a list of pages, each containing:
+        - content: The text content of the page
+        - tables: Any tables found on the page
+        - image: The page image (if vision_mode is True)
+        
+        Args:
+            source: Either a file path or BytesIO stream
+            config: Optional configuration for Document AI processing
+            
+        Returns:
+            List[Dict[str, Any]]: List of pages with content and optional images
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
+
+        config = config or Config()
+        try:
+            # Get document content and mime type
+            if isinstance(source, str):
+                with open(source, "rb") as document:
+                    document_content = document.read()
+                mime_type = self._resolve_mime_type(source)
+            else:
+                document_content = source.read()
+                mime_type = mimetypes.guess_type(source.name)[0] if hasattr(source, 'name') else 'application/pdf'
+
+            # Process with Document AI
+            response = self.client.process_document(
+                request=documentai.ProcessRequest(
+                    name=self.processor_name,
+                    raw_document=documentai.RawDocument(
+                        content=document_content,
+                        mime_type=mime_type,
+                    ),
+                    process_options=self._create_process_options(config),
+                    skip_human_review=True,
+                ),
+            )
+
+            # Convert to our standard page-based format
+            pages = []
+            for page in response.document.pages:
+                page_dict = {
+                    "content": self._get_page_full_content(response.document.text, page),
+                    "paragraphs": self._get_page_paragraphs(response.document.text, page),
+                    "tables": self._get_page_tables(response.document.text, page)
+                }
+
+                # If vision mode is enabled, add page image
+                if self.vision_mode:
+                    images_dict = self.convert_to_images(source)
+                    if page.page_number - 1 in images_dict:  # Document AI uses 1-based page numbers
+                        page_dict["image"] = images_dict[page.page_number - 1]
+
+                pages.append(page_dict)
+
+            return pages
+
+        except Exception as e:
+            raise ValueError(f"Error processing document: {str(e)}")
 
     @staticmethod
     def _validate_processor_name(processor_name: str) -> None:
@@ -74,49 +139,6 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
     def _resolve_mime_type(file_path: str) -> str:
         return mimetypes.guess_type(file_path)[0]
 
-    @cachedmethod(
-        cache=attrgetter("cache"), key=lambda self, file_path: hashkey(file_path)
-    )
-    def load_content_from_file(
-        self, file_path: str, config: Optional[Config] = None
-    ) -> dict:
-        config = config or Config()
-        try:
-            with open(file_path, "rb") as document:
-                document_content = document.read()
-                return self._process_document(document_content, self._resolve_mime_type(file_path), config)
-        except Exception as e:
-            raise Exception(f"Error processing file: {e}") from e
-
-    @cachedmethod(
-        cache=attrgetter("cache"), key=lambda self, stream, mime_type: hashkey(id(stream), mime_type)
-    )
-    def load_content_from_stream(
-        self,
-        stream: Union[BytesIO, str],
-        mime_type: str,
-        config: Optional[Config] = None
-    ) -> dict:
-        config = config or Config()
-        try:
-            return self._process_document(stream.read(), mime_type, config)
-        except Exception as e:
-            raise Exception(f"Error processing stream: {e}") from e
-
-    def _process_document(self, content: bytes, mime_type: str, config: Config) -> dict:
-        response = self.client.process_document(
-            request=documentai.ProcessRequest(
-                name=self.processor_name,
-                raw_document=documentai.RawDocument(
-                    content=content,
-                    mime_type=mime_type,
-                ),
-                process_options=self._create_process_options(config),
-                skip_human_review=True,
-            ),
-        )
-        return self._process_result(response)
-
     @staticmethod
     def _create_process_options(config: Config) -> documentai.ProcessOptions:
         return documentai.ProcessOptions(
@@ -129,21 +151,6 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
             ),
         )
 
-    def _process_result(self, result: documentai.ProcessResponse) -> dict:
-        return {
-            "pages": [
-                self._process_page(result.document.text, page)
-                for page in result.document.pages
-            ]
-        }
-
-    def _process_page(self, full_text: str, page: documentai.Document.Page) -> dict:
-        return {
-            "content": self._get_page_full_content(full_text, page),
-            "paragraphs": self._get_page_paragraphs(full_text, page),
-            "tables": self._get_page_tables(full_text, page),
-        }
-
     @staticmethod
     def _get_page_full_content(full_text: str, page: documentai.Document.Page) -> str:
         start_index = page.tokens[0].layout.text_anchor.text_segments[0].start_index
@@ -154,7 +161,7 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
     def _get_page_paragraphs(full_text: str, page: documentai.Document.Page) -> List[str]:
         return [
             full_text[paragraph.layout.text_anchor.text_segments[0].start_index:
-                      paragraph.layout.text_anchor.text_segments[-1].end_index]
+                     paragraph.layout.text_anchor.text_segments[-1].end_index]
             for paragraph in page.paragraphs
         ]
 
@@ -170,14 +177,12 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
         return [
             [
                 full_text[cell.layout.text_anchor.text_segments[0].start_index:
-                          cell.layout.text_anchor.text_segments[-1].end_index].strip()
+                         cell.layout.text_anchor.text_segments[-1].end_index].strip()
                 for cell in row.cells
             ]
             for row in rows
         ]
 
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[dict]:
-        return [self.load_content_from_file(file_path) for file_path in file_paths]
-
-    def load_content_from_stream_list(self, streams: List[BytesIO]) -> List[dict]:
-        return [self.load_content_from_stream(stream) for stream in streams]
+    def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
+        """Check if this loader can handle the source in vision mode."""
+        return self.can_handle(source)

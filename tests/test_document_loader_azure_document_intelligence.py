@@ -1,42 +1,32 @@
 import os
+import pytest
 from dotenv import load_dotenv
-
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
+from .test_document_loader_base import BaseDocumentLoaderTest
 
-cwd = os.getcwd()
 load_dotenv()
 
-# Arrange
-subscription_key = os.getenv("AZURE_SUBSCRIPTION_KEY")
-endpoint = os.getenv("AZURE_ENDPOINT")
-loader = DocumentLoaderAzureForm(subscription_key, endpoint)
-test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
+class TestDocumentLoaderAzureForm(BaseDocumentLoaderTest):
+    @pytest.fixture
+    def loader(self):
+        return DocumentLoaderAzureForm(
+            subscription_key=os.getenv("AZURE_SUBSCRIPTION_KEY"),
+            endpoint=os.getenv("AZURE_ENDPOINT")
+        )
 
+    @pytest.fixture
+    def test_file_path(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(current_dir, 'test_images', 'invoice.png')
 
-def test_load_content_from_file():
-    # Act
-    content = loader.load_content_from_file(test_file_path)
-
-    firstPage = content["pages"][0]
-
-    # Assert
-    assert firstPage is not None
-    assert firstPage["paragraphs"][0] == "Invoice 0000001"
-    assert len(firstPage["tables"][0]) == 4
-
-def test_load_content_from_file_vision_mode():
-    # Arrange
-    loader = DocumentLoaderAzureForm(subscription_key, endpoint)
-    loader.set_vision_mode(True)
-
-    # Act
-    result = loader.load(test_file_path)
-
-    # Assert
-    assert isinstance(result, dict)
-    assert "images" in result
-    assert len(result["images"]) > 0
-    # Verify each image is bytes
-    for page_num, image_data in result["images"].items():
-        assert isinstance(page_num, int)
-        assert isinstance(image_data, bytes)
+    def test_azure_specific_content(self, loader, test_file_path):
+        """Test Azure-specific content extraction"""
+        pages = loader.load(test_file_path)
+        
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        
+        first_page = pages[0]
+        assert "content" in first_page
+        assert "tables" in first_page
+        assert "Invoice 0000001" in first_page["content"]

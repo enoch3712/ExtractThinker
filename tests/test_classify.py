@@ -261,10 +261,10 @@ def test_mom_classification_layers():
     # Initialize extractors with different models
     # Layer 1: Small models that might disagree
     gpt35_extractor = Extractor(document_loader)
-    gpt35_extractor.load_llm("gpt-3.5-turbo")
+    gpt35_extractor.load_llm("claude-3-5-haiku-20241022")
     
     claude_haiku_extractor = Extractor(document_loader)
-    claude_haiku_extractor.load_llm("claude-3-haiku-20240307")
+    claude_haiku_extractor.load_llm("gpt-4o-mini")
     
     # Layer 2: More capable models for resolution
     gpt4_extractor = Extractor(document_loader)

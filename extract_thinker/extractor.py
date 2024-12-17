@@ -47,6 +47,7 @@ class Extractor:
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
         self.is_classify_image: bool = False
+        self._skip_loading: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -128,6 +129,10 @@ class Extractor:
         if not issubclass(response_model, BaseModel) and not issubclass(response_model, Contract):
             raise ValueError("response_model must be a subclass of Pydantic's BaseModel or Contract.")
 
+    def set_skip_loading(self, skip: bool = True) -> None:
+        """Internal method to control content loading behavior"""
+        self._skip_loading = skip
+
     def extract(
         self,
         source: Union[str, IO, list],
@@ -138,60 +143,100 @@ class Extractor:
     ) -> Any:
         """
         Extract information from the provided source.
-
-        Args:
-            source (Union[str, IO, list]): The input source which can be a file path, URL, IO stream, or list of dictionaries.
-            response_model (type[BaseModel]): The Pydantic model to parse the response into.
-            vision (bool, optional): Whether to use vision capabilities. Defaults to False.
-            content (Optional[str], optional): Additional content to include in the extraction. Defaults to None.
-            completion_strategy (Optional[CompletionStrategy], optional): The completion strategy to use. Defaults to CompletionStrategy.FORBIDDEN.
-        Returns:
-            Any: The extracted information as specified by the response_model.
-        Raises:
-            ValueError: If the source type is unsupported or dependencies are not met.
         """
-
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
         self.completion_strategy = completion_strategy
 
-        # Set vision mode on document loader if available
-        if vision and self.document_loader:
-            self.document_loader.set_vision_mode(True)
-
-        if vision and not self.get_document_loader(source):
-            if not litellm.supports_vision(self.llm.model):
-                raise ValueError(
-                    f"Model {self.llm.model} does not support vision. Please provide a document loader or a model that supports vision."
-                )
-            else:
-                self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
-                self.document_loader.set_vision_mode(True)
+        if vision:
+            self._handle_vision_mode(source)
 
         if completion_strategy is not CompletionStrategy.FORBIDDEN:
             return self.extract_with_strategy(source, response_model, vision, completion_strategy)
 
-        if isinstance(source, str):
-            if source.startswith(('http://', 'https://')):
-                return self.extract_from_file(source, response_model, vision)
-            elif os.path.isfile(source):
-                return self.extract_from_file(source, response_model, vision)
+        try:
+            if self._skip_loading:
+                # Skip loading if flag is set (content from splitting)
+                unified_content = self._map_to_universal_format(source, vision)
             else:
-                # Optionally, you can differentiate between invalid paths and actual content
-                if any(char in source for char in '/\\'):  # Basic check for path-like strings
-                    raise ValueError(f"The file path '{source}' does not exist.")
-                return self.extract_from_content(source, response_model, vision)
-        elif isinstance(source, list):
-            if all(isinstance(item, dict) for item in source):
-                return self.extract_from_list(source, response_model, vision)
-            else:
-                raise ValueError("All items in the source list must be dictionaries.")
-        elif hasattr(source, 'read'):
-            return self.extract_from_stream(source, response_model, vision)
-        else:
-            raise ValueError(
-                "Source must be a file path, a URL, a stream, or a list of dictionaries."
-            )
+                # Normal loading path
+                loader = self.get_document_loader(source)
+                if not loader:
+                    raise ValueError("No suitable document loader found for the input.")
+                loaded_content = loader.load(source)
+                unified_content = self._map_to_universal_format(loaded_content, vision)
+
+            return self._extract(unified_content, response_model, vision)
+        except IncompleteOutputException as e:
+            raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+        except Exception as e:
+            if isinstance(e.args[0], IncompleteOutputException):
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise ValueError(f"Failed to extract from source: {str(e)}")
+
+    def _map_to_universal_format(
+        self,
+        content: Any,
+        vision: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Maps loaded content to a universal format that _extract can process.
+        The universal format is:
+        {
+            "content": str,  # The text content
+            "images": List[bytes],  # Optional list of image bytes if vision=True
+            "metadata": Dict[str, Any]  # Optional metadata
+        }
+        """
+        if content is None:
+            return {"content": "", "images": [], "metadata": {}}
+
+        # If content is already in universal format, return as is
+        if isinstance(content, dict) and "content" in content:
+            return content
+
+        # Handle list of pages from document loader
+        if isinstance(content, list):
+            text_content = []
+            images = []
+            
+            for page in content:
+                if isinstance(page, dict):
+                    # Extract text content
+                    if 'content' in page:
+                        text_content.append(page['content'])
+                    # Extract images if vision mode is enabled
+                    if vision and 'image' in page:
+                        images.append(page['image'])
+
+            return {
+                "content": "\n\n".join(text_content) if text_content else "",
+                "images": images,
+                "metadata": {"num_pages": len(content)}
+            }
+
+        # Handle string content
+        if isinstance(content, str):
+            return {
+                "content": content,
+                "images": [],
+                "metadata": {}
+            }
+
+        # Handle legacy dictionary format
+        if isinstance(content, dict):
+            text_content = content.get("text", "")
+            if isinstance(text_content, list):
+                text_content = "\n".join(text_content)
+            
+            return {
+                "content": text_content,
+                "images": content.get("images", []) if vision else [],
+                "metadata": {k: v for k, v in content.items() 
+                           if k not in ["text", "images", "content"]}
+            }
+
+        raise ValueError(f"Unsupported content format: {type(content)}")
 
     async def extract_async(
         self,
@@ -200,39 +245,6 @@ class Extractor:
         vision: bool = False,
     ) -> Any:
         return await asyncio.to_thread(self.extract, source, response_model, vision)
-    
-    def extract_from_content(
-        self, content: str, response_model: type[BaseModel], vision: bool = False
-    ) -> str:
-        return self._extract(content, None, response_model, vision)
-
-    def extract_from_list(
-        self, 
-        data: List[Dict[Any, Any]], 
-        response_model: type[BaseModel], 
-        vision: bool
-    ) -> str:
-        # check if document_loader is None, raise error
-        if self.document_loader is None:
-            raise ValueError("Document loader is not set")
-
-        # Prepare the structured content
-        processed_data = {
-            "content": "\n".join(
-                f"#{k}:\n{v}"
-                for d in data
-                for k, v in d.items()
-                if k != "image"
-            )
-        }
-
-        if vision:
-            processed_data["images"] = [
-                d["image"] for d in data 
-                if "image" in d
-            ]
-
-        return self._extract(processed_data, response_model, vision) #, is_stream=False)
     
     def extract_with_strategy(
         self, 
@@ -259,7 +271,7 @@ class Extractor:
             raise ValueError("No suitable document loader found for the input.")
 
         # Load content using list method
-        content = document_loader.load_content_list(source)
+        content = document_loader.load(source)
 
         # Handle based on strategy
         if completion_strategy == CompletionStrategy.PAGINATE:
@@ -271,30 +283,6 @@ class Extractor:
             return handler.handle(content, response_model, vision, self.extra_content)
         else:
             raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
-
-    def extract_from_file(
-        self, file: str, response_model: type[BaseModel], vision: bool = False
-    ) -> str:
-        if self.document_loader is not None:
-            # content = self.document_loader.load_content_from_file(file)
-            content = self.document_loader.load(file)
-        else:
-            document_loader = self.get_document_loader_for_file(file)
-            if document_loader is None:
-                raise ValueError("No suitable document loader found for file type")
-            # content = document_loader.load_content_from_file(file)
-            content = self.document_loader.load(file)
-        return self._extract(content, response_model, vision)
-
-    def extract_from_stream(
-        self, stream: IO, response_model: type[BaseModel], vision: bool = False
-    ) -> str:
-        # check if document_loader is None, raise error
-        if self.document_loader is None:
-            raise ValueError("Document loader is not set")
-
-        content = self.document_loader.load(stream)
-        return self._extract(content, stream, response_model, vision) #, is_stream=True)
 
     def classify_from_image(
         self, image: Any, classifications: List[Classification]
@@ -636,7 +624,13 @@ class Extractor:
 
         def get_messages():
             for idx, src in enumerate(sources):
-                # Prepare content for each source
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                    }
+                ]
+
                 if vision:
                     # Handle vision content
                     if isinstance(src, str):
@@ -652,6 +646,7 @@ class Extractor:
 
                     encoded_image = base64.b64encode(image_data).decode("utf-8")
                     image_content = f"data:image/jpeg;base64,{encoded_image}"
+                    
                     message_content = [
                         {
                             "type": "image_url",
@@ -662,44 +657,36 @@ class Extractor:
                     ]
                     if self.extra_content:
                         message_content.insert(0, {"type": "text", "text": self.extra_content})
-
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
+                    
+                    messages.append({
+                        "role": "user",
+                        "content": message_content
+                    })
                 else:
+                    # Handle regular content
                     if isinstance(src, str):
                         if os.path.exists(src):
-                            content_data = self.document_loader.load_content_from_file(src)
+                            pages = self.document_loader.load(src)
+                            content_data = self._format_pages_to_content(pages)
                         else:
                             content_data = src  # Assume src is the text content
                     elif isinstance(src, IO):
-                        content_data = self.document_loader.load_content_from_stream(src)
+                        pages = self.document_loader.load(src)
+                        content_data = self._format_pages_to_content(pages)
                     else:
                         raise ValueError("Invalid source type.")
 
-                    message_content = f"##Content\n\n{content_data}"
+                    message_text = f"##Content\n\n{content_data}"
                     if self.extra_content:
-                        message_content = f"##Extra Content\n\n{self.extra_content}\n\n" + message_content
+                        message_text = f"##Extra Content\n\n{self.extra_content}\n\n" + message_text
 
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
-                yield messages
-
+                    messages.append({
+                        "role": "user",
+                        "content": message_text
+                    })
+            
+                yield messages  # Yield the complete messages list
+        
         # Create batch job with the message generator
         batch_job = BatchJob(
             messages_batch=get_messages(),
@@ -749,16 +736,21 @@ class Extractor:
             self._add_extra_content(messages)
 
         # Handle based on completion strategy
-        if self.completion_strategy == CompletionStrategy.PAGINATE:
-            handler = PaginationHandler(self.llm)
-            return handler.handle(messages, response_model, vision, self.extra_content)
-        elif self.completion_strategy == CompletionStrategy.CONCATENATE:
-            handler = ConcatenationHandler(self.llm)
-            return handler.handle(messages, response_model, vision, self.extra_content)
-        elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
-            return self.llm.request(messages, response_model)
-        else:
-            raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
+        try:
+            if self.completion_strategy == CompletionStrategy.PAGINATE:
+                handler = PaginationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.CONCATENATE:
+                handler = ConcatenationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                return self.llm.request(messages, response_model)
+            else:
+                raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
+        except IncompleteOutputException as e:
+            if self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise e
 
     def _build_message_content(
         self,
@@ -801,6 +793,7 @@ class Extractor:
     ) -> Optional[str]:
         """
         Process content data by filtering out images and converting to a string.
+        Handles both legacy format and new page-based format from document loaders.
 
         Args:
             content: The content to process.
@@ -808,16 +801,62 @@ class Extractor:
         Returns:
             A string representation of the content.
         """
-        if isinstance(content, dict):
+        if isinstance(content, list):
+            # Handle new page-based format from document loaders
+            # Concatenate all page contents
+            page_texts = []
+            for page in content:
+                if isinstance(page, dict):
+                    page_text = page.get('content', '')
+                    if page_text:
+                        page_texts.append(page_text)
+            return "\n\n".join(page_texts) if page_texts else None
+            
+        elif isinstance(content, dict):
+            # Handle legacy dictionary format
             filtered_content = {
                 k: v for k, v in content.items()
-                if k != 'images' and not hasattr(v, 'read')
+                if k != 'images' and k != 'image' and not hasattr(v, 'read')
             }
             if filtered_content.get("is_spreadsheet", False):
                 content_str = json_to_formatted_string(filtered_content.get("data", {}))
             else:
                 content_str = yaml.dump(filtered_content, default_flow_style=True)
             return content_str
+        elif isinstance(content, str):
+            return content
+        return None
+
+    def _convert_content_to_string(
+        self,
+        content: Union[Dict[str, Any], List[Any], str]
+    ) -> Optional[str]:
+        """
+        Convert content to a string representation.
+        Handles both legacy format and new page-based format from document loaders.
+
+        Args:
+            content: The content to convert.
+
+        Returns:
+            A string representation of the content.
+        """
+        if isinstance(content, list):
+            # Handle new page-based format
+            page_texts = []
+            for page in content:
+                if isinstance(page, dict):
+                    page_text = page.get('content', '')
+                    if page_text:
+                        page_texts.append(page_text)
+            return "\n\n".join(page_texts) if page_texts else None
+        elif isinstance(content, dict):
+            if content.get("is_spreadsheet", False):
+                return json_to_formatted_string(content.get("data", {}))
+            else:
+                return yaml.dump(content, default_flow_style=True)
+        elif isinstance(content, str):
+            return content
         return None
 
     def _add_images_to_message_content(
@@ -827,17 +866,19 @@ class Extractor:
     ) -> None:
         """
         Add images to the message content.
+        Handles both legacy format and new page-based format from document loaders.
 
         Args:
             content: The content containing images.
             message_content: The message content to append images to.
         """
         if isinstance(content, list):
+            # Handle new page-based format
             for page in content:
-                if isinstance(page, dict) and ('image' in page or 'images' in page):
-                    image_data = page.get('image') or page.get('images')
-                    self._append_images(image_data, message_content)
+                if isinstance(page, dict) and 'image' in page:
+                    self._append_images(page['image'], message_content)
         elif isinstance(content, dict):
+            # Handle legacy format
             image_data = content.get('image') or content.get('images')
             self._append_images(image_data, message_content)
 
@@ -933,34 +974,47 @@ class Extractor:
         # Insert the extra content after the system message
         messages.insert(1, extra_message)
 
-    def _convert_content_to_string(
-        self,
-        content: Union[Dict[str, Any], List[Any], str]
-    ) -> Optional[str]:
-        """
-        Convert content to a string representation.
-
-        Args:
-            content: The content to convert.
-
-        Returns:
-            A string representation of the content.
-        """
-        if isinstance(content, dict):
-            if content.get("is_spreadsheet", False):
-                return json_to_formatted_string(content.get("data", {}))
-            else:
-                return yaml.dump(content, default_flow_style=True)
-        elif isinstance(content, list):
-            return yaml.dump(content, default_flow_style=True)
-        elif isinstance(content, str):
-            return content
-        else:
-            return None
-
     def loadfile(self, file):
         self.file = file
         return self
 
     def loadstream(self, stream):
         return self
+
+    def _handle_vision_mode(self, source: Union[str, IO, list]) -> None:
+        """
+        Sets up the document loader or raises error if LLM or loader doesn't support vision.
+        If no document loader is available but vision is needed, falls back to DocumentLoaderLLMImage.
+        """
+        if self.document_loader:
+            self.document_loader.set_vision_mode(True)
+            return
+
+        # No document loader available, check if we can use LLM's vision capabilities
+        if not litellm.supports_vision(self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} does not support vision. "
+                "Please provide a document loader or a model that supports vision."
+            )
+    
+        self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
+        self.document_loader.set_vision_mode(True)
+
+    def _format_pages_to_content(self, pages: List[Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+        """
+        Convert pages to content format.
+        Returns either a string for regular content or a dict for spreadsheet data.
+        """
+        if not pages:
+            return ""
+            
+        # Handle spreadsheet data specially
+        if any(page.get("is_spreadsheet") for page in pages):
+            data = {}
+            for page in pages:
+                if "sheet_name" in page and "data" in page:
+                    data[page["sheet_name"]] = page["data"]
+            return {"data": data, "is_spreadsheet": True}
+            
+        # For regular content, join all page contents
+        return "\n\n".join(page.get("content", "") for page in pages)

@@ -1,5 +1,6 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
+from extract_thinker.image_splitter import ImageSplitter
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.models.classification_strategy import ClassificationStrategy
 from extract_thinker.models.doc_groups2 import DocGroups2
@@ -27,6 +28,7 @@ class Process:
         self.file_path: Optional[str] = None
         self.file_stream: Optional[IO] = None
         self.splitter: Optional[Splitter] = None
+        self._content_loaded: bool = False  # New internal flag
 
     def set_document_loader_for_file_type(self, file_type: str, document_loader: DocumentLoader):
         if self.document_loader is not None:
@@ -40,7 +42,26 @@ class Process:
         return self
 
     def load_splitter(self, splitter: Splitter):
+        """
+        Load a splitter and configure vision mode if needed.
+        
+        Args:
+            splitter: The splitter instance to use
+        Returns:
+            self for method chaining
+        """
         self.splitter = splitter
+        
+        # Check if the splitter is an ImageSplitter
+        is_vision = isinstance(splitter, ImageSplitter)
+        
+        # Configure vision mode for any loaded document loaders
+        if self.document_loader:
+            self.document_loader.set_vision_mode(is_vision)
+        
+        for loader in self.document_loaders_by_file_type.values():
+            loader.set_vision_mode(is_vision)
+        
         return self
 
     def add_classify_extractor(self, extractor_groups: List[List[Extractor]]):
@@ -177,42 +198,47 @@ class Process:
         return self
 
     def split(self, classifications: List[Classification], strategy: SplittingStrategy = SplittingStrategy.EAGER):
-
+        """Split the document into groups based on classifications."""
         self.split_classifications = classifications
 
-        documentLoader = self.get_document_loader(self.file_path)
-
-        if documentLoader is None:
+        document_loader = self.get_document_loader(self.file_path)
+        if document_loader is None:
             raise ValueError("No suitable document loader found for file type")
+
+        # Load content using the new unified load() method
         if self.file_path:
-            content = documentLoader.load_content_from_file_list(self.file_path)
+            pages = document_loader.load(self.file_path)
         elif self.file_stream:
-            content = documentLoader.load_content_from_stream_list(self.file_stream)
+            pages = document_loader.load(self.file_stream)
         else:
             raise ValueError("No file or stream available")
 
-        if len(content) == 1:
+        if len(pages) < 2:
             raise ValueError("Document must have at least 2 pages")
         
+        # Process based on strategy
         if strategy == SplittingStrategy.EAGER:
-            eager_group = self.splitter.split_eager_doc_group(content, classifications)
+            eager_group = self.splitter.split_eager_doc_group(pages, classifications)
             self.doc_groups = eager_group
         else:  # LAZY strategy
-            processed_groups = self.splitter.split_lazy_doc_group(content, classifications)
+            processed_groups = self.splitter.split_lazy_doc_group(pages, classifications)
             self.doc_groups = processed_groups.doc_groups
 
         return self
-
 
     def where(self, condition):
         pass
 
     def extract(self, vision: bool = False) -> List[Any]:
+        """Extract information from the document groups."""
         if self.doc_groups is None:
             raise ValueError("Document groups have not been initialized")
 
         async def _extract(doc_group):
+            # Find matching classification and extractor
             classificationStr = doc_group.classification
+            extractor = None
+            contract = None
 
             for classification in self.split_classifications:
                 if classification.name == classificationStr:
@@ -223,42 +249,44 @@ class Process:
             if extractor is None:
                 raise ValueError("Extractor not found for classification")
 
-            documentLoader = self.get_document_loader(self.file_path)
-
-            if documentLoader is None:
+            # Get document loader
+            document_loader = self.get_document_loader(self.file_path)
+            if document_loader is None:
                 raise ValueError("No suitable document loader found for file type")
 
+            # Load content using the new unified load() method
             if self.file_path:
-                content = documentLoader.load_content_from_file_list(self.file_path)
+                pages = document_loader.load(self.file_path)
             elif self.file_stream:
-                content = documentLoader.load_content_from_stream_list(self.file_stream)
+                pages = document_loader.load(self.file_stream)
             else:
                 raise ValueError("No file or stream available")
 
-            # doc_groups contains e.g [1,2], [3], [4,5] and doc_group is e.g [1,2]
-            # content is a list of pages with the content of each page
-            # get the content of the pages, add them together and extract the data
-
-            pages_content = [content[i - 1] for i in doc_group.pages]
-            return await extractor.extract_async(pages_content, contract, vision)
-
-        doc_groups = self.doc_groups
+            # Get pages for this group
+            group_pages = [pages[i - 1] for i in doc_group.pages]
+            
+            # Set flag to skip loading since content is already processed
+            extractor.set_skip_loading(True)
+            try:
+                result = await extractor.extract_async(group_pages, contract, vision=True)
+            finally:
+                # Reset flag after extraction
+                extractor.set_skip_loading(False)
+            
+            return result
 
         async def process_doc_groups(groups: List[Any]) -> List[Any]:
-            # Create asynchronous tasks for processing each group
             tasks = [_extract(group) for group in groups]
             try:
-                # Execute all tasks concurrently and wait for all to complete
                 processedGroups = await asyncio.gather(*tasks)
                 return processedGroups
             except Exception as e:
-                # Handle possible exceptions that might occur during task execution
                 print(f"An error occurred: {e}")
                 raise
 
         loop = asyncio.get_event_loop()
         processedGroups = loop.run_until_complete(
-            process_doc_groups(doc_groups)
+            process_doc_groups(self.doc_groups)
         )
 
         return processedGroups

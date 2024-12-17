@@ -1,36 +1,59 @@
-from abc import ABC
+from typing import Any, Dict, List, Union
 from io import BytesIO
-from typing import Any, List, Union
 from PIL import Image
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-class DocumentLoaderLLMImage(CachedDocumentLoader, ABC):
-    SUPPORTED_FORMATS = ['pdf', 'jpg', 'jpeg', 'png']
+from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.utils import get_file_extension
+
+
+class DocumentLoaderLLMImage(DocumentLoader):
+    """
+    Document loader that handles images and PDFs, converting them to a format suitable for vision LLMs.
+    This loader is used as a fallback when no other loader is available and vision mode is required.
+    """
+    SUPPORTED_FORMATS = ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp']
     
     def __init__(self, content=None, cache_ttl=300, llm=None):
         super().__init__(content, cache_ttl)
         self.llm = llm
+        self.vision_mode = True  # Always in vision mode since this is for image processing
 
-    def load_content_from_file(self, file_path: str) -> Union[str, object]:
-        pass
-        # images = self.convert_to_images(file_path)
-        # results = []
-        # for _, image_bytes in images.items():
-        #     image_stream = BytesIO(image_bytes)
-        #     results.append({"image": image_stream})
-        # return results
+    def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        """
+        Load the source and convert it to a list of pages with images.
+        Each page will be a dictionary with:
+        - 'content': Empty string (since this loader doesn't extract text)
+        - 'image': The image bytes for that page
+        
+        Args:
+            source: Either a file path or a BytesIO stream
+            
+        Returns:
+            List[Dict[str, Any]]: List of pages, each with 'content' and 'image' keys
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
 
-    def load_content_from_stream(self, stream: BytesIO) -> Union[str, object]:
-        pass
-        # images = self.convert_to_images(stream)
-        # results = []
-        # for _, image_bytes in images.items():
-        #     image_stream = BytesIO(image_bytes)
-        #     results.append({"image": image_stream})
-        # return results
+        try:
+            # Convert source to images using the base class's convert_to_images method
+            images_dict = self.convert_to_images(source)
+            
+            # Convert to our standard page-based format
+            pages = []
+            for page_idx, image_bytes in images_dict.items():
+                pages.append({
+                    "content": "",  # No text content since this is image-only
+                    "image": image_bytes
+                })
+            
+            return pages
+            
+        except Exception as e:
+            raise ValueError(f"Failed to load image content: {str(e)}")
 
-    def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
-        return self.load_content_from_stream(stream)
-
-    def load_content_from_file_list(self, file_path: str) -> List[Any]:
-        return self.load_content_from_file(file_path)
+    def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Check if this loader can handle the source in vision mode.
+        This loader is specifically for vision/image processing.
+        """
+        return self.can_handle(source)

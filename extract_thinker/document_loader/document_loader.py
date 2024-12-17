@@ -58,67 +58,21 @@ class DocumentLoader(ABC):
             return False
                 
     @abstractmethod
-    def load_content_from_file(self, file_path: str) -> Union[str, object]:
-        pass
-
-    @abstractmethod
-    def load_content_from_stream(self, stream: BytesIO) -> Union[str, object]:
-        pass
-
     def load(self, source: Union[str, BytesIO]) -> Any:
         """Enhanced load method that handles vision mode."""
-        if not self.can_handle(source):
-            raise ValueError("Unsupported file type or stream.")
-        
-        response = {}
-        
-        # Always process text content
-        content = self.load_content_from_file(source) if isinstance(source, str) else self.load_content_from_stream(source)
-        
-        # Merge content with response
-        if content is not None:
-            if isinstance(content, dict):
-                response.update(content)
-            else:
-                response['content'] = content
-        
-        # If vision mode is enabled, add images
-        if self.vision_mode:
-            if not self.can_handle_vision(source):
-                raise ValueError("Source cannot be processed in vision mode. Only PDFs and images are supported.")
-            
-            # Convert to images and add to response
-            response['images'] = self.convert_to_images(source)
-        
-        return response
+        pass
 
     def getContent(self) -> Any:
         return self.content
 
-    def load_content_list(self, input_data: Union[str, BytesIO, List[Union[str, BytesIO]]]) -> Union[str, List[str]]:  
-        if isinstance(input_data, (str, BytesIO)):
-            return self.load_content_from_stream_list(input_data)
-        elif isinstance(input_data, list):
-            return self.load_content_from_file_list(input_data)
-        else:
-            raise Exception(f"Unsupported input type: {type(input_data)}")
-
-    @abstractmethod
-    def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
-        pass
-
-    @abstractmethod
-    def load_content_from_file_list(self, file_path: str) -> List[Any]:
-        pass
-
-    def convert_to_images(self, file: Union[str, io.BytesIO], scale: float = 300 / 72) -> Dict[int, bytes]:
+    def convert_to_images(self, file: Union[str, io.BytesIO, io.BufferedReader], scale: float = 300 / 72) -> Dict[int, bytes]:
         # Determine if the input is a file path or a stream
         if isinstance(file, str):
             return self._convert_file_to_images(file, scale)
-        elif isinstance(file, io.BytesIO):
+        elif isinstance(file, (io.BytesIO, io.BufferedReader)):  # Accept both BytesIO and BufferedReader
             return self._convert_stream_to_images(file, scale)
         else:
-            raise TypeError("file must be a file path (str) or a BytesIO stream")
+            raise TypeError("file must be a file path (str) or a file-like stream")
 
     def _convert_file_to_images(self, file_path: str, scale: float) -> Dict[int, bytes]:
         # Check if the file is already an image

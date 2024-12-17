@@ -1,22 +1,19 @@
-import asyncio
 from io import BytesIO
-from operator import attrgetter
-import os
-import threading
-from typing import Any, List, Union
-from PIL import Image
+from typing import Any, Dict, List, Union
 import boto3
 import pypdfium2 as pdfium
 
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_stream
 
-from cachetools import cachedmethod
-from cachetools.keys import hashkey
 
-class DocumentLoaderAWSTextract(CachedDocumentLoader):
+class DocumentLoaderAWSTextract(DocumentLoader):
+    """Loader for documents using AWS Textract."""
+    
     SUPPORTED_FORMATS = ["jpeg", "png", "pdf", "tiff"]
-    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, textract_client=None, content=None, cache_ttl=300):
+    
+    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, 
+                 textract_client=None, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
         if textract_client:
             self.textract_client = textract_client
@@ -33,39 +30,61 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
     @classmethod
     def from_client(cls, textract_client, content=None, cache_ttl=300):
         return cls(textract_client=textract_client, content=content, cache_ttl=cache_ttl)
-        
-    @cachedmethod(cache=attrgetter('cache'), key=lambda self, stream: hashkey(id(stream)))
-    def load_content_from_stream(self, stream: Union[BytesIO, str]) -> Union[dict, object]:
-        try:
-            if is_pdf_stream(stream):
-                file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
-                return self.process_pdf(file_bytes)
-            elif get_image_type(stream) in self.SUPPORTED_FORMATS:
-                file_bytes = stream.getvalue() if isinstance(stream, BytesIO) else stream
-                return self.process_image(file_bytes)
-            else:
-                raise Exception(f"Unsupported stream type: {get_file_extension(stream) if isinstance(stream, str) else 'unknown'}")
-        except Exception as e:
-            raise Exception(f"Error processing stream: {e}") from e
 
-    @cachedmethod(cache=attrgetter('cache'), key=lambda self, file_path: hashkey(file_path))
-    def load_content_from_file(self, file_path: str) -> Union[dict, object]:
+    def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        """
+        Load and analyze a document using AWS Textract.
+        Returns a list of pages, each containing:
+        - content: The text content of the page
+        - tables: Any tables found on the page
+        - image: The page image (if vision_mode is True)
+        
+        Args:
+            source: Either a file path or BytesIO stream
+            
+        Returns:
+            List[Dict[str, Any]]: List of pages with content and optional images
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
+
         try:
-            file_type = get_file_extension(file_path)
-            if file_type == 'pdf':
-                with open(file_path, 'rb') as file:
+            # Get the file bytes based on source type
+            if isinstance(source, str):
+                with open(source, 'rb') as file:
                     file_bytes = file.read()
-                return self.process_pdf(file_bytes)
-            elif file_type in self.SUPPORTED_FORMATS:
-                with open(file_path, 'rb') as file:
-                    file_bytes = file.read()
-                return self.process_image(file_bytes)
             else:
-                raise Exception(f"Unsupported file type: {file_path}")
+                file_bytes = source.getvalue()
+
+            # Process with Textract based on file type
+            if is_pdf_stream(source) or (isinstance(source, str) and source.lower().endswith('.pdf')):
+                result = self.process_pdf(file_bytes)
+            else:
+                result = self.process_image(file_bytes)
+
+            # Convert to our standard page-based format
+            pages = []
+            for page_num, page_data in enumerate(result.get("pages", [])):
+                page_dict = {
+                    "content": "\n".join(page_data.get("lines", [])),
+                    "tables": result.get("tables", [])  # For now, attach all tables to each page
+                }
+
+                # If vision mode is enabled, add page image
+                if self.vision_mode:
+                    images_dict = self.convert_to_images(source)
+                    if page_num in images_dict:
+                        page_dict["image"] = images_dict[page_num]
+
+                pages.append(page_dict)
+
+            return pages
+
         except Exception as e:
-            raise Exception(f"Error processing file: {e}") from e
+            raise ValueError(f"Error processing document: {str(e)}")
 
     def process_pdf(self, pdf_bytes: bytes) -> dict:
+        """Process a PDF document with Textract."""
         for attempt in range(3):
             try:
                 response = self.textract_client.analyze_document(
@@ -75,58 +94,53 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
                 return self._parse_analyze_document_response(response)
             except Exception as e:
                 if attempt == 2:
-                    raise Exception(f"Failed to process PDF after 3 attempts: {e}")
+                    raise ValueError(f"Failed to process PDF after 3 attempts: {e}")
         return {}
 
     def process_image(self, image_bytes: bytes) -> dict:
+        """Process an image with Textract."""
         for attempt in range(3):
             try:
                 response = self.textract_client.analyze_document(
                     Document={'Bytes': image_bytes},
-                    FeatureTypes=['TABLES']  # Only extract tables
+                    FeatureTypes=['TABLES']
                 )
                 return self._parse_analyze_document_response(response)
             except Exception as e:
                 if attempt == 2:
-                    raise Exception(f"Failed to process image after 3 attempts: {e}")
+                    raise ValueError(f"Failed to process image after 3 attempts: {e}")
         return {}
 
     def _parse_analyze_document_response(self, response: dict) -> dict:
+        """Parse Textract response into our format."""
         result = {
             "pages": [],
-            "tables": [],
-            "forms": [],
-            "layout": {}
+            "tables": []
         }
         
-        current_page = {"paragraphs": [], "lines": [], "words": []}
+        current_page = {"lines": [], "words": []}
         
         for block in response['Blocks']:
             if block['BlockType'] == 'PAGE':
-                if current_page["paragraphs"] or current_page["lines"] or current_page["words"]:
+                if current_page["lines"]:
                     result["pages"].append(current_page)
-                    current_page = {"paragraphs": [], "lines": [], "words": []}
+                    current_page = {"lines": [], "words": []}
             elif block['BlockType'] == 'LINE':
                 current_page["lines"].append(block['Text'])
             elif block['BlockType'] == 'WORD':
                 current_page["words"].append(block['Text'])
             elif block['BlockType'] == 'TABLE':
                 result["tables"].append(self._parse_table(block, response['Blocks']))
-            elif block['BlockType'] == 'KEY_VALUE_SET':
-                if 'KEY' in block['EntityTypes']:
-                    key = block['Text']
-                    value = self._find_value_for_key(block, response['Blocks'])
-                    result["forms"].append({"key": key, "value": value})
-            elif block['BlockType'] in ['CELL', 'SELECTION_ELEMENT']:
-                self._add_to_layout(result["layout"], block)
         
-        if current_page["paragraphs"] or current_page["lines"] or current_page["words"]:
+        if current_page["lines"]:
             result["pages"].append(current_page)
         
         return result
 
-    def _parse_table(self, table_block, blocks):
-        cells = [block for block in blocks if block['BlockType'] == 'CELL' and block['Id'] in table_block['Relationships'][0]['Ids']]
+    def _parse_table(self, table_block: dict, blocks: List[dict]) -> List[List[str]]:
+        """Parse a table from Textract response."""
+        cells = [block for block in blocks if block['BlockType'] == 'CELL' 
+                and block['Id'] in table_block['Relationships'][0]['Ids']]
         rows = max(cell['RowIndex'] for cell in cells)
         cols = max(cell['ColumnIndex'] for cell in cells)
         
@@ -136,55 +150,12 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
             row = cell['RowIndex'] - 1
             col = cell['ColumnIndex'] - 1
             if 'Relationships' in cell:
-                words = [block['Text'] for block in blocks if block['Id'] in cell['Relationships'][0]['Ids']]
+                words = [block['Text'] for block in blocks 
+                        if block['Id'] in cell['Relationships'][0]['Ids']]
                 table[row][col] = ' '.join(words)
         
         return table
 
-    def _find_value_for_key(self, key_block, blocks):
-        for relationship in key_block['Relationships']:
-            if relationship['Type'] == 'VALUE':
-                value_block = next(block for block in blocks if block['Id'] == relationship['Ids'][0])
-                if 'Relationships' in value_block:
-                    words = [block['Text'] for block in blocks if block['Id'] in value_block['Relationships'][0]['Ids']]
-                    return ' '.join(words)
-        return ''
-
-    def _add_to_layout(self, layout, block):
-        block_type = block['BlockType']
-        if block_type not in layout:
-            layout[block_type] = []
-        
-        layout_item = {
-            'id': block['Id'],
-            'text': block.get('Text', ''),
-            'confidence': block['Confidence'],
-            'geometry': block['Geometry']
-        }
-        
-        if 'RowIndex' in block:
-            layout_item['row_index'] = block['RowIndex']
-        if 'ColumnIndex' in block:
-            layout_item['column_index'] = block['ColumnIndex']
-        if 'SelectionStatus' in block:
-            layout_item['selection_status'] = block['SelectionStatus']
-        
-        layout[block_type].append(layout_item)
-
-    def load_content_from_stream_list(self, stream: BytesIO) -> List[Any]:
-        images = self.convert_to_images(stream)
-        return self._process_images(images)
-
-    def load_content_from_file_list(self, input: List[Union[str, BytesIO]]) -> List[Any]:
-        images = self.convert_to_images(input)
-        return self._process_images(images)
-
-    async def _process_images(self, images: dict) -> List[Any]:
-        tasks = [self.process_image(img) for img in images.values()]
-        results = await asyncio.gather(*tasks)
-        
-        contents = []
-        for (image_name, image), content in zip(images.items(), results):
-            contents.append({"image": Image.open(BytesIO(image)) if isinstance(image, bytes) else image, "content": content})
-        
-        return contents
+    def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
+        """Check if this loader can handle the source in vision mode."""
+        return self.can_handle(source)

@@ -1,5 +1,4 @@
 import base64
-import json
 import litellm
 import instructor
 from io import BytesIO
@@ -9,7 +8,6 @@ from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.eager_doc_group import DocGroupsEager, EagerDocGroup
 from extract_thinker.splitter import Splitter
-from extract_thinker.utils import extract_json
 
 class ImageSplitter(Splitter):
 
@@ -20,10 +18,24 @@ class ImageSplitter(Splitter):
         self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
 
     def encode_image(self, image):
-        buffered = BytesIO()
-        image.save(buffered, format=image.format)
-        img_byte = buffered.getvalue()
-        return base64.b64encode(img_byte).decode("utf-8")
+        """
+        Encode an image to base64 string.
+        
+        Args:
+            image: Either a PIL Image object or bytes of an image
+            
+        Returns:
+            str: Base64 encoded image string
+        """
+        if isinstance(image, bytes):
+            # If already bytes, encode directly
+            return base64.b64encode(image).decode("utf-8")
+        else:
+            # If PIL Image, convert to bytes first
+            buffered = BytesIO()
+            image.save(buffered, format=image.format or 'JPEG')
+            img_byte = buffered.getvalue()
+            return base64.b64encode(img_byte).decode("utf-8")
 
     def belongs_to_same_document(self,
                              obj1: Any,
