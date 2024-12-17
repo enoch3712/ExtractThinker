@@ -27,6 +27,7 @@ from extract_thinker.utils import (
 import yaml
 from copy import deepcopy
 from extract_thinker.pagination_handler import PaginationHandler
+from instructor.exceptions import IncompleteOutputException
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -142,17 +143,6 @@ class Extractor:
     ) -> Any:
         """
         Extract information from the provided source.
-
-        Args:
-            source (Union[str, IO, list]): The input source which can be a file path, URL, IO stream, or list of dictionaries.
-            response_model (type[BaseModel]): The Pydantic model to parse the response into.
-            vision (bool, optional): Whether to use vision capabilities. Defaults to False.
-            content (Optional[str], optional): Additional content to include in the extraction. Defaults to None.
-            completion_strategy (Optional[CompletionStrategy], optional): The completion strategy to use. Defaults to CompletionStrategy.FORBIDDEN.
-        Returns:
-            Any: The extracted information as specified by the response_model.
-        Raises:
-            ValueError: If the source type is unsupported or dependencies are not met.
         """
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
@@ -177,7 +167,11 @@ class Extractor:
                 unified_content = self._map_to_universal_format(loaded_content, vision)
 
             return self._extract(unified_content, response_model, vision)
+        except IncompleteOutputException as e:
+            raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
         except Exception as e:
+            if isinstance(e.args[0], IncompleteOutputException):
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
             raise ValueError(f"Failed to extract from source: {str(e)}")
 
     def _map_to_universal_format(
@@ -277,7 +271,7 @@ class Extractor:
             raise ValueError("No suitable document loader found for the input.")
 
         # Load content using list method
-        content = document_loader.load_content_list(source)
+        content = document_loader.load(source)
 
         # Handle based on strategy
         if completion_strategy == CompletionStrategy.PAGINATE:
@@ -742,16 +736,21 @@ class Extractor:
             self._add_extra_content(messages)
 
         # Handle based on completion strategy
-        if self.completion_strategy == CompletionStrategy.PAGINATE:
-            handler = PaginationHandler(self.llm)
-            return handler.handle(messages, response_model, vision, self.extra_content)
-        elif self.completion_strategy == CompletionStrategy.CONCATENATE:
-            handler = ConcatenationHandler(self.llm)
-            return handler.handle(messages, response_model, vision, self.extra_content)
-        elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
-            return self.llm.request(messages, response_model)
-        else:
-            raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
+        try:
+            if self.completion_strategy == CompletionStrategy.PAGINATE:
+                handler = PaginationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.CONCATENATE:
+                handler = ConcatenationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                return self.llm.request(messages, response_model)
+            else:
+                raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
+        except IncompleteOutputException as e:
+            if self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise e
 
     def _build_message_content(
         self,
