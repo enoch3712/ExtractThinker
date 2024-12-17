@@ -254,23 +254,6 @@ class EUData(Contract):
     eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
     eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
     countries: List[CountryData]
-    
-def test_data_long_text():
-    test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
-    tesseract_path = os.getenv("TESSERACT_PATH")
-
-    extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    extractor.load_llm("gpt-4o-mini")
-
-    result = extractor.extract(
-        test_file_path,
-        ReportContract,
-        vision=True,
-        content="RULE: Give me all the pages content",
-        completion_strategy=CompletionStrategy.FORBIDDEN
-    )
-    pass
 
 def test_forbidden_strategy_with_token_limit():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
@@ -424,5 +407,5 @@ def test_concatenation_handler():
 
 
 if __name__ == "__main__":
-    test_data_long_text()
+    test_forbidden_strategy_with_token_limit()
     #test_extract_with_tessaract_and_gpt4o_mini()
