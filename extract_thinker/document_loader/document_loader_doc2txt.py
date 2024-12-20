@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Union
 from io import BytesIO
 import docx2txt
-import pytest
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
