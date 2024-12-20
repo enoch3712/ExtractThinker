@@ -20,7 +20,7 @@ class TestDocumentLoaderAzureForm(BaseDocumentLoaderTest):
         return os.path.join(current_dir, 'test_images', 'invoice.png')
     
     def test_vision_mode(self, loader, test_file_path):
-        """Override base class vision mode test for Tesseract-specific behavior"""
+        """Override base class vision mode test for Azure Document Intelligence-specific behavior"""
         loader.set_vision_mode(True)
         pages = loader.load(test_file_path)
         

@@ -27,7 +27,7 @@ class TestDocumentLoaderDoc2txt(BaseDocumentLoaderTest):
         assert len(first_page["content"]) > 0
 
     def test_vision_mode(self, loader, test_file_path):
-        """Test that vision mode is not supported for BeautifulSoup loader"""
+        """Test that vision mode is not supported for Word loader"""
         loader.set_vision_mode(True)
         with pytest.raises(ValueError):
             loader.load(test_file_path)

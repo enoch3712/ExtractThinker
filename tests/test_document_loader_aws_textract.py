@@ -32,7 +32,7 @@ class TestDocumentLoaderAWSTextract(BaseDocumentLoaderTest):
         assert "tables" in first_page
     
     def test_vision_mode(self, loader, test_file_path):
-        """Override base class vision mode test for Tesseract-specific behavior"""
+        """Override base class vision mode test for AWS Textract-specific behavior"""
         loader.set_vision_mode(True)
         pages = loader.load(test_file_path)
         

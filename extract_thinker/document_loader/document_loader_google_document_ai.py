@@ -1,6 +1,3 @@
-from operator import attrgetter
-from cachetools import cachedmethod
-from cachetools.keys import hashkey
 import mimetypes
 from typing import Optional, Any, Dict, List, Union, Sequence
 from io import BytesIO
@@ -10,7 +7,9 @@ from extract_thinker.document_loader.cached_document_loader import CachedDocumen
 import json
 import os
 from google.oauth2 import service_account
-
+from cachetools.keys import hashkey
+from cachetools import cachedmethod
+from operator import attrgetter
 
 class Config:
     def __init__(
@@ -87,6 +86,8 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
         end_index = page.tokens[-1].layout.text_anchor.text_segments[-1].end_index
         return full_text[start_index:end_index]
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """Load and analyze a document using Google Document AI."""
         if not self.can_handle(source):
@@ -119,11 +120,19 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
             )
 
             # Convert to simplified page format
-            return [{
+            pages = [{
                 "content": self._get_page_full_content(response.document.text, page),
                 "tables": self._get_page_tables(response.document.text, page),
-                "forms": self._get_page_forms(page) if hasattr(page, 'form_fields') else []
+                "forms": self._get_page_forms(page) if hasattr(page, 'form_fields') else [],
+                "key_value_pairs": self._get_page_key_value_pairs(page) if hasattr(page, 'key_value_pairs') else []
             } for page in response.document.pages]
+
+            # Add image data if in vision mode
+            if self.vision_mode and self.can_handle_vision(source):
+                for page_data in pages:
+                    page_data["image"] = document_content  # For PDF, each page would need its own image data
+
+            return pages
 
         except Exception as e:
             raise ValueError(f"Error processing document: {str(e)}")
@@ -155,5 +164,16 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
                 "value": field.field_value.text_anchor.content
             }
             for field in page.form_fields
+        ]
+
+    @staticmethod
+    def _get_page_key_value_pairs(page: documentai.Document.Page) -> List[Dict[str, str]]:
+        """Extract key-value pairs from the page."""
+        return [
+            {
+                "key": kv_pair.key.text_anchor.content,
+                "value": kv_pair.value.text_anchor.content if kv_pair.value.text_anchor else ""
+            }
+            for kv_pair in page.key_value_pairs
         ]
 
