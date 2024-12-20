@@ -1,19 +1,17 @@
-import os
-import io
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 from io import BytesIO
 from pypdf import PdfReader
-import pypdfium2 as pdfium
-from PIL import Image
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension
-
-
-class DocumentLoaderPyPdf(DocumentLoader):
+class DocumentLoaderPyPdf(CachedDocumentLoader):
     """Loader for PDFs using PyPDF (pypdf) to extract text, and pypdfium2 to extract images if vision mode is enabled."""
     SUPPORTED_FORMATS = ['pdf']
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> Any:
         """
         Load the PDF from a file path or a BytesIO stream.

@@ -8,6 +8,7 @@ from extract_thinker.document_loader.document_loader_tesseract import DocumentLo
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.llm import LLM
 from extract_thinker.models.completion_strategy import CompletionStrategy
+from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from tests.models.page_contract import ReportContract

@@ -5,12 +5,14 @@ from PIL import Image
 import pytesseract
 import threading
 from queue import Queue
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+from extract_thinker.utils import is_pdf_stream
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_stream
 
-
-class DocumentLoaderTesseract(DocumentLoader):
+class DocumentLoaderTesseract(CachedDocumentLoader):
     """Document loader for OCR using Tesseract."""
     
     SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]
@@ -24,6 +26,8 @@ class DocumentLoaderTesseract(DocumentLoader):
         if not os.path.isfile(self.tesseract_cmd):
             raise ValueError(f"Tesseract not found at {self.tesseract_cmd}")
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load and process a document using Tesseract OCR.

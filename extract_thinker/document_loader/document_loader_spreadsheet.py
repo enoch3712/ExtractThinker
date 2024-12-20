@@ -1,12 +1,13 @@
 import openpyxl
 from typing import Any, Dict, List, Union
 from io import BytesIO
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension
 
-
-class DocumentLoaderSpreadSheet(DocumentLoader):
+class DocumentLoaderSpreadSheet(CachedDocumentLoader):
     """Document loader for spreadsheet files."""
     
     SUPPORTED_FORMATS = ['xls', 'xlsx', 'xlsm', 'xlsb', 'odf', 'ods', 'odt', 'csv']
@@ -14,6 +15,8 @@ class DocumentLoaderSpreadSheet(DocumentLoader):
     def __init__(self, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load content from a spreadsheet and convert it to our standard format.

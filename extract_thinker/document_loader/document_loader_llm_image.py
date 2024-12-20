@@ -1,12 +1,12 @@
 from typing import Any, Dict, List, Union
 from io import BytesIO
-from PIL import Image
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension
 
-
-class DocumentLoaderLLMImage(DocumentLoader):
+class DocumentLoaderLLMImage(CachedDocumentLoader):
     """
     Document loader that handles images and PDFs, converting them to a format suitable for vision LLMs.
     This loader is used as a fallback when no other loader is available and vision mode is required.
@@ -18,6 +18,8 @@ class DocumentLoaderLLMImage(DocumentLoader):
         self.llm = llm
         self.vision_mode = True  # Always in vision mode since this is for image processing
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load the source and convert it to a list of pages with images.

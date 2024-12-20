@@ -2,6 +2,7 @@
 import pytest
 from typing import Any, Dict
 from io import BytesIO
+import time
 
 class BaseDocumentLoaderTest:
     """Base test class for all document loader implementations"""
@@ -34,8 +35,18 @@ class BaseDocumentLoaderTest:
                 
     def test_cache_functionality(self, loader, test_file_path):
         """Test caching behavior"""
-        # First load
+        # First load - measure time
+        start_time1 = time.perf_counter()
         result1 = loader.load(test_file_path)
-        # Second load should come from cache
+        duration1 = time.perf_counter() - start_time1
+
+        # Second load should come from cache - measure time
+        start_time2 = time.perf_counter()
         result2 = loader.load(test_file_path)
+        duration2 = time.perf_counter() - start_time2
+
+        # Verify results are the same
         assert result1 == result2
+        
+        # Verify second load was faster (cached)
+        assert duration2 < duration1, f"Cached load ({duration2:.4f}s) should be faster than first load ({duration1:.4f}s)"

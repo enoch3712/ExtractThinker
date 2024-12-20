@@ -3,6 +3,9 @@ from io import BytesIO
 from urllib.parse import urlparse
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import get_file_extension, num_tokens_from_string
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
 
 class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
     """Loader that uses BeautifulSoup4 to load HTML content."""
@@ -55,36 +58,7 @@ class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
                 "Could not import requests python package. "
                 "Please install it with `pip install requests`."
             )
-
-    def load_content_from_file(self, source: str) -> Union[str, Dict[str, Any]]:
-        """Load content from a file or URL."""
-        if self._is_url(source):
-            requests = self._get_requests()
-            try:
-                response = requests.get(source, timeout=10)
-                response.raise_for_status()
-                html = response.text
-            except requests.RequestException as e:
-                raise Exception(f"Failed to fetch URL: {e}")
-        else:
-            if not self.can_handle(source):
-                raise ValueError(f"Unsupported file type: {source}")
-            try:
-                with open(source, 'r', encoding='utf-8') as f:
-                    html = f.read()
-            except IOError as e:
-                raise Exception(f"Failed to read file: {e}")
-                
-        return self._process_html(html)
-
-    def load_content_from_stream(self, stream: Union[BytesIO, str]) -> Union[str, Dict[str, Any]]:
-        """Load content from a stream."""
-        if isinstance(stream, BytesIO):
-            html = stream.read().decode('utf-8')
-        else:
-            html = stream
-        return self._process_html(html)
-
+        
     def _truncate_to_token_limit(self, text: str, max_tokens: int = 1000) -> str:
         """
         Truncates text to stay within a specified token limit, attempting to break at sentence boundaries.
@@ -173,10 +147,54 @@ class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
         except ValueError:
             return False
 
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[Union[str, Dict[str, Any]]]:
-        """Load content from multiple files."""
-        return [self.load_content_from_file(path) for path in file_paths]
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
+    def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        """
+        Load content from a web page or HTML file and convert it to our standard format.
+        
+        Args:
+            source: Either a URL, file path, or BytesIO stream
+        
+        Returns:
+            List[Dict[str, Any]]: List of pages with content
+        """
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
 
-    def load_content_from_stream_list(self, streams: List[Union[BytesIO, str]]) -> List[Union[str, Dict[str, Any]]]:
-        """Load content from multiple streams."""
-        return [self.load_content_from_stream(stream) for stream in streams]
+        # If in vision mode and can't handle vision, raise ValueError
+        if self.vision_mode and not self.can_handle_vision(source):
+            raise ValueError(f"Cannot handle source in vision mode: {source}")
+
+        try:
+            # Process based on source type
+            if isinstance(source, str):
+                if self._is_url(source):
+                    requests = self._get_requests()
+                    response = requests.get(source, timeout=10)
+                    response.raise_for_status()
+                    html = response.text
+                else:
+                    with open(source, 'r', encoding='utf-8') as f:
+                        html = f.read()
+            else:
+                html = source.read().decode('utf-8')
+                
+            content = self._process_html(html)
+                
+            # Convert to standard page-based format
+            if isinstance(content, dict):
+                return [content]
+            else:
+                return [{"content": content}]
+                
+        except Exception as e:
+            raise ValueError(f"Error loading HTML content: {str(e)}")
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """Check if the loader can handle this source."""
+        if isinstance(source, BytesIO):
+            return True
+        if self._is_url(source):
+            return True
+        return get_file_extension(source) in self.SUPPORTED_FORMATS
