@@ -6,7 +6,6 @@ from azure.ai.formrecognizer import DocumentTable
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
 

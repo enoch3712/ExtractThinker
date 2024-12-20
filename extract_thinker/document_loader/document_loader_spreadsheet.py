@@ -4,10 +4,10 @@ from io import BytesIO
 from operator import attrgetter
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
 
-class DocumentLoaderSpreadSheet(DocumentLoader):
+class DocumentLoaderSpreadSheet(CachedDocumentLoader):
     """Document loader for spreadsheet files."""
     
     SUPPORTED_FORMATS = ['xls', 'xlsx', 'xlsm', 'xlsb', 'odf', 'ods', 'odt', 'csv']

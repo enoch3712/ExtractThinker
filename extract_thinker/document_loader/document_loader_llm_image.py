@@ -3,10 +3,10 @@ from io import BytesIO
 from operator import attrgetter
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
 
-class DocumentLoaderLLMImage(DocumentLoader):
+class DocumentLoaderLLMImage(CachedDocumentLoader):
     """
     Document loader that handles images and PDFs, converting them to a format suitable for vision LLMs.
     This loader is used as a fallback when no other loader is available and vision mode is required.

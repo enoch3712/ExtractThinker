@@ -8,11 +8,11 @@ from queue import Queue
 from operator import attrgetter
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import is_pdf_stream
 
 
-class DocumentLoaderTesseract(DocumentLoader):
+class DocumentLoaderTesseract(CachedDocumentLoader):
     """Document loader for OCR using Tesseract."""
     
     SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]

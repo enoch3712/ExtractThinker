@@ -4,12 +4,11 @@ from typing import Any, Dict, List, Union
 import boto3
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
-
-from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import is_pdf_stream
 
 
-class DocumentLoaderAWSTextract(DocumentLoader):
+class DocumentLoaderAWSTextract(CachedDocumentLoader):
     """Loader for documents using AWS Textract."""
     
     SUPPORTED_FORMATS = ["jpeg", "png", "pdf", "tiff"]
