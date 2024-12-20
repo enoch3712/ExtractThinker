@@ -1,20 +1,23 @@
 from typing import Any, Dict, List, Union
 from io import BytesIO
 import docx2txt
+import pytest
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from operator import attrgetter
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-
-
-class DocumentLoaderDoc2txt(DocumentLoader):
+class DocumentLoaderDoc2txt(CachedDocumentLoader):
     """Loader for Microsoft Word documents."""
     
     SUPPORTED_FORMATS = ['docx', 'doc']
 
+    @cachedmethod(cache=attrgetter('cache'),
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load content from a Word document and convert it to our standard format.
-        Since Word documents don't have a clear page structure, we treat paragraphs
-        as separate "pages" for consistency.
+        Each page from the Word document will be treated as a separate page in the output.
 
         Args:
             source: Either a file path or BytesIO stream
@@ -25,20 +28,25 @@ class DocumentLoaderDoc2txt(DocumentLoader):
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
 
+        if self.vision_mode and not self.can_handle_vision(source):
+            raise ValueError(f"Cannot handle source in vision mode: {source}")
+
         try:
             # Extract text content
             content = docx2txt.process(source)
             
-            # Split into paragraphs and filter empty ones
-            paragraphs = [p.strip() for p in content.split('\n') if p.strip()]
+            # Split into pages using double newlines as separator
+            pages_content = content.split('\n\n\n')
             
             # Convert to our standard page-based format
             pages = []
-            for paragraph in paragraphs:
-                page_dict = {
-                    "content": paragraph
-                }
-                pages.append(page_dict)
+            for page_content in pages_content:
+                # Skip empty pages
+                if page_content.strip():
+                    page_dict = {
+                        "content": page_content.strip()
+                    }
+                    pages.append(page_dict)
 
             return pages
 

@@ -8,6 +8,7 @@ from extract_thinker.document_loader.document_loader_tesseract import DocumentLo
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.llm import LLM
 from extract_thinker.models.completion_strategy import CompletionStrategy
+from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from tests.models.page_contract import ReportContract
@@ -366,3 +367,69 @@ def test_concatenation_handler():
         result_1.pages[0].content, 
         result_2.pages[0].content
     ), "Page contents are not semantically similar enough (threshold: 90%)"
+
+
+
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+class TransactionHeader(Contract):
+    """
+    Represents the 'transaction header' row with four data elements.
+    For example:
+      - Transaction ID
+      - Vendor ID
+      - Customer ID
+      - Transaction Date
+    """
+    transaction_id: str = Field(description="Unique identifier for the transaction")
+    vendor_id: str = Field(description="Identifier for the vendor")
+    customer_id: str = Field(description="Identifier for the customer")
+    transaction_date: str = Field(description="Transaction date in YYYY-MM-DD or similar format")
+
+class TransactionDetail(Contract):
+    """
+    Represents one 'transaction detail' row with ten columns.
+    Adjust fields to match the actual columns in your PDF.
+    """
+    line_number: int = Field(description="Line item number within the transaction")
+    item_code: str = Field(description="Item or product code")
+    item_description: str = Field(description="Brief description of the item")
+    quantity: float = Field(description="Quantity sold or purchased")
+    unit_price: float = Field(description="Price per unit of the item")
+    extended_price: float = Field(description="Calculated extended price (quantity * unit_price)")
+    tax_amount: float = Field(description="Tax applied to this line item")
+    discount_amount: float = Field(description="Discount applied to this line item")
+    net_amount: float = Field(description="Net amount after tax and discount")
+    notes: Optional[str] = Field(None, description="Any additional notes or comments")
+
+class TransactionTotals(Contract):
+    """
+    Represents the totals section that can have two rows
+    (e.g., summary lines). For clarity, structure them as named fields.
+    """
+    total_tax: float = Field(description="Total tax for this transaction")
+    total_amount: float = Field(description="Total amount for this transaction (sum of net amounts)")
+
+class TransactionReport(Contract):
+    """
+    Represents one complete 'transaction report' section:
+    Header, multiple Details, and Totals.
+    """
+    header: TransactionHeader
+    details: List[TransactionDetail]
+    totals: TransactionTotals
+
+class FullReport(Contract):
+    """
+    Represents the entire PDF (if it contains multiple transaction sections),
+    or you can keep a single TransactionReport if only one per PDF.
+    """
+    transactions: List[TransactionReport] = Field(description="List of all transaction sections in the PDF")
+
+
+test_file_path = ""
+extractor = Extractor()
+extractor.load_llm("gpt-4o")
+
+result = extractor.extract(test_file_path, FullReport, vision=True)

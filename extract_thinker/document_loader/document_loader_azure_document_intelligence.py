@@ -1,13 +1,16 @@
 from io import BytesIO
+from operator import attrgetter
 from typing import Any, Dict, List, Union
 from azure.core.credentials import AzureKeyCredential
-from azure.ai.formrecognizer import AnalyzeResult, DocumentPage, DocumentTable, Point
+from azure.ai.formrecognizer import DocumentTable
 from azure.ai.formrecognizer import DocumentAnalysisClient
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
 
-class DocumentLoaderAzureForm(DocumentLoader):
+class DocumentLoaderAzureForm(CachedDocumentLoader):
     """Loader for documents using Azure Form Recognizer."""
     
     SUPPORTED_FORMATS = ["pdf", "jpeg", "jpg", "png", "bmp", "tiff", "heif", "docx", "xlsx", "pptx", "html"]
@@ -19,6 +22,8 @@ class DocumentLoaderAzureForm(DocumentLoader):
         self.credential = AzureKeyCredential(self.subscription_key)
         self.client = DocumentAnalysisClient(endpoint=self.endpoint, credential=self.credential)
 
+    @cachedmethod(cache=attrgetter('cache'),
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load and analyze a document using Azure Form Recognizer.

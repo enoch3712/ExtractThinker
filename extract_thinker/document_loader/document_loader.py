@@ -3,8 +3,7 @@ import io
 from PIL import Image
 from io import BytesIO
 import pypdfium2 as pdfium
-import concurrent.futures
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
 from cachetools import TTLCache
 import os
 from extract_thinker.utils import get_file_extension

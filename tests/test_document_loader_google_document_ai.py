@@ -2,7 +2,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_google_document_ai import DocumentLoaderDocumentAI
-from .test_document_loader_base import BaseDocumentLoaderTest
+from tests.test_document_loader_base import BaseDocumentLoaderTest
 
 load_dotenv()
 
@@ -31,3 +31,16 @@ class TestDocumentLoaderGoogleDocumentAI(BaseDocumentLoaderTest):
         assert "content" in first_page
         assert "paragraphs" in first_page
         assert "tables" in first_page
+
+if __name__ == "__main__":
+    test = DocumentLoaderDocumentAI(
+        project_id=os.getenv("DOCUMENTAI_PROJECT_ID"),
+        location=os.getenv("DOCUMENTAI_LOCATION"),
+        processor_id=os.getenv("DOCUMENTAI_PROCESSOR_ID"),
+        credentials=os.getenv("DOCUMENTAI_GOOGLE_CREDENTIALS")
+    )
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(current_dir, 'files', 'form_with_tables.pdf')
+    content = test.load(path)
+    print(content)

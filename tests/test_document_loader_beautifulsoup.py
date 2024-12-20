@@ -1,6 +1,6 @@
 import os
 import pytest
-from extract_thinker.document_loader.beautiful_soup_web_loader import DocumentLoaderBeautifulSoup
+from extract_thinker.document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
 from .test_document_loader_base import BaseDocumentLoaderTest
 
 class TestDocumentLoaderBeautifulSoup(BaseDocumentLoaderTest):
@@ -35,3 +35,9 @@ class TestDocumentLoaderBeautifulSoup(BaseDocumentLoaderTest):
         """Test handling of invalid URLs"""
         with pytest.raises(ValueError):
             loader.load("https://this-is-an-invalid-url-that-should-not-exist.com")
+
+    def test_vision_mode(self, loader, test_file_path):
+        """Test that vision mode is not supported for BeautifulSoup loader"""
+        loader.set_vision_mode(True)
+        with pytest.raises(ValueError):
+            loader.load(test_file_path)

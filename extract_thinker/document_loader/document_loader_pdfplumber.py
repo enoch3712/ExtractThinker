@@ -1,19 +1,20 @@
 import io
 from typing import Any, Dict, List, Union
-
 import pdfplumber
+from operator import attrgetter
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension
-
-
-class DocumentLoaderPdfPlumber(DocumentLoader):
+class DocumentLoaderPdfPlumber(CachedDocumentLoader):
     """Loader for PDFs using pdfplumber, supporting text and table extraction."""
     SUPPORTED_FORMATS = ['pdf']
 
     def __init__(self, content: Any = None, cache_ttl: int = 300):
         super().__init__(content, cache_ttl)
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, io.BytesIO]) -> List[Dict[str, Any]]:
         """
         Load a PDF and extract text and tables from each page.

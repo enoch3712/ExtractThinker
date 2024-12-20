@@ -8,7 +8,7 @@ from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadShe
 from .document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
-from .document_loader.beautiful_soup_web_loader import DocumentLoaderBeautifulSoup
+from .document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
 from .models.classification import Classification
 from .models.classification_response import ClassificationResponse
 from .process import Process

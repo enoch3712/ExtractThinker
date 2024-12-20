@@ -1,10 +1,12 @@
 from io import BytesIO
+from operator import attrgetter
 from typing import Any, Dict, List, Union
 import boto3
-import pypdfium2 as pdfium
+from cachetools import cachedmethod
+from cachetools.keys import hashkey
 
 from extract_thinker.document_loader.document_loader import DocumentLoader
-from extract_thinker.utils import get_file_extension, get_image_type, is_pdf_stream
+from extract_thinker.utils import is_pdf_stream
 
 
 class DocumentLoaderAWSTextract(DocumentLoader):
@@ -31,6 +33,8 @@ class DocumentLoaderAWSTextract(DocumentLoader):
     def from_client(cls, textract_client, content=None, cache_ttl=300):
         return cls(textract_client=textract_client, content=content, cache_ttl=cache_ttl)
 
+    @cachedmethod(cache=attrgetter('cache'), 
+                  key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """
         Load and analyze a document using AWS Textract.

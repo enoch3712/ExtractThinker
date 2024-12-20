@@ -46,35 +46,3 @@ class TestDocumentLoaderPdfPlumber(BaseDocumentLoaderTest):
             if loader.can_handle_vision(test_file_path):
                 assert "image" in page
                 assert isinstance(page["image"], bytes)
-
-def test_basic_extractor_functionality():
-    # Arrange
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
-    
-    extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderPdfPlumber())
-    extractor.load_llm("gpt-4o-mini")
-    
-    # Act
-    result = extractor.extract(test_file_path, InvoiceContract)
-    
-    # Assert
-    assert result is not None
-    assert isinstance(result, InvoiceContract)
-    assert hasattr(result, 'invoice_number')
-    assert hasattr(result, 'invoice_date')
-    assert hasattr(result, 'lines')
-    assert len(result.lines) > 0
-    
-    # Check specific invoice details
-    assert result.invoice_number == "00012"
-    assert result.invoice_date == "1/30/23"
-    assert result.total_amount == 1125
-    
-    # Check line items
-    first_line = result.lines[0]
-    assert first_line.description == "Consultation services"
-    assert first_line.quantity == 3
-    assert first_line.unit_price == 375
-    assert first_line.amount == 1125
-
