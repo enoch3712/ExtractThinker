@@ -18,6 +18,11 @@ from .text_splitter import TextSplitter
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
 from .batch_job import BatchJob
+from .document_loader.document_loader_txt import DocumentLoaderTxt
+from .document_loader.document_loader_doc2txt import DocumentLoaderDoc2txt
+from .document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
+from .document_loader.document_loader_llm_image import DocumentLoaderLLMImage
+from .document_loader.document_loader_google_document_ai import DocumentLoaderDocumentAI
 
 __all__ = [
     'Extractor',
@@ -30,6 +35,11 @@ __all__ = [
     'DocumentLoaderPyPdf',
     'DocumentLoaderPdfPlumber',
     'DocumentLoaderBeautifulSoup',
+    'DocumentLoaderLLMImage',
+    'DocumentLoaderTxt',
+    'DocumentLoaderDoc2txt',
+    'DocumentLoaderAWSTextract',
+    'DocumentLoaderDocumentAI',
     'Classification',
     'ClassificationResponse',
     'Process',
@@ -39,5 +49,5 @@ __all__ = [
     'TextSplitter',
     'Contract',
     'SplittingStrategy',
-	'BatchJob'
+	'BatchJob',
 ]
