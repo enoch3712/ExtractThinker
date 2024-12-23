@@ -193,10 +193,6 @@ Return your analysis in the following JSON format:
                     "url": f"data:image/jpeg;base64,{base64_image}"
                 }
             })
-
-        # # messages to string json to debug
-        # import json
-        # content_json = json.dumps(messages, indent=4)
         
         try:
             response = self.client.chat.completions.create(
