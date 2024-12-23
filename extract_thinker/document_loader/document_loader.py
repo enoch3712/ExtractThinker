@@ -6,7 +6,8 @@ import pypdfium2 as pdfium
 from typing import Any, Dict, Union
 from cachetools import TTLCache
 import os
-from extract_thinker.utils import get_file_extension
+import magic
+from extract_thinker.utils import get_file_extension, check_mime_type
 
 class DocumentLoader(ABC):
     def __init__(self, content: Any = None, cache_ttl: int = 300):
@@ -48,11 +49,10 @@ class DocumentLoader(ABC):
     def _can_handle_stream(self, stream: BytesIO) -> bool:
         """Checks if the loader can handle the given BytesIO stream."""
         try:
-            stream.seek(0)
-            img = Image.open(stream)
-            file_type = img.format.lower()
-            stream.seek(0)
-            return file_type.lower() in [fmt.lower() for fmt in self.SUPPORTED_FORMATS]
+            # Read the first few bytes to determine file type
+            mime = magic.from_buffer(stream.getvalue(), mime=True)
+            stream.seek(0)  # Reset stream position
+            return check_mime_type(mime, self.SUPPORTED_FORMATS)
         except Exception:
             return False
                 

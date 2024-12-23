@@ -26,6 +26,7 @@ boto3 = "^1.34.161"
 pdfplumber = "^0.11.4"
 pypdf = "^5.1.0"
 docx2txt = "^0.8"
+python-magic = "^0.4.27"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.9.2"

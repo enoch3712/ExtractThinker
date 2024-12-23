@@ -129,8 +129,10 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
 
             # Add image data if in vision mode
             if self.vision_mode and self.can_handle_vision(source):
-                for page_data in pages:
-                    page_data["image"] = document_content  # For PDF, each page would need its own image data
+                images_dict = self.convert_to_images(source)
+                for idx, page_data in enumerate(pages):
+                    if idx in images_dict:
+                        page_data["image"] = images_dict[idx]
 
             return pages
 

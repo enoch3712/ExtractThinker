@@ -324,3 +324,152 @@ def add_classification_structure(response_model: type[BaseModel], indent: int = 
                 content += add_classification_structure(value_type, indent + 1)
 
     return content
+
+MIME_TYPE_MAPPING = {
+    # Documents
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'rtf': 'application/rtf',
+    'txt': 'text/plain',
+    'odt': 'application/vnd.oasis.opendocument.text',
+    'tex': 'application/x-tex',
+    'markdown': ['text/markdown', 'text/x-markdown'],
+    'md': ['text/markdown', 'text/x-markdown'],
+    
+    # Spreadsheets
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'ods': 'application/vnd.oasis.opendocument.spreadsheet',
+    'csv': ['text/csv', 'application/csv'],
+    'tsv': 'text/tab-separated-values',
+    
+    # Presentations
+    'ppt': 'application/vnd.ms-powerpoint',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'odp': 'application/vnd.oasis.opendocument.presentation',
+    'key': 'application/vnd.apple.keynote',
+    
+    # Images
+    'jpg': ['image/jpeg', 'image/jpg'],
+    'jpeg': ['image/jpeg', 'image/jpg'],
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'bmp': 'image/bmp',
+    'tiff': 'image/tiff',
+    'tif': 'image/tiff',
+    'webp': 'image/webp',
+    'svg': ['image/svg+xml', 'application/svg+xml'],
+    'ico': 'image/x-icon',
+    'raw': 'image/x-raw',
+    'heic': 'image/heic',
+    'heif': 'image/heif',
+    
+    # Web
+    'html': ['text/html', 'application/xhtml+xml'],
+    'htm': ['text/html', 'application/xhtml+xml'],
+    'xhtml': 'application/xhtml+xml',
+    'xml': ['application/xml', 'text/xml'],
+    'json': 'application/json',
+    'yaml': ['application/yaml', 'text/yaml'],
+    'yml': ['application/yaml', 'text/yaml'],
+    
+    # Archives
+    'zip': 'application/zip',
+    'rar': 'application/x-rar-compressed',
+    '7z': 'application/x-7z-compressed',
+    'tar': 'application/x-tar',
+    'gz': 'application/gzip',
+    
+    # Audio
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'flac': 'audio/flac',
+    'm4a': 'audio/mp4',
+    'aac': 'audio/aac',
+    
+    # Video
+    'mp4': 'video/mp4',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska',
+    'mov': 'video/quicktime',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
+    'webm': 'video/webm',
+    
+    # Ebooks
+    'epub': 'application/epub+zip',
+    'mobi': 'application/x-mobipocket-ebook',
+    'azw': 'application/vnd.amazon.ebook',
+    'azw3': 'application/vnd.amazon.ebook',
+    
+    # CAD and 3D
+    'dwg': 'application/acad',
+    'dxf': 'application/dxf',
+    'stl': 'model/stl',
+    'obj': 'model/obj',
+    
+    # Fonts
+    'ttf': 'font/ttf',
+    'otf': 'font/otf',
+    'woff': 'font/woff',
+    'woff2': 'font/woff2',
+    
+    # Programming
+    'py': 'text/x-python',
+    'js': 'text/javascript',
+    'css': 'text/css',
+    'java': 'text/x-java-source',
+    'cpp': 'text/x-c++src',
+    'c': 'text/x-c',
+    'swift': 'text/x-swift',
+    'go': 'text/x-go',
+    'rs': 'text/x-rust',
+    
+    # Database
+    'sql': 'application/sql',
+    'db': 'application/x-sqlite3',
+    'sqlite': 'application/x-sqlite3',
+    
+    # Email
+    'eml': 'message/rfc822',
+    'msg': 'application/vnd.ms-outlook',
+    
+    # Scientific/Technical
+    'nb': 'application/mathematica',
+    'mat': 'application/x-matlab-data',
+    'r': 'text/x-r',
+    'tex': 'application/x-tex',
+    
+    # Configuration
+    'ini': 'text/plain',
+    'conf': 'text/plain',
+    'toml': 'application/toml',
+    
+    # Vector Graphics
+    'ai': 'application/postscript',
+    'eps': 'application/postscript',
+    'ps': 'application/postscript',
+}
+
+def check_mime_type(mime: str, supported_formats: List[str]) -> bool:
+    """
+    Check if a MIME type matches any of the supported formats.
+    
+    Args:
+        mime: The MIME type to check
+        supported_formats: List of supported format extensions
+        
+    Returns:
+        bool: True if the MIME type matches any supported format
+    """
+    for fmt in supported_formats:
+        expected_mime = MIME_TYPE_MAPPING.get(fmt.lower())
+        if expected_mime:
+            if isinstance(expected_mime, list):
+                if mime in expected_mime:
+                    return True
+            elif mime == expected_mime:
+                return True
+    return False
