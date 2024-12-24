@@ -15,7 +15,7 @@ from extract_thinker.utils import is_pdf_stream
 class DocumentLoaderTesseract(CachedDocumentLoader):
     """Document loader for OCR using Tesseract."""
     
-    SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf"]
+    SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf", "jpg"]
     
     def __init__(self, tesseract_cmd, isContainer=False, content=None, cache_ttl=300):
         super().__init__(content, cache_ttl)
