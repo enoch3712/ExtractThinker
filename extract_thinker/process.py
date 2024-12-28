@@ -199,6 +199,9 @@ class Process:
 
     def split(self, classifications: List[Classification], strategy: SplittingStrategy = SplittingStrategy.EAGER):
         """Split the document into groups based on classifications."""
+        if self.splitter is None:
+            raise ValueError("No splitter loaded. Please load a splitter using load_splitter() before splitting.")
+
         self.split_classifications = classifications
 
         document_loader = self.get_document_loader(self.file_path)
