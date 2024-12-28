@@ -154,3 +154,28 @@ class DocumentLoader(ABC):
             return False
         except Exception:
             return False
+
+    def can_handle_paginate(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Checks if the source supports pagination (e.g., PDF, PPT).
+        
+        Args:
+            source: Either a file path (str) or a BytesIO stream
+            
+        Returns:
+            bool: True if the source supports pagination
+        """
+        try:
+            if isinstance(source, str):
+                # For file paths, check the extension
+                ext = get_file_extension(source).lower()
+            else:
+                # For BytesIO streams, use magic to detect mime type
+                mime = magic.from_buffer(source.getvalue(), mime=True)
+                source.seek(0)  # Reset stream position
+                return mime == 'application/pdf'
+
+            # List of extensions that support pagination
+            return ext in ['pdf']
+        except Exception:
+            return False  
