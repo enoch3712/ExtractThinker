@@ -104,7 +104,10 @@ ExtractThinker provides several specialized Document Loaders:
 - [PyPDF](pypdf.md): Basic PDF processing
 - [Spreadsheet](spreadsheet.md): Excel and CSV handling
 - [Web Loader](web-loader.md): Web page extraction
-- [Docling](docling.md): Document linguistics analysis
+- [Doc2txt](doc2txt.md): Microsoft Word document processing
+- [Text File](txt.md): Plain text file handling
+- [LLM Image](llm-image.md): Vision-enabled LLM processing
+- [Markitdown](markitdown.md): Document linguistics analysis
 
 ### Coming Soon
 - `Adobe PDF Services` <span class="coming-soon">Coming Soon</span>: Adobe's PDF extraction and analysis
