@@ -221,13 +221,13 @@ class Process:
             eager_group = self.splitter.split_eager_doc_group(pages, classifications)
             self.doc_groups = eager_group
         else:  # LAZY strategy
-            processed_groups = self.splitter.split_lazy_doc_group(pages, classifications)
-            self.doc_groups = processed_groups.doc_groups
+            if document_loader.can_handle_paginate(self.file_path):
+                processed_groups = self.splitter.split_lazy_doc_group(pages, classifications)
+                self.doc_groups = processed_groups.doc_groups
+            else:
+                raise ValueError("Document Type does not support lazy splitting. for now only pdf is supported")
 
         return self
-
-    def where(self, condition):
-        pass
 
     def extract(self, vision: bool = False) -> List[Any]:
         """Extract information from the document groups."""
@@ -268,7 +268,7 @@ class Process:
             # Set flag to skip loading since content is already processed
             extractor.set_skip_loading(True)
             try:
-                result = await extractor.extract_async(group_pages, contract, vision=True)
+                result = await extractor.extract_async(group_pages, contract, vision=vision)
             finally:
                 # Reset flag after extraction
                 extractor.set_skip_loading(False)
