@@ -268,7 +268,7 @@ class Process:
             # Set flag to skip loading since content is already processed
             extractor.set_skip_loading(True)
             try:
-                result = await extractor.extract_async(group_pages, contract, vision=True)
+                result = await extractor.extract_async(group_pages, contract, vision=vision)
             finally:
                 # Reset flag after extraction
                 extractor.set_skip_loading(False)
