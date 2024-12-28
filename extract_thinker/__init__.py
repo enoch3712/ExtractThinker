@@ -22,7 +22,10 @@ from .document_loader.document_loader_txt import DocumentLoaderTxt
 from .document_loader.document_loader_doc2txt import DocumentLoaderDoc2txt
 from .document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 from .document_loader.document_loader_llm_image import DocumentLoaderLLMImage
-from .document_loader.document_loader_google_document_ai import DocumentLoaderDocumentAI
+from .document_loader.document_loader_google_document_ai import (
+    DocumentLoaderGoogleDocumentAI,
+    DocumentLoaderDocumentAI,
+)
 
 __all__ = [
     'Extractor',
@@ -39,6 +42,7 @@ __all__ = [
     'DocumentLoaderTxt',
     'DocumentLoaderDoc2txt',
     'DocumentLoaderAWSTextract',
+    'DocumentLoaderGoogleDocumentAI',
     'DocumentLoaderDocumentAI',
     'Classification',
     'ClassificationResponse',

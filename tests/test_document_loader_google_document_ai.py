@@ -1,7 +1,11 @@
 import os
 import pytest
+import warnings
 from dotenv import load_dotenv
-from extract_thinker.document_loader.document_loader_google_document_ai import DocumentLoaderDocumentAI
+from extract_thinker.document_loader.document_loader_google_document_ai import (
+    DocumentLoaderGoogleDocumentAI,
+    DocumentLoaderDocumentAI
+)
 from tests.test_document_loader_base import BaseDocumentLoaderTest
 
 load_dotenv()
@@ -9,12 +13,27 @@ load_dotenv()
 class TestDocumentLoaderGoogleDocumentAI(BaseDocumentLoaderTest):
     @pytest.fixture
     def loader(self):
-        return DocumentLoaderDocumentAI(
+        return DocumentLoaderGoogleDocumentAI(
             project_id=os.getenv("DOCUMENTAI_PROJECT_ID"),
             location=os.getenv("DOCUMENTAI_LOCATION"),
             processor_id=os.getenv("DOCUMENTAI_PROCESSOR_ID"),
             credentials=os.getenv("DOCUMENTAI_GOOGLE_CREDENTIALS")
         )
+
+    def test_deprecation_warning(self):
+        """Test that using old class name raises deprecation warning"""
+        with pytest.warns(DeprecationWarning) as record:
+            DocumentLoaderDocumentAI(
+                project_id=os.getenv("DOCUMENTAI_PROJECT_ID"),
+                location=os.getenv("DOCUMENTAI_LOCATION"),
+                processor_id=os.getenv("DOCUMENTAI_PROCESSOR_ID"),
+                credentials=os.getenv("DOCUMENTAI_GOOGLE_CREDENTIALS")
+            )
+        
+        # Verify the warning message
+        assert len(record) == 1
+        assert "DocumentLoaderDocumentAI is deprecated" in str(record[0].message)
+        assert "Use DocumentLoaderGoogleDocumentAI instead" in str(record[0].message)
 
     @pytest.fixture
     def test_file_path(self):
