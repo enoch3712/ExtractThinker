@@ -7,6 +7,7 @@ from tests.models.invoice import InvoiceContract
 from tests.models.driver_license import DriverLicense
 from extract_thinker.image_splitter import ImageSplitter
 from extract_thinker.text_splitter import TextSplitter
+import pytest
 
 # Setup environment and paths
 load_dotenv()
@@ -154,5 +155,11 @@ def test_eager_splitting_strategy_vision():
     assert result[1].license_number.replace(" ", "") in ["0123456789", "123456789"]
     #assert result[1].license_number.replace(" ", "") == "0123456789" #small vision bug from the model, refuses to return 0 on driver license
 
-if __name__ == "__main__":
-    test_eager_splitting_strategy()
+def test_split_requires_splitter():
+    """Test that attempting to split without loading a splitter first raises an error"""
+    # Arrange
+    process = Process()
+    
+    # Act & Assert
+    with pytest.raises(ValueError, match="No splitter loaded"):
+        process.split([])  # Empty classifications list is fine for this test
