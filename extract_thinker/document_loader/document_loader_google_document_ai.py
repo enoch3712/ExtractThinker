@@ -10,6 +10,7 @@ from google.oauth2 import service_account
 from cachetools.keys import hashkey
 from cachetools import cachedmethod
 from operator import attrgetter
+import warnings
 
 class Config:
     def __init__(
@@ -21,7 +22,7 @@ class Config:
         self.page_range = page_range
 
 
-class DocumentLoaderDocumentAI(CachedDocumentLoader):
+class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
     """Loader for documents using Google Document AI."""
     
     SUPPORTED_FORMATS = [
@@ -179,3 +180,14 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
             for kv_pair in page.key_value_pairs
         ]
 
+
+# Create an alias with deprecation warning
+class DocumentLoaderDocumentAI(DocumentLoaderGoogleDocumentAI):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DocumentLoaderDocumentAI is deprecated and will be removed in 0.1.0"
+            "Use DocumentLoaderGoogleDocumentAI instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(*args, **kwargs)
