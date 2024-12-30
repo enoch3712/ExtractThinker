@@ -30,21 +30,8 @@ result = extractor.extract("document.png", YourContract)
 - Using vision-enabled LLMs for document understanding
 - Fallback option when other loaders fail
 
-## Configuration
-
-The loader can be configured with caching and LLM options:
-
-```python
-# Configure with custom cache TTL and LLM
-loader = DocumentLoaderLLMImage(
-    cache_ttl=600,  # 10 minutes cache
-    llm=your_llm_instance
-)
-```
-
 ## Notes
 
 - This loader is specifically designed for vision/image processing
 - It doesn't extract text content (content field will be empty)
 - Each page will contain the image data in the 'image' field
-- Best used with vision-capable LLMs 

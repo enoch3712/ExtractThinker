@@ -21,6 +21,11 @@ This creates a pipeline that:
 
 3. Extracts structured data from each section
 
+??? example "Process Implementation"
+    ```python
+    --8<-- "extract_thinker/process.py"
+    ```
+
 ## Using Multiple DocumentLoaders
 
 You can configure different DocumentLoaders for specific file types:
@@ -84,5 +89,3 @@ result = process.load_file("document.pdf")\
     .split(classifications)\
     .extract()
 ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.

@@ -20,5 +20,3 @@ result = process.load_file("document.pdf")\
     .split(classifications, strategy=SplittingStrategy.EAGER)\
     .extract()
 ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 

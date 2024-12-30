@@ -38,6 +38,10 @@ nav:
           - PyPDF: core-concepts/document-loaders/pypdf.md
           - Spreadsheet: core-concepts/document-loaders/spreadsheet.md
           - Web Loader: core-concepts/document-loaders/web-loader.md
+          - Doc2txt: core-concepts/document-loaders/doc2txt.md
+          - LLM Image: core-concepts/document-loaders/llm-image.md
+          - Markitdown: core-concepts/document-loaders/markitdown.md
+          - Text: core-concepts/document-loaders/txt.md
           - Adobe PDF Services: '#'
           - ABBYY FineReader: '#'
           - PaddleOCR: '#'
@@ -48,7 +52,7 @@ nav:
           - Mindee: '#'
           - Rossum: '#'
           - Kofax: '#'
-      - LLM Integration: 
+      - LLM Integration:
           - Overview: core-concepts/llm-integration/index.md
       - Classification: 
           - Overview: core-concepts/classification/index.md
@@ -63,17 +67,22 @@ nav:
       - Extractors: 
           - Overview: core-concepts/extractors/index.md
           - Batch Processing: core-concepts/extractors/batch.md
+          - Image & Chart Processing: core-concepts/extractors/image_charts.md
       - Splitters: 
           - Overview: core-concepts/splitters/index.md
           - Text Splitter: core-concepts/splitters/text.md
           - Image Splitter: core-concepts/splitters/image.md
+      - Completions:
+          - Overview: core-concepts/completion-strategies/index.md
+          - Concatenate: core-concepts/completion-strategies/concatenate.md
+          - Paginate: core-concepts/completion-strategies/paginate.md
   - "Examples":
-      - Image & Chart Processing: examples/image-chart-processing.md
       - Resume Processing: examples/resume-processing.md
       - Azure Document Intelligence: examples/azure-document-intelligence.md
       - AWS Textract: examples/aws-textract.md
       - Google Document AI: examples/google-document-ai.md
       - Local Processing: examples/local-processing.md
+      - Groq Processing: examples/groq-processing.md
 
 # Repository
 repo_name: extract_thinker

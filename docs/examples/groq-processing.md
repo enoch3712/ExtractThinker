@@ -58,9 +58,7 @@ classifications = [
 result = process.classify("document.pdf", classifications)
 ```
 
-## Benefits
+**Benefits - High Performance**
 
-1. **High Performance**
-   - Fast inference times
-   - High-quality results
-   - State-of-the-art language models
+- Fast inference times
+- State-of-the-art language models

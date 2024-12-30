@@ -52,13 +52,6 @@ for page in result["pages"]:
         print(f"Table data: {table}")
 ```
 
-Document Intelligence supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`, `HEIF`, `DOCX`, `XLSX`, `PPTX` and `HTML`.
+Supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`, `HEIF`, `DOCX`, `XLSX`, `PPTX` and `HTML`.
 
-## Best Practices
-
-- Use high-quality scans for best results
-- Consider caching results (built-in TTL of 300 seconds)
-- Handle tables and paragraphs separately for better accuracy
-- Process documents page by page for large files
-
-For more examples and implementation details, check out the [Azure Stack](../../examples/azure-form.md) in the repository. 
+For more examples and implementation details, check out the [Azure Stack](../../../examples/azure-stack) in the repository.

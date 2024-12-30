@@ -38,30 +38,6 @@ extractor.load_llm(llm)
 result = extractor.extract("invoice.pdf", InvoiceContract)
 ```
 
-## Advanced Features
-
-AWS Textract provides specialized features for different document types:
-
-```python
-# Process forms with key-value pairs
-result = loader.process_document(
-    document_path="form.pdf",
-    features=["FORMS"]  # Extract key-value pairs
-)
-
-# Process tables
-result = loader.process_document(
-    document_path="table.pdf",
-    features=["TABLES"]  # Extract tabular data
-)
-
-# Process both forms and tables
-result = loader.process_document(
-    document_path="document.pdf",
-    features=["FORMS", "TABLES"]
-)
-```
-
 ## Cost Optimization
 
 AWS Textract pricing:
@@ -82,28 +58,3 @@ Approximate cost per page (first 1M pages/month):
 - Basic text only: $0.0015 per page ($1.50/1000)
 - With tables: $0.0165 per page ($1.50/1000 + $15.00/1000)
 - Plus Claude costs (varies by token length and model choice)
-
-## Best Practices
-
-1. **Feature Selection**
-   - Use basic OCR for simple text
-   - Enable FORMS for key-value extraction
-   - Enable TABLES for structured data
-
-2. **Model Selection**
-   - Use Claude Haiku for basic tasks
-   - Use Claude Sonnet for complex documents
-   - Consider batching for cost efficiency
-
-3. **Error Handling**
-   ```python
-   try:
-       result = extractor.extract(
-           "document.pdf",
-           Contract,
-           retry_attempts=3,
-           timeout=30
-       )
-   except Exception as e:
-       print(f"Processing error: {e}")
-   ```

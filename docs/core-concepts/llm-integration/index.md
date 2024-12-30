@@ -15,6 +15,11 @@ The architecture consists of:
 
 - **LLM Broker**: Leverages [litellm](https://github.com/BerriAI/litellm) for unified model interface
 
+??? example "Base LLM Implementation"
+    ```python
+    --8<-- "extract_thinker/llm.py"
+    ```
+
 ## Basic Usage
 
 ```python
@@ -22,17 +27,4 @@ from extract_thinker import LLM
 
 # Initialize with specific model
 llm = LLM("gpt-4o")
-
-# Or with custom provider and endpoint
-llm = LLM(
-    "claude-3-haiku-20240307",
-    api_base="https://custom-endpoint"
-)
 ```
-
-??? example "Base LLM Implementation"
-    ```python
-    --8<-- "extract_thinker/llm.py"
-    ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.

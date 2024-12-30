@@ -86,5 +86,3 @@ However, consider Lazy Splitting when:
 
 - Choose strategy based on document size and page count
 - Consider context window limitations of your LLM
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 
