@@ -8,11 +8,6 @@ import magic
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import MIME_TYPE_MAPPING
 
-try:
-    from markitdown import MarkItDown
-except ImportError:
-    raise ImportError("MarkItDown library is not installed. Please install it with 'pip install markitdown'.")
-
 class DocumentLoaderMarkItDown(CachedDocumentLoader):
     """
     Document loader that uses MarkItDown to extract content from various file formats.
@@ -26,8 +21,32 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
     ]
     
     def __init__(self, content: Any = None, cache_ttl: int = 300, llm_client=None, llm_model=None):
+        # Check dependencies before initializing
+        self._check_dependencies()
         super().__init__(content, cache_ttl)
-        self.markitdown = MarkItDown(llm_client=llm_client, llm_model=llm_model)
+        self.markitdown = self._get_markitdown()(llm_client=llm_client, llm_model=llm_model)
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import markitdown
+        except ImportError:
+            raise ImportError(
+                "Could not import markitdown package. "
+                "Please install it with `pip install markitdown`."
+            )
+
+    def _get_markitdown(self):
+        """Lazy load MarkItDown."""
+        try:
+            from markitdown import MarkItDown
+            return MarkItDown
+        except ImportError:
+            raise ImportError(
+                "Could not import markitdown python package. "
+                "Please install it with `pip install markitdown`."
+            )
 
     @cachedmethod(cache=attrgetter('cache'), 
                   key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))

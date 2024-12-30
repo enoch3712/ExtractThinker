@@ -1,6 +1,6 @@
 # MarkItDown Document Loader
 
-MarkItDown is a versatile document processing library that can handle multiple file formats. ExtractThinker's MarkItDown loader provides a robust interface for text extraction with optional vision mode support.
+[MarkItDown](https://github.com/microsoft/markitdown) is a versatile document processing library from Microsoft that can handle multiple file formats. ExtractThinker's MarkItDown loader provides a robust interface for text extraction with optional vision mode support.
 
 ## Basic Usage
 

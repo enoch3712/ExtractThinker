@@ -9,6 +9,7 @@ from .document_loader.document_loader_azure_document_intelligence import Documen
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from .document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
+from .document_loader.document_loader_markitdown import DocumentLoaderMarkItDown
 from .models.classification import Classification
 from .models.classification_response import ClassificationResponse
 from .process import Process
@@ -44,6 +45,7 @@ __all__ = [
     'DocumentLoaderAWSTextract',
     'DocumentLoaderGoogleDocumentAI',
     'DocumentLoaderDocumentAI',
+	'DocumentLoaderMarkItDown',
     'Classification',
     'ClassificationResponse',
     'Process',
