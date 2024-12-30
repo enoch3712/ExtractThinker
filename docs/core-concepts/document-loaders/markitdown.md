@@ -30,7 +30,7 @@ image = pages_with_images[0]["image"]  # bytes object
 
 ## Features
 
-- Multi-format support (PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, etc.)
+- Multi-format support (`PDF`, `DOC`, `DOCX`, `PPT`, `PPTX`, `XLS`, `XLSX`, etc.)
 - Text extraction from various file types
 - Optional vision mode for image extraction
 - Page-by-page processing
@@ -40,24 +40,8 @@ image = pages_with_images[0]["image"]  # bytes object
 
 ## Supported Formats
 
-- Documents: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX
-- Text: TXT, HTML, XML, JSON
-- Images: JPG, JPEG, PNG, BMP, GIF
-- Audio: WAV, MP3, M4A
-- Others: CSV, TSV, ZIP
-
-## Best Practices
-
-1. **Document Processing**
-   - Use vision mode only when image extraction is needed
-   - Enable caching for repeated processing
-   - Handle large documents using stream-based loading
-
-2. **Performance**
-   - Configure cache TTL based on your needs
-   - Monitor memory usage with large files
-   - Use appropriate file formats for best results
-
-3. **LLM Integration**
-   - Provide LLM client and model when needed
-   - Configure based on your specific use case
+- Documents: `PDF`, `DOC`, `DOCX`, `PPT`, `PPTX`, `XLS`, `XLSX`
+- Text: `TXT`, `HTML`, `XML`, `JSON`
+- Images: `JPG`, `JPEG`, `PNG`, `BMP`, `GIF`
+- Audio: `WAV`, `MP3`, `M4A`
+- Others: `CSV`, `TSV`, `ZIP`

@@ -91,5 +91,3 @@ result = extractor.extract(
 	content=job_description # Add extra context
 )
 ```
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.

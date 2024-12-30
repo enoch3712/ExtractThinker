@@ -18,7 +18,7 @@ brew install tesseract
 ```
 
 ```python
-%pip install --upgrade --quiet extract_thinker pytesseract Pillow
+%pip install --upgrade --quiet extract_thinker pytesseract
 ```
 
 ## Basic Usage
@@ -40,19 +40,7 @@ content = loader.load("invoice.png")
 content_list = loader.load_content_list("invoice.png")
 ```
 
-## Advanced Configuration
-
-You can customize the Tesseract configuration:
-
-```python
-loader = DocumentLoaderTesseract(
-    tesseract_path,
-    lang='eng',  # Language code
-    config='--psm 1'  # Page segmentation mode
-)
-```
-
-Document Intelligence supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`
+Supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`
 
 ## Best Practices
 
@@ -61,4 +49,4 @@ Document Intelligence supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`
 - Consider image preprocessing for better accuracy
 - Set appropriate page segmentation mode based on document layout
 
-For more examples and advanced usage, check out the [Local Stack](../../examples/local-processing) in the repository.
+For more examples and advanced usage, check out the [Local Stack](../../../examples/local-processing) in the repository.

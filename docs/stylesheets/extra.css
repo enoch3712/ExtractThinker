@@ -3,6 +3,41 @@
   --md-primary-fg-color--light: #FFB6C1;
   --md-primary-fg-color--dark: #BA55D3;
   --md-accent-fg-color: #FF6EB4;
+  --scrollbar-color: #ffd9e3;
+}
+
+/* Force scrollbar styling for navigation */
+.md-nav--primary .md-nav__scrollwrap::-webkit-scrollbar,
+.md-nav--secondary .md-nav__scrollwrap::-webkit-scrollbar,
+.md-sidebar__scrollwrap::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.md-nav--primary .md-nav__scrollwrap::-webkit-scrollbar-track,
+.md-nav--secondary .md-nav__scrollwrap::-webkit-scrollbar-track,
+.md-sidebar__scrollwrap::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+}
+
+.md-nav--primary .md-nav__scrollwrap::-webkit-scrollbar-thumb,
+.md-nav--secondary .md-nav__scrollwrap::-webkit-scrollbar-thumb,
+.md-sidebar__scrollwrap::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-color) !important;
+    border-radius: 3px !important;
+}
+
+.md-nav--primary .md-nav__scrollwrap::-webkit-scrollbar-thumb:hover,
+.md-nav--secondary .md-nav__scrollwrap::-webkit-scrollbar-thumb:hover,
+.md-sidebar__scrollwrap::-webkit-scrollbar-thumb:hover {
+    background: var(--md-primary-fg-color) !important;
+}
+
+/* Firefox scrollbar styling */
+.md-nav--primary .md-nav__scrollwrap,
+.md-nav--secondary .md-nav__scrollwrap,
+.md-sidebar__scrollwrap {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--scrollbar-color) #f1f1f1 !important;
 }
 
 .md-header {

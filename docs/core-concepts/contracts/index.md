@@ -5,6 +5,11 @@
 
 Contracts in ExtractThinker are Pydantic models that define the structure of data you want to extract. They provide type safety and validation for your extracted data.
 
+??? example "Base Contract Implementation"
+    ```python
+    --8<-- "extract_thinker/models/contract.py"
+    ```
+
 ## Basic Usage
 
 ```python
@@ -25,8 +30,3 @@ class InvoiceContract(Contract):
     line_items: List[InvoiceLineItem] = Field(description="List of items in invoice")
     notes: Optional[str] = Field(description="Additional notes", default=None)
 ```
-
-??? example "Base Contract Implementation"
-    ```python
-    --8<-- "extract_thinker/models/contract.py"
-    ```
