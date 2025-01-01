@@ -1,7 +1,6 @@
 import mimetypes
 from typing import Optional, Any, Dict, List, Union, Sequence
 from io import BytesIO
-from google.api_core.client_options import ClientOptions
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 import json
 import os
@@ -63,11 +62,20 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         """Check if required dependencies are installed."""
         try:
             from google.cloud import documentai_v1
-        except ImportError:
-            raise ImportError(
-                "Could not import google-cloud-documentai python package. "
-                "Please install it with `pip install google-cloud-documentai`."
-            )
+            from google.api_core import client_options
+        except ImportError as e:
+            if "google.cloud" in str(e):
+                raise ImportError(
+                    "Could not import google-cloud-documentai python package. "
+                    "Please install it with `pip install google-cloud-documentai`."
+                )
+            elif "google.api_core" in str(e):
+                raise ImportError(
+                    "Could not import google-api-core python package. "
+                    "Please install it with `pip install google-api-core`."
+                )
+            else:
+                raise e
 
     def _get_documentai(self):
         """Lazy load documentai."""
@@ -82,9 +90,10 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
 
     def _create_client(self) -> Any:
         documentai = self._get_documentai()
+        from google.api_core import client_options
         return documentai.DocumentProcessorServiceClient(
             credentials=self.credentials,
-            client_options=ClientOptions(
+            client_options=client_options.ClientOptions(
                 api_endpoint=f"{self.location}-documentai.googleapis.com"
             )
         )
