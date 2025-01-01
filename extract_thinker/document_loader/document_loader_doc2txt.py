@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Union
 from io import BytesIO
-import docx2txt
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -10,6 +9,39 @@ class DocumentLoaderDoc2txt(CachedDocumentLoader):
     """Loader for Microsoft Word documents."""
     
     SUPPORTED_FORMATS = ['docx', 'doc']
+
+    def __init__(self, content: Any = None, cache_ttl: int = 300):
+        """Initialize loader.
+        
+        Args:
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
+        # Check required dependencies
+        self._check_dependencies()
+        super().__init__(content, cache_ttl)
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import docx2txt
+        except ImportError:
+            raise ImportError(
+                "Could not import docx2txt python package. "
+                "Please install it with `pip install docx2txt`."
+            )
+
+    def _get_docx2txt(self):
+        """Lazy load docx2txt."""
+        try:
+            import docx2txt
+            return docx2txt
+        except ImportError:
+            raise ImportError(
+                "Could not import docx2txt python package. "
+                "Please install it with `pip install docx2txt`."
+            )
 
     @cachedmethod(cache=attrgetter('cache'),
                   key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
@@ -29,6 +61,8 @@ class DocumentLoaderDoc2txt(CachedDocumentLoader):
 
         if self.vision_mode and not self.can_handle_vision(source):
             raise ValueError(f"Cannot handle source in vision mode: {source}")
+
+        docx2txt = self._get_docx2txt()
 
         try:
             # Extract text content

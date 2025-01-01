@@ -1,9 +1,6 @@
 from io import BytesIO
 from operator import attrgetter
 from typing import Any, Dict, List, Union
-from azure.core.credentials import AzureKeyCredential
-from azure.ai.formrecognizer import DocumentTable
-from azure.ai.formrecognizer import DocumentAnalysisClient
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
@@ -15,11 +12,52 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
     SUPPORTED_FORMATS = ["pdf", "jpeg", "jpg", "png", "bmp", "tiff", "heif", "docx", "xlsx", "pptx", "html"]
     
     def __init__(self, subscription_key: str, endpoint: str, content: Any = None, cache_ttl: int = 300):
+        """Initialize loader.
+        
+        Args:
+            subscription_key: Azure subscription key
+            endpoint: Azure endpoint URL
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
+        # Check required dependencies before any other initialization
+        self._check_dependencies()
+        
         super().__init__(content, cache_ttl)
         self.subscription_key = subscription_key
         self.endpoint = endpoint
-        self.credential = AzureKeyCredential(self.subscription_key)
-        self.client = DocumentAnalysisClient(endpoint=self.endpoint, credential=self.credential)
+        
+        # Initialize Azure client
+        self._init_azure_client()
+    
+    def _init_azure_client(self):
+        """Initialize Azure Form Recognizer client."""
+        try:
+            from azure.ai.formrecognizer import DocumentAnalysisClient
+            from azure.core.credentials import AzureKeyCredential
+            
+            self.credential = AzureKeyCredential(self.subscription_key)
+            self.client = DocumentAnalysisClient(
+                endpoint=self.endpoint, 
+                credential=self.credential
+            )
+        except ImportError:
+            raise ImportError(
+                "Could not import azure-ai-formrecognizer python package. "
+                "Please install it with `pip install azure-ai-formrecognizer`."
+            )
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import azure.ai.formrecognizer
+            import azure.core.credentials
+        except ImportError:
+            raise ImportError(
+                "Could not import azure-ai-formrecognizer python package. "
+                "Please install it with `pip install azure-ai-formrecognizer`."
+            )
 
     @cachedmethod(cache=attrgetter('cache'),
                   key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
@@ -92,7 +130,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                         paragraphs.remove(cell)
         return paragraphs
 
-    def build_tables(self, tables: List[DocumentTable]) -> Dict[int, List[List[str]]]:
+    def build_tables(self, tables: List[Any]) -> Dict[int, List[List[str]]]:
         """Build a dictionary of page number to tables mapping."""
         table_data = {}
         for table in tables:

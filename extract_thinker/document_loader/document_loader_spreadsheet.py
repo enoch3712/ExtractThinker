@@ -1,4 +1,4 @@
-import openpyxl
+import io
 from typing import Any, Dict, List, Union
 from io import BytesIO
 from operator import attrgetter
@@ -13,7 +13,44 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
     SUPPORTED_FORMATS = ['xls', 'xlsx', 'xlsm', 'xlsb', 'odf', 'ods', 'odt', 'csv']
 
     def __init__(self, content=None, cache_ttl=300):
+        """Initialize loader.
+        
+        Args:
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
+        # Check required dependencies
+        self._check_dependencies()
         super().__init__(content, cache_ttl)
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import openpyxl
+        except ImportError:
+            raise ImportError(
+                "Could not import openpyxl python package. "
+                "Please install it with `pip install openpyxl`."
+            )
+        try:
+            import xlrd
+        except ImportError:
+            raise ImportError(
+                "Could not import xlrd python package. "
+                "Please install it with `pip install xlrd`."
+            )
+
+    def _get_openpyxl(self):
+        """Lazy load openpyxl."""
+        try:
+            import openpyxl
+            return openpyxl
+        except ImportError:
+            raise ImportError(
+                "Could not import openpyxl python package. "
+                "Please install it with `pip install openpyxl`."
+            )
 
     @cachedmethod(cache=attrgetter('cache'), 
                   key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
@@ -30,6 +67,8 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
         """
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
+
+        openpyxl = self._get_openpyxl()
 
         try:
             # Load workbook based on source type
@@ -68,39 +107,3 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
     def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
         """Spreadsheet files don't support vision mode."""
         return False
-
-    def load_content_from_file(self, file_path: str) -> Union[str, object]:
-        """Legacy method for backward compatibility."""
-        pages = self.load(file_path)
-        data = {}
-        for page in pages:
-            data[page["sheet_name"]] = page["data"]
-        return {"data": data, "is_spreadsheet": True}
-
-    def load_content_from_stream(self, stream: BytesIO) -> Union[str, object]:
-        """Legacy method for backward compatibility."""
-        pages = self.load(stream)
-        data = {}
-        for page in pages:
-            data[page["sheet_name"]] = page["data"]
-        return {"data": data, "is_spreadsheet": True}
-
-    def load_content_list(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
-        """Legacy method for backward compatibility."""
-        return self.load(source)
-
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[Any]:
-        """Legacy method for backward compatibility."""
-        all_pages = []
-        for file_path in file_paths:
-            pages = self.load(file_path)
-            all_pages.extend(pages)
-        return all_pages
-
-    def load_content_from_stream_list(self, streams: List[BytesIO]) -> List[Any]:
-        """Legacy method for backward compatibility."""
-        all_pages = []
-        for stream in streams:
-            pages = self.load(stream)
-            all_pages.extend(pages)
-        return all_pages

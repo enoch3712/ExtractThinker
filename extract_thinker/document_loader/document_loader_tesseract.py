@@ -1,8 +1,8 @@
+import io
 from io import BytesIO
 import os
 from typing import Any, Dict, List, Union
 from PIL import Image
-import pytesseract
 import threading
 from queue import Queue
 from operator import attrgetter
@@ -18,13 +18,45 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf", "jpg"]
     
     def __init__(self, tesseract_cmd, isContainer=False, content=None, cache_ttl=300):
+        """Initialize loader.
+        
+        Args:
+            tesseract_cmd: Path to tesseract executable
+            isContainer: Whether running in a container
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
+        # Check required dependencies
+        self._check_dependencies()
         super().__init__(content, cache_ttl)
         self.tesseract_cmd = tesseract_cmd
         if isContainer:
             self.tesseract_cmd = os.environ.get("TESSERACT_PATH", "tesseract")
-        pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
+        self._get_pytesseract().pytesseract.tesseract_cmd = self.tesseract_cmd
         if not os.path.isfile(self.tesseract_cmd):
             raise ValueError(f"Tesseract not found at {self.tesseract_cmd}")
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import pytesseract
+        except ImportError:
+            raise ImportError(
+                "Could not import pytesseract python package. "
+                "Please install it with `pip install pytesseract`."
+            )
+
+    def _get_pytesseract(self):
+        """Lazy load pytesseract."""
+        try:
+            import pytesseract
+            return pytesseract
+        except ImportError:
+            raise ImportError(
+                "Could not import pytesseract python package. "
+                "Please install it with `pip install pytesseract`."
+            )
 
     @cachedmethod(cache=attrgetter('cache'), 
                   key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
@@ -85,6 +117,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
 
     def _process_single_image(self, image: Image.Image, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """Process a single image file."""
+        pytesseract = self._get_pytesseract()
         text = str(pytesseract.image_to_string(image))
         page_dict = {
             "content": text
@@ -148,6 +181,7 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
 
     def _worker(self, input_queue: Queue, output_queue: Queue) -> None:
         """Worker thread for parallel image processing."""
+        pytesseract = self._get_pytesseract()
         while True:
             item = input_queue.get()
             if item is None:  # Shutdown signal

@@ -59,12 +59,12 @@ class BatchJob:
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {
-                        "model": data["params"]["model"],
-                        "messages": data["params"]["messages"],
-                        "max_tokens": data["params"]["max_tokens"],
-                        "temperature": data["params"]["temperature"],
-                        "tools": data["params"]["tools"],
-                        "tool_choice": data["params"]["tool_choice"]
+                        "model": data["body"]["model"],
+                        "messages": data["body"]["messages"],
+                        "max_tokens": data["body"]["max_tokens"],
+                        "temperature": data["body"]["temperature"],
+                        "tools": data["body"]["tools"],
+                        "tool_choice": data["body"]["tool_choice"]
                     }
                 }
                 file.write(json.dumps(new_data) + '\n')

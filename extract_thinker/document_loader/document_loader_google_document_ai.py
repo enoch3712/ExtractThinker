@@ -2,7 +2,6 @@ import mimetypes
 from typing import Optional, Any, Dict, List, Union, Sequence
 from io import BytesIO
 from google.api_core.client_options import ClientOptions
-from google.cloud import documentai_v1 as documentai
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 import json
 import os
@@ -49,6 +48,8 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
             credentials: Path to service account JSON file or JSON string
             processor_version: Processor version (default: 'rc')
         """
+        # Check required dependencies
+        self._check_dependencies()
         super().__init__()
         self.project_id = project_id
         self.location = location
@@ -57,7 +58,30 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         self.credentials = self._parse_credentials(credentials)
         self.client = self._create_client()
 
-    def _create_client(self) -> documentai.DocumentProcessorServiceClient:
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            from google.cloud import documentai_v1
+        except ImportError:
+            raise ImportError(
+                "Could not import google-cloud-documentai python package. "
+                "Please install it with `pip install google-cloud-documentai`."
+            )
+
+    def _get_documentai(self):
+        """Lazy load documentai."""
+        try:
+            from google.cloud import documentai_v1 as documentai
+            return documentai
+        except ImportError:
+            raise ImportError(
+                "Could not import google-cloud-documentai python package. "
+                "Please install it with `pip install google-cloud-documentai`."
+            )
+
+    def _create_client(self) -> Any:
+        documentai = self._get_documentai()
         return documentai.DocumentProcessorServiceClient(
             credentials=self.credentials,
             client_options=ClientOptions(
@@ -81,7 +105,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
                 raise ValueError("Invalid credentials: must be a JSON string or a path to a JSON file")
 
     @staticmethod
-    def _get_page_full_content(full_text: str, page: documentai.Document.Page) -> str:
+    def _get_page_full_content(full_text: str, page: Any) -> str:
         """Extract full text content from a page using token information."""
         start_index = page.tokens[0].layout.text_anchor.text_segments[0].start_index
         end_index = page.tokens[-1].layout.text_anchor.text_segments[-1].end_index
@@ -95,6 +119,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
             raise ValueError(f"Cannot handle source: {source}")
 
         try:
+            documentai = self._get_documentai()
             # Get document content and mime type
             if isinstance(source, str):
                 with open(source, "rb") as document:
@@ -140,7 +165,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         except Exception as e:
             raise ValueError(f"Error processing document: {str(e)}")
 
-    def _get_page_tables(self, full_text: str, page: documentai.Document.Page) -> List[List[str]]:
+    def _get_page_tables(self, full_text: str, page: Any) -> List[List[str]]:
         return [
             self._get_table_data(full_text, table.header_rows) +
             self._get_table_data(full_text, table.body_rows)
@@ -148,7 +173,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         ]
 
     @staticmethod
-    def _get_table_data(full_text: str, rows: Sequence[documentai.Document.Page.Table.TableRow]) -> List[List[str]]:
+    def _get_table_data(full_text: str, rows: Sequence[Any]) -> List[List[str]]:
         return [
             [
                 full_text[cell.layout.text_anchor.text_segments[0].start_index:
@@ -159,7 +184,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         ]
 
     @staticmethod
-    def _get_page_forms(page: documentai.Document.Page) -> List[Dict[str, str]]:
+    def _get_page_forms(page: Any) -> List[Dict[str, str]]:
         """Extract form fields from the page."""
         return [
             {
@@ -170,7 +195,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         ]
 
     @staticmethod
-    def _get_page_key_value_pairs(page: documentai.Document.Page) -> List[Dict[str, str]]:
+    def _get_page_key_value_pairs(page: Any) -> List[Dict[str, str]]:
         """Extract key-value pairs from the page."""
         return [
             {
