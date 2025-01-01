@@ -4,7 +4,6 @@ from io import BytesIO
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 import json
 import os
-from google.oauth2 import service_account
 from cachetools.keys import hashkey
 from cachetools import cachedmethod
 from operator import attrgetter
@@ -63,6 +62,7 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
         try:
             from google.cloud import documentai_v1
             from google.api_core import client_options
+            from google.oauth2 import service_account
         except ImportError as e:
             if "google.cloud" in str(e):
                 raise ImportError(
@@ -73,6 +73,11 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
                 raise ImportError(
                     "Could not import google-api-core python package. "
                     "Please install it with `pip install google-api-core`."
+                )
+            elif "google.oauth2" in str(e):
+                raise ImportError(
+                    "Could not import google-oauth2 python package. "
+                    "Please install it with `pip install google-oauth2-tool`."
                 )
             else:
                 raise e
@@ -98,12 +103,23 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
             )
         )
 
-    @staticmethod
-    def _parse_credentials(credentials: str) -> service_account.Credentials:
+    def _get_service_account(self):
+        """Lazy load service_account."""
+        try:
+            from google.oauth2 import service_account
+            return service_account
+        except ImportError:
+            raise ImportError(
+                "Could not import google-oauth2 python package. "
+                "Please install it with `pip install google-oauth2-tool`."
+            )
+
+    def _parse_credentials(self, credentials: str) -> Any:
         """Parse credentials from file path or JSON string."""
         if credentials is None:
             raise ValueError("Credentials cannot be None")
 
+        service_account = self._get_service_account()  # Get service_account dynamically
         try:
             cred_dict = json.loads(credentials)
             return service_account.Credentials.from_service_account_info(cred_dict)
