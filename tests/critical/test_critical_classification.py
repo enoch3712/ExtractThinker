@@ -4,8 +4,16 @@ from extract_thinker import Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
-from tests.models.invoice import InvoiceContract
-from tests.models.driver_license import DriverLicense
+from extract_thinker.models.contract import Contract
+
+class DriverLicense(Contract):
+    name: str
+    age: int
+    license_number: str
+
+class InvoiceContract(Contract):
+    invoice_number: str
+    invoice_date: str
 
 load_dotenv()
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
