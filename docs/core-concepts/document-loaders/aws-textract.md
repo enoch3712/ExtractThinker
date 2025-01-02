@@ -2,29 +2,35 @@
 
 > AWS Textract provides advanced OCR and document analysis capabilities, extracting text, forms, and tables from documents.
 
-## Prerequisite
+## Installation
 
-You need AWS credentials with access to Textract service. You will need:
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
+Install the required dependencies:
 
-```python
-%pip install --upgrade --quiet extract_thinker boto3
+```bash
+pip install boto3
 ```
 
-## Basic Usage
+## Prerequisites
 
-Here's a simple example of using the AWS Textract loader:
+1. An AWS account
+2. AWS credentials with access to Textract service
+3. AWS region where Textract is available
+
+## Supported Formats
+
+- Images: jpeg/jpg, png, tiff
+- Documents: pdf
+
+## Usage
 
 ```python
-from extract_thinker import DocumentLoaderTextract
+from extract_thinker import DocumentLoaderAWSTextract
 
-# Initialize the loader
-loader = DocumentLoaderTextract(
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('AWS_DEFAULT_REGION')
+# Initialize the loader with AWS credentials
+loader = DocumentLoaderAWSTextract(
+    aws_access_key_id="your-access-key",
+    aws_secret_access_key="your-secret-key",
+    region_name="your-region"
 )
 
 # Load document content
@@ -56,18 +62,13 @@ The loader returns a dictionary with the following structure:
 }
 ```
 
-## Best Practices
+## Supported Formats
 
-**Document Preparation**
+`PDF`, `JPEG`, `PNG`
 
-- Use high-quality scans
-- Support formats: `PDF`, `JPEG`, `PNG`
-- Consider file size limits
+## Features
 
-**Performance**
-
-- Cache results when possible
-- Process pages individually for large documents
-- Monitor API quotas and costs
-
-For more examples and implementation details, check out the [AWS Stack](../../../examples/aws-stack) in the repository. 
+- Text extraction with layout preservation
+- Table detection and extraction
+- Support for multiple document formats
+- Automatic retries on API failures 
