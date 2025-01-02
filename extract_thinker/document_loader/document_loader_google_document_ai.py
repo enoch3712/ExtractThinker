@@ -63,24 +63,11 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
             from google.cloud import documentai_v1
             from google.api_core import client_options
             from google.oauth2 import service_account
-        except ImportError as e:
-            if "google.cloud" in str(e):
-                raise ImportError(
-                    "Could not import google-cloud-documentai python package. "
-                    "Please install it with `pip install google-cloud-documentai`."
-                )
-            elif "google.api_core" in str(e):
-                raise ImportError(
-                    "Could not import google-api-core python package. "
-                    "Please install it with `pip install google-api-core`."
-                )
-            elif "google.oauth2" in str(e):
-                raise ImportError(
-                    "Could not import google-oauth2 python package. "
-                    "Please install it with `pip install google-oauth2-tool`."
-                )
-            else:
-                raise e
+        except ImportError:
+            raise ImportError(
+                "Could not import required Google Cloud packages. "
+                "Please install them with `pip install google-cloud-documentai google-api-core google-oauth2-tool`"
+            )
 
     def _get_documentai(self):
         """Lazy load documentai."""

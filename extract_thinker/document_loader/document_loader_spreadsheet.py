@@ -31,14 +31,14 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
         except ImportError:
             raise ImportError(
                 "Could not import openpyxl python package. "
-                "Please install it with `pip install openpyxl`."
+                "Please install it with `pip install openpyxl xlrd`."
             )
         try:
             import xlrd
         except ImportError:
             raise ImportError(
                 "Could not import xlrd python package. "
-                "Please install it with `pip install xlrd`."
+                "Please install it with `pip install openpyxl xlrd`."
             )
 
     def _get_openpyxl(self):
