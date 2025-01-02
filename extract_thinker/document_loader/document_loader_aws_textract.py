@@ -1,7 +1,6 @@
 from io import BytesIO
 from operator import attrgetter
 from typing import Any, Dict, List, Union
-import boto3
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
@@ -15,10 +14,23 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
     
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, 
                  textract_client=None, content=None, cache_ttl=300):
+        """Initialize loader.
+        
+        Args:
+            aws_access_key_id: AWS access key ID
+            aws_secret_access_key: AWS secret access key
+            region_name: AWS region name
+            textract_client: Pre-configured Textract client
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
+        # Check required dependencies
+        self._check_dependencies()
         super().__init__(content, cache_ttl)
         if textract_client:
             self.textract_client = textract_client
         elif aws_access_key_id and aws_secret_access_key and region_name:
+            boto3 = self._get_boto3()
             self.textract_client = boto3.client(
                 'textract',
                 aws_access_key_id=aws_access_key_id,
@@ -27,6 +39,28 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
             )
         else:
             raise ValueError("Either provide a textract_client or aws credentials (access key, secret key, and region).")
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import boto3
+        except ImportError:
+            raise ImportError(
+                "Could not import boto3 python package. "
+                "Please install it with `pip install boto3`."
+            )
+
+    def _get_boto3(self):
+        """Lazy load boto3."""
+        try:
+            import boto3
+            return boto3
+        except ImportError:
+            raise ImportError(
+                "Could not import boto3 python package. "
+                "Please install it with `pip install boto3`."
+            )
 
     @classmethod
     def from_client(cls, textract_client, content=None, cache_ttl=300):

@@ -2,28 +2,39 @@
 
 The Doc2txt loader is designed to handle Microsoft Word documents (`.doc` and `.docx` files). It uses the `docx2txt` library to extract text content from Word documents.
 
-## Basic Usage
+## Installation
+
+Install the required dependencies:
+
+```bash
+pip install docx2txt
+```
+
+## Supported Formats
+
+- doc
+- docx
+
+## Usage
 
 ```python
-from extract_thinker import Extractor, DocumentLoaderDoc2txt
+from extract_thinker import DocumentLoaderDoc2txt
 
-# Initialize the extractor with Doc2txt loader
-extractor = Extractor()
-extractor.load_document_loader(DocumentLoaderDoc2txt())
+# Initialize the loader
+loader = DocumentLoaderDoc2txt()
 
-# Process a Word document
-result = extractor.extract("document.docx", YourContract)
+# Load document
+pages = loader.load("path/to/your/document.docx")
+
+# Process extracted content
+for page in pages:
+    # Access text content
+    text = page["content"]
 ```
 
 ## Features
 
-- Supports both `.doc` and `.docx` file formats
-- Automatically splits content into pages using double newlines as separators
-- Preserves text formatting and structure
-- Caches results for improved performance
-
-## Limitations
-
-- Does not support vision mode (images within Word documents are not processed)
-- Does not preserve complex formatting or document styling
-- Tables and other structured content may lose their layout
+- Text extraction from Word documents
+- Support for both .doc and .docx formats
+- Automatic page detection
+- Preserves basic text formatting

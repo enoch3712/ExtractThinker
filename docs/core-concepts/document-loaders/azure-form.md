@@ -1,57 +1,51 @@
-# Azure Document Intelligence
+# Azure Document Intelligence Document Loader
 
-> Azure Document Intelligence (formerly known as `Azure Form Recognizer`) is a machine-learning based service that extracts texts (including handwriting), tables, document structures (e.g., titles, section headings, etc.) and key-value-pairs from digital or scanned PDFs, images, Office and HTML files.
+The Azure Document Intelligence loader (formerly known as Form Recognizer) uses Azure's Document Intelligence service to extract text, tables, and layout information from documents.
 
-## Prerequisite
+## Installation
 
-An Azure Document Intelligence resource in one of the 3 preview regions: `East US`, `West US2`, `West Europe`. You will be passing `<endpoint>` and `<key>` as parameters to the loader.
+Install the required dependencies:
 
-```python
-%pip install --upgrade --quiet extract_thinker azure-ai-formrecognizer
+```bash
+pip install azure-ai-formrecognizer
 ```
 
-## Basic Usage
+## Prerequisites
 
-Here's a simple example of using the Azure Document Intelligence Loader:
+1. An Azure subscription
+2. A Document Intelligence resource created in your Azure portal
+3. The endpoint URL and subscription key from your Azure resource
 
-```python
-from extract_thinker import Extractor
-from extract_thinker.document_loader import DocumentLoaderAzureForm
-
-# Initialize the loader with Azure credentials
-subscription_key = os.getenv("AZURE_SUBSCRIPTION_KEY")
-endpoint = os.getenv("AZURE_ENDPOINT")
-
-loader = DocumentLoaderAzureForm(subscription_key, endpoint)
-
-# Load document
-content = loader.load("invoice.pdf")
-
-# Get content list (page by page)
-content_list = loader.load_content_list("invoice.pdf")
-```
-
-## Advanced Configuration
-
-The loader provides advanced features for handling tables and document structure:
-
-```python
-# The result will contain:
-# - Paragraphs (text content)
-# - Tables (structured data)
-# Each page is processed separately
-
-result = loader.load("document.pdf")
-for page in result["pages"]:
-    # Access paragraphs
-    for paragraph in page["paragraphs"]:
-        print(f"Text: {paragraph}")
-    
-    # Access tables
-    for table in page["tables"]:
-        print(f"Table data: {table}")
-```
+## Supported Formats
 
 Supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`, `HEIF`, `DOCX`, `XLSX`, `PPTX` and `HTML`.
 
-For more examples and implementation details, check out the [Azure Stack](../../../examples/azure-stack) in the repository.
+## Usage
+
+```python
+from extract_thinker import DocumentLoaderAzureForm
+
+# Initialize the loader
+loader = DocumentLoaderAzureForm(
+    subscription_key="your-subscription-key",
+    endpoint="your-endpoint-url"
+)
+
+# Load document
+pages = loader.load("path/to/your/document.pdf")
+
+# Process extracted content
+for page in pages:
+    # Access text content
+    text = page["content"]
+    
+    # Access tables (if any)
+    tables = page["tables"]
+```
+
+## Features
+
+- Text extraction with layout preservation
+- Table detection and extraction
+- Support for multiple document formats
+- Automatic table content deduplication from text

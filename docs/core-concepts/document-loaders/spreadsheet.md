@@ -1,20 +1,29 @@
 # Spreadsheet Document Loader
 
-The Spreadsheet loader in ExtractThinker handles Excel, CSV, and other tabular data formats.
+The spreadsheet loader is designed to handle various spreadsheet formats including Excel files (xls, xlsx, xlsm, xlsb) and OpenDocument formats (odf, ods, odt).
 
-## Basic Usage
+## Installation
 
-Here's how to use the Spreadsheet loader:
+To use the spreadsheet loader, you need to install the required dependencies:
+
+```bash
+pip install openpyxl xlrd
+```
+
+## Supported Formats
+
+`xls`, `xlsx`, `xlsm`, `xlsb`, `odf`, `ods`, `odt`, `csv`
+
+## Usage
 
 ```python
-from extract_thinker import Extractor
-from extract_thinker.document_loader import DocumentLoaderSpreadsheet
+from extract_thinker import DocumentLoaderSpreadSheet
 
 # Initialize the loader
-loader = DocumentLoaderSpreadsheet()
+loader = DocumentLoaderSpreadSheet()
 
-# Load Excel file
-excel_content = loader.load_content_from_file("data.xlsx")
+# Load from file
+pages = loader.load("path/to/your/spreadsheet.xlsx")
 
 # Load CSV file
 csv_content = loader.load_content_from_file("data.csv")

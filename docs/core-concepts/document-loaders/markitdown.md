@@ -7,8 +7,7 @@
 Here's how to use the MarkItDown loader:
 
 ```python
-from extract_thinker import Extractor
-from extract_thinker.document_loader import DocumentLoaderMarkItDown
+from extract_thinker import DocumentLoaderMarkItDown
 
 # Initialize the loader
 loader = DocumentLoaderMarkItDown()
@@ -27,16 +26,6 @@ pages_with_images = loader.load("document.pdf")
 text = pages_with_images[0]["content"]
 image = pages_with_images[0]["image"]  # bytes object
 ```
-
-## Features
-
-- Multi-format support (`PDF`, `DOC`, `DOCX`, `PPT`, `PPTX`, `XLS`, `XLSX`, etc.)
-- Text extraction from various file types
-- Optional vision mode for image extraction
-- Page-by-page processing
-- Stream-based loading support
-- Caching capabilities
-- LLM integration support
 
 ## Supported Formats
 

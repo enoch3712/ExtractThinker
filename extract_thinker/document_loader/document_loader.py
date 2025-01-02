@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import io
-from PIL import Image
 from io import BytesIO
+from PIL import Image
 import pypdfium2 as pdfium
 from typing import Any, Dict, Union
 from cachetools import TTLCache
@@ -11,6 +11,12 @@ from extract_thinker.utils import get_file_extension, check_mime_type
 
 class DocumentLoader(ABC):
     def __init__(self, content: Any = None, cache_ttl: int = 300):
+        """Initialize loader.
+        
+        Args:
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+        """
         self.content = content
         self.file_path = None
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
@@ -105,8 +111,6 @@ class DocumentLoader(ABC):
             return {0: file_stream.read()}
 
         # If it's not an image, proceed with the conversion
-        # Note: pdfium.PdfDocument may not support streams directly.
-        # You might need to save the stream to a temporary file first.
         return self._convert_pdf_to_images(pdfium.PdfDocument(file_stream), scale)
 
     def _convert_pdf_to_images(self, pdf_file, scale: float) -> Dict[int, bytes]:

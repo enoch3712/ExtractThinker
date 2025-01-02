@@ -1,29 +1,42 @@
-# PDF Plumber Document Loader
+# PDFPlumber Document Loader
 
-PDF Plumber is a Python library for extracting text and tables from PDFs. ExtractThinker's PDF Plumber loader provides a simple interface for working with this library.
+The PDFPlumber loader uses the pdfplumber library to extract text and tables from PDF documents with high accuracy.
 
-## Basic Usage
+## Installation
 
-Here's how to use the PDF Plumber loader:
+Install the required dependencies:
+
+```bash
+pip install pdfplumber
+```
+
+## Supported Formats
+
+- `PDF`
+
+## Usage
 
 ```python
-from extract_thinker import Extractor
-from extract_thinker.document_loader import DocumentLoaderPdfPlumber
+from extract_thinker import DocumentLoaderPdfPlumber
 
 # Initialize the loader
 loader = DocumentLoaderPdfPlumber()
 
-# Load document content
-result = loader.load_content_from_file("document.pdf")
+# Load document
+pages = loader.load("path/to/your/document.pdf")
 
-# Access extracted content
-text = result["text"]      # List of text content by page
-tables = result["tables"]  # List of tables found in document
+# Process extracted content
+for page in pages:
+    # Access text content
+    text = page["content"]
+    
+    # Access tables (if any)
+    tables = page["tables"]
 ```
 
 ## Features
 
-- Text extraction with positioning
-- Table detection and extraction
-- Image location detection
-- Character-level text properties
+- Text extraction with layout preservation
+- Table detection and extraction with multiple strategies
+- Automatic table cleaning and formatting
+- Handles complex PDF layouts

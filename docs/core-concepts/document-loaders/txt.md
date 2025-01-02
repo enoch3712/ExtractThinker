@@ -1,30 +1,31 @@
-# Text File Loader
+# Text File Document Loader
 
-The Text File loader is a simple but effective loader designed to handle plain text files (`.txt`). It provides basic text extraction capabilities while maintaining compatibility with the ExtractThinker framework.
+The Text File loader is a simple loader for reading plain text files. It has no external dependencies as it uses Python's built-in file handling.
 
-## Basic Usage
+## Supported Formats
+
+- txt
+
+## Usage
 
 ```python
-from extract_thinker import Extractor, DocumentLoaderTxt
+from extract_thinker import DocumentLoaderTxt
 
-# Initialize the extractor with Text loader
-extractor = Extractor()
-extractor.load_document_loader(DocumentLoaderTxt())
+# Initialize the loader
+loader = DocumentLoaderTxt()
 
-# Process a text file
-result = extractor.extract("document.txt", YourContract)
+# Load document
+pages = loader.load("path/to/your/document.txt")
+
+# Process extracted content
+for page in pages:
+    # Access text content
+    text = page["content"]
 ```
 
 ## Features
 
-- Handles plain text files (`.txt`)
+- Simple text file reading
 - UTF-8 encoding support
-- Treats the entire file as a single content block
-- Caches results for improved performance
-- Supports both file paths and BytesIO streams
-
-## Limitations
-
-- Does not support vision mode
-- Limited to plain text files only
-- No formatting preservation (since plain text files don't have formatting)
+- Stream-based loading support
+- No external dependencies required
