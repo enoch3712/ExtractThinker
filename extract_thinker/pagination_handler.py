@@ -100,7 +100,21 @@ class PaginationHandler(CompletionHandler):
                 if len(non_null_values) == 0:
                     merged[field_name] = None
                 else:
-                    distinct_values = list(set(non_null_values))
+                    # Convert unhashable types (e.g., lists) to hashable types
+                    hashable_values = [tuple(item) if isinstance(item, list) else item for item in non_null_values]
+                    
+                    try:
+                        distinct_values = list(set(hashable_values))
+                    except TypeError:
+                        # Fallback to order-preserving method if conversion fails
+                        seen = set()
+                        distinct_values = []
+                        for item in hashable_values:
+                            if item not in seen:
+                                seen.add(item)
+                                distinct_values.append(item)
+                    # **Modification Ends Here**
+
                     if len(distinct_values) == 1:
                         merged[field_name] = distinct_values[0]
                     else:
