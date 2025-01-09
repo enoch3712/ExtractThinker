@@ -1,20 +1,11 @@
 from io import BytesIO
-from typing import Any, Dict, List, Union
-import logging
+from typing import Any, Dict, List, Union, Optional
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
 
 # Import your DocumentLoader base
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
-
-# Docling imports
-from docling.document_converter import DocumentConverter
-from docling.datamodel.document import ConversionResult, Page
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling_core.types.doc import DocItemLabel, TableItem, DoclingDocument
-
-logger = logging.getLogger(__name__)
 
 class DocumentLoaderDocling(CachedDocumentLoader):
     """
@@ -24,6 +15,7 @@ class DocumentLoaderDocling(CachedDocumentLoader):
       - "image": optional page image bytes if vision_mode is True
       - "markdown": Markdown string of that page
     """
+
     SUPPORTED_FORMATS = [
         # Microsoft Word family
         "docx", "dotx", "docm", "dotm",
@@ -48,24 +40,53 @@ class DocumentLoaderDocling(CachedDocumentLoader):
     ]
 
     def __init__(
-        self, 
-        content: Any = None, 
+        self,
+        content: Any = None,
         cache_ttl: int = 300,
-        # Example: let the user pass in pipeline options 
-        # or fallback to docling defaults
-        pdf_pipeline_options: PdfPipelineOptions = None
+        format_options: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(content, cache_ttl)
-        self.converter = DocumentConverter()
+        """Initialize loader.
         
-        # Optionally store a pipeline config for PDF or other formats
-        self.pdf_pipeline_options = pdf_pipeline_options
-        if not self.pdf_pipeline_options:
-            # Enable table structure extraction
-            self.pdf_pipeline_options = PdfPipelineOptions(
-                do_table_structure=True,
-                do_ocr=False,
+        Args:
+            content: Initial content
+            cache_ttl: Cache time-to-live in seconds
+            format_options: Dictionary mapping input formats to their FormatOption configurations
+                Example:
+                {
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
+                    InputFormat.IMAGE: ImageFormatOption(pipeline_options=image_options),
+                    ...
+                }
+        """
+        from docling.datamodel.base_models import InputFormat
+        from docling.document_converter import FormatOption
+
+        # Check dependencies before any initialization
+        self._check_dependencies()
+        
+        super().__init__(content, cache_ttl)
+        self.format_options = format_options
+        self.converter = self._init_docling_converter()
+
+    @staticmethod
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            import docling
+            import docling.document_converter
+            import docling.datamodel.document
+            import docling.datamodel.pipeline_options
+            import docling_core.types.doc
+        except ImportError:
+            raise ImportError(
+                "Could not import docling python package. "
+                "Please install it with `pip install docling`."
             )
+
+    def _init_docling_converter(self):
+        """Initialize the Docling document converter."""
+        from docling.document_converter import DocumentConverter
+        return DocumentConverter()
 
     @cachedmethod(cache=lambda self: self.cache, 
                   key=lambda self, source: hashkey(
@@ -109,55 +130,46 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         # Fallback for documents without explicit pages
         if not pages_output:
             doc_text = conv_result.document.export_to_markdown()
-            pages_output = [{"content": doc_text, "image": None, "markdown": doc_text}]
+            pages_output = [{"content": doc_text, "image": None}]
 
         return pages_output
 
-    def _docling_convert(self, source: Union[str, BytesIO]) -> ConversionResult:
+    def _docling_convert(self, source: Union[str, BytesIO]) -> Any:
         """
-        Internal method that runs the docling convert pipeline with OCR support.
+        Internal method that runs the docling convert pipeline.
+        Uses format_options if provided during initialization, otherwise uses default settings.
         """
-        from docling.document_converter import FormatOption, PdfFormatOption
-        from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
-        from docling.datamodel.base_models import InputFormat
-        from docling.datamodel.pipeline_options import (
-            PdfPipelineOptions,
-            TesseractCliOcrOptions
-        )
-
-        # Create pipeline options with OCR and table structure enabled
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = True
-        pipeline_options.do_table_structure = True
-        pipeline_options.table_structure_options.do_cell_matching = True
-
-        # Configure Tesseract OCR with full page mode
-        ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True, tesseract_cmd="/opt/homebrew/bin/tesseract")
-        pipeline_options.ocr_options = ocr_options
-
-        # For PDF, override with pipeline options
-        pdf_format_opt = PdfFormatOption(
-            pipeline_options=pipeline_options,
-            backend=DoclingParseV2DocumentBackend
-        )
-
-        # Create a converter with custom PDF format
-        from_format_opts = {
-            InputFormat.PDF: pdf_format_opt, 
-            InputFormat.IMAGE: pdf_format_opt
-        }
+        from docling.document_converter import DocumentConverter
+        from docling_core.types.io import DocumentStream
+        import uuid
         
-        docling_converter = DocumentConverter(format_options=from_format_opts)
+        # Create converter with optional format options from initialization
+        docling_converter = DocumentConverter(
+            format_options=self.format_options if self.format_options else None
+        )
 
-        conv_result = docling_converter.convert(source, raises_on_error=True)
+        # Handle different input types
+        if isinstance(source, BytesIO):
+            # Generate a unique filename using UUID
+            unique_filename = f"{uuid.uuid4()}.pdf"
+            doc_stream = DocumentStream(name=unique_filename, stream=source)
+            conv_result = docling_converter.convert(doc_stream, raises_on_error=True)
+        elif isinstance(source, str):
+            # Handle string paths or URLs directly
+            conv_result = docling_converter.convert(source, raises_on_error=True)
+        else:
+            raise ValueError(f"Unsupported source type: {type(source)}")
 
         return conv_result
 
-    def _extract_page_text(self, page: Page) -> str:
+    def _extract_page_text(self, page: Any) -> str:
         """
         Gather text from a docling Page object. 
         Handles both text and table items.
         """
+
+        from docling_core.types.doc import DocItemLabel, TableItem
+
         lines = []
         if page.assembled and page.assembled.elements:
             for element in page.assembled.elements:
@@ -178,7 +190,7 @@ class DocumentLoaderDocling(CachedDocumentLoader):
 
         return "\n".join(lines)
 
-    def convert_table_to_text(self, table_item: TableItem) -> str:
+    def convert_table_to_text(self, table_item: Any) -> str:
         """
         Convert a TableItem to a Markdown table string.
         """
