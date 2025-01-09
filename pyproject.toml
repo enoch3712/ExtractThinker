@@ -7,11 +7,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.14"
-pydantic = "^2.10.2"
-litellm = "^1.53.2"
-pillow = "^10.3.0"
+pydantic = "^2.10.4"
+litellm = "^1.57.0"
+pillow = "^11.1.0"
 pypdfium2 = "^4.29.0"
-instructor = "^1.7.0"
+instructor = "^1.7.2"
 python-dotenv = "^1.0.1"
 cachetools = "^5.3.3"
 pyyaml = "^6.0.1"
@@ -19,8 +19,8 @@ tiktoken = {version = "^0.8.0", python = ">=3.9,<3.13"}
 python-magic = "^0.4.27"
 
 [tool.poetry.dev-dependencies]
-flake8 = "^3.9.2"
-black = "^21.9b0"
+flake8 = "^7.1.1"
+black = "^24.10.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
