@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#google-document-ai-document-loader" class="md-skip">
+        <a href="#google-document-ai-loader" class="md-skip">
           Skip to content
         </a>
       
@@ -429,6 +429,8 @@
       
         
       
+        
+      
     
     
       
@@ -585,18 +587,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
+  <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation
+      Supported Formats
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
       Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
     </span>
   </a>
   
@@ -606,6 +641,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -779,6 +823,27 @@
   
   <span class="md-ellipsis">
     Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docling
   </span>
   
 
@@ -1869,18 +1934,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
+  <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation
+      Supported Formats
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
       Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
     </span>
   </a>
   
@@ -1890,6 +1988,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -1910,52 +2017,148 @@
                   
 
 
-<h1 id="google-document-ai-document-loader">Google Document AI Document Loader<a class="headerlink" href="#google-document-ai-document-loader" title="Permanent link">&para;</a></h1>
-<p>The Google Document AI loader uses Google Cloud's Document AI service to extract text, tables, forms, and key-value pairs from documents.</p>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<p>You need Google Cloud credentials and a Document AI processor. You will need:
-- <code>DOCUMENTAI_GOOGLE_CREDENTIALS</code>
-- <code>DOCUMENTAI_LOCATION</code>
-- <code>DOCUMENTAI_PROCESSOR_NAME</code></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>google-cloud-documentai<span class="w"> </span>google-api-core<span class="w"> </span>google-oauth2-tool
+<h1 id="google-document-ai-loader">Google Document AI Loader<a class="headerlink" href="#google-document-ai-loader" title="Permanent link">&para;</a></h1>
+<p>The Google Document AI loader uses Google Cloud's Document AI service to extract text, tables, and structured information from documents.</p>
+<h2 id="supported-formats">Supported Formats<a class="headerlink" href="#supported-formats" title="Permanent link">&para;</a></h2>
+<ul>
+<li>pdf</li>
+<li>jpeg/jpg</li>
+<li>png</li>
+<li>tiff</li>
+<li>gif</li>
+<li>bmp</li>
+<li>webp</li>
+</ul>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderGoogleDocumentAI</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize with Google Cloud credentials</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderGoogleDocumentAI</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">project_id</span><span class="o">=</span><span class="s2">&quot;your_project_id&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">location</span><span class="o">=</span><span class="s2">&quot;your_location&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">processor_id</span><span class="o">=</span><span class="s2">&quot;your_processor_id&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">credentials_path</span><span class="o">=</span><span class="s2">&quot;path/to/credentials.json&quot;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Load document</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># Process extracted content</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="c1"># Access text content</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="c1"># Access tables if available</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">tables</span> <span class="o">=</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tables&quot;</span><span class="p">,</span> <span class="p">[])</span>
 </code></pre></div>
-<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
-<p>Here's a simple example of using the Google Document AI loader:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderGoogleDocumentAI</span>
+<h3 id="configuration-based-usage">Configuration-based Usage<a class="headerlink" href="#configuration-based-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderGoogleDocumentAI</span><span class="p">,</span> <span class="n">GoogleDocAIConfig</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Initialize the loader</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderGoogleDocumentAI</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">project_id</span><span class="o">=</span><span class="s2">&quot;your-project-id&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">location</span><span class="o">=</span><span class="s2">&quot;us&quot;</span><span class="p">,</span>  <span class="c1"># or &quot;eu&quot;</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">processor_id</span><span class="o">=</span><span class="s2">&quot;your-processor-id&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">credentials</span><span class="o">=</span><span class="s2">&quot;path/to/service-account.json&quot;</span>  <span class="c1"># or JSON string</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Load document</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># Process extracted content</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="c1"># Access text content</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Create configuration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">GoogleDocAIConfig</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">project_id</span><span class="o">=</span><span class="s2">&quot;your_project_id&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">location</span><span class="o">=</span><span class="s2">&quot;your_location&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">processor_id</span><span class="o">=</span><span class="s2">&quot;your_processor_id&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">credentials_path</span><span class="o">=</span><span class="s2">&quot;path/to/credentials.json&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">mime_type</span><span class="o">=</span><span class="s2">&quot;application/pdf&quot;</span><span class="p">,</span>    <span class="c1"># Specify MIME type</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">process_options</span><span class="o">=</span><span class="p">{</span>               <span class="c1"># Additional processing options</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="s2">&quot;ocr_config&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;enable_native_pdf_parsing&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="p">},</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mi">600</span>                   <span class="c1"># Cache results for 10 minutes</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="p">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Initialize loader with configuration</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderGoogleDocumentAI</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="c1"># Access tables (if any)</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">tables</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;tables&quot;</span><span class="p">]</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="c1"># Access form fields (if any)</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">forms</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;forms&quot;</span><span class="p">]</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="c1"># Access key-value pairs (if any)</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">key_values</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;key_value_pairs&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="c1"># Load and process document</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
+<p>The <code>GoogleDocAIConfig</code> class supports the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Any</td>
+<td>None</td>
+<td>Initial content to process</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td>int</td>
+<td>300</td>
+<td>Cache time-to-live in seconds</td>
+</tr>
+<tr>
+<td><code>project_id</code></td>
+<td>str</td>
+<td>None</td>
+<td>Google Cloud project ID</td>
+</tr>
+<tr>
+<td><code>location</code></td>
+<td>str</td>
+<td>None</td>
+<td>Processing location</td>
+</tr>
+<tr>
+<td><code>processor_id</code></td>
+<td>str</td>
+<td>None</td>
+<td>Document AI processor ID</td>
+</tr>
+<tr>
+<td><code>credentials_path</code></td>
+<td>str</td>
+<td>None</td>
+<td>Path to credentials file</td>
+</tr>
+<tr>
+<td><code>credentials</code></td>
+<td>Credentials</td>
+<td>None</td>
+<td>Pre-configured credentials</td>
+</tr>
+<tr>
+<td><code>mime_type</code></td>
+<td>str</td>
+<td>None</td>
+<td>Document MIME type</td>
+</tr>
+<tr>
+<td><code>process_options</code></td>
+<td>Dict</td>
+<td>None</td>
+<td>Additional processing options</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
-<p>Document AI supports <code>PDF</code>, <code>TIFF</code>, <code>GIF</code>, <code>JPEG</code>, <code>PNG</code> with a maximum file size of 20MB or 2000 pages.</p>
 <ul>
 <li>Text extraction with layout preservation</li>
 <li>Table detection and extraction</li>
-<li>Form field detection</li>
-<li>Key-value pair extraction</li>
-<li>Support for multiple document formats</li>
+<li>Form field recognition</li>
+<li>Multiple processor support</li>
+<li>Native PDF parsing</li>
+<li>Custom processing options</li>
+<li>Caching support</li>
+<li>Support for pre-configured credentials</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Vision mode is supported for image formats</li>
+<li>Google Cloud credentials are required</li>
+<li>Rate limits and quotas apply based on your Google Cloud account</li>
+<li>Different processors may support different document types</li>
+<li>Native PDF parsing can improve performance for PDF documents</li>
 </ul>
 
 

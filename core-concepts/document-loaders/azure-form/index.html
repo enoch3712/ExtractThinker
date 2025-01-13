@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#azure-document-intelligence-document-loader" class="md-skip">
+        <a href="#azure-document-intelligence-loader" class="md-skip">
           Skip to content
         </a>
       
@@ -429,6 +429,8 @@
       
         
       
+        
+      
     
     
       
@@ -543,24 +545,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
       Supported Formats
@@ -576,12 +560,54 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -797,6 +823,27 @@
   
   <span class="md-ellipsis">
     Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docling
   </span>
   
 
@@ -1887,24 +1934,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
       Supported Formats
@@ -1920,12 +1949,54 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -1946,46 +2017,130 @@
                   
 
 
-<h1 id="azure-document-intelligence-document-loader">Azure Document Intelligence Document Loader<a class="headerlink" href="#azure-document-intelligence-document-loader" title="Permanent link">&para;</a></h1>
-<p>The Azure Document Intelligence loader (formerly known as Form Recognizer) uses Azure's Document Intelligence service to extract text, tables, and layout information from documents.</p>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<p>Install the required dependencies:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>azure-ai-formrecognizer
-</code></pre></div>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<ol>
-<li>An Azure subscription</li>
-<li>A Document Intelligence resource created in your Azure portal</li>
-<li>The endpoint URL and subscription key from your Azure resource</li>
-</ol>
+<h1 id="azure-document-intelligence-loader">Azure Document Intelligence Loader<a class="headerlink" href="#azure-document-intelligence-loader" title="Permanent link">&para;</a></h1>
+<p>The Azure Document Intelligence loader (formerly Form Recognizer) uses Azure's Document Intelligence service to extract text, tables, and structured information from documents.</p>
 <h2 id="supported-formats">Supported Formats<a class="headerlink" href="#supported-formats" title="Permanent link">&para;</a></h2>
 <p>Supports <code>PDF</code>, <code>JPEG/JPG</code>, <code>PNG</code>, <code>BMP</code>, <code>TIFF</code>, <code>HEIF</code>, <code>DOCX</code>, <code>XLSX</code>, <code>PPTX</code> and <code>HTML</code>.</p>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAzureForm</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Initialize the loader</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAzureForm</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">subscription_key</span><span class="o">=</span><span class="s2">&quot;your-subscription-key&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;your-endpoint-url&quot;</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Load document</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># Process extracted content</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="c1"># Access text content</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="c1"># Access tables (if any)</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">tables</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;tables&quot;</span><span class="p">]</span>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAzureForm</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize with Azure credentials</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAzureForm</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;your_endpoint&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">key</span><span class="o">=</span><span class="s2">&quot;your_api_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;prebuilt-document&quot;</span>  <span class="c1"># Use prebuilt document model</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Load document</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Process extracted content</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="c1"># Access text content</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="c1"># Access tables if available</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">tables</span> <span class="o">=</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tables&quot;</span><span class="p">,</span> <span class="p">[])</span>
 </code></pre></div>
+<h3 id="configuration-based-usage">Configuration-based Usage<a class="headerlink" href="#configuration-based-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAzureForm</span><span class="p">,</span> <span class="n">AzureConfig</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Create configuration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">AzureConfig</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;your_endpoint&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">key</span><span class="o">=</span><span class="s2">&quot;your_api_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;prebuilt-read&quot;</span><span class="p">,</span>     <span class="c1"># Use layout model for enhanced layout analysis</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">language</span><span class="o">=</span><span class="s2">&quot;en&quot;</span><span class="p">,</span>               <span class="c1"># Specify document language</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">pages</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>            <span class="c1"># Process specific pages</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mi">600</span>               <span class="c1"># Cache results for 10 minutes</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">)</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Initialize loader with configuration</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAzureForm</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Load and process document</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
+<p>The <code>AzureConfig</code> class supports the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Any</td>
+<td>None</td>
+<td>Initial content to process</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td>int</td>
+<td>300</td>
+<td>Cache time-to-live in seconds</td>
+</tr>
+<tr>
+<td><code>endpoint</code></td>
+<td>str</td>
+<td>None</td>
+<td>Azure endpoint URL</td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>str</td>
+<td>None</td>
+<td>Azure API key</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>str</td>
+<td>"prebuilt-document"</td>
+<td>Model ID to use</td>
+</tr>
+<tr>
+<td><code>language</code></td>
+<td>str</td>
+<td>None</td>
+<td>Document language code</td>
+</tr>
+<tr>
+<td><code>pages</code></td>
+<td>List[int]</td>
+<td>None</td>
+<td>Specific pages to process</td>
+</tr>
+<tr>
+<td><code>reading_order</code></td>
+<td>str</td>
+<td>"natural"</td>
+<td>Text reading order</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Text extraction with layout preservation</li>
 <li>Table detection and extraction</li>
-<li>Support for multiple document formats</li>
-<li>Automatic table content deduplication from text</li>
+<li>Form field recognition</li>
+<li>Multiple model support (document, layout, read)</li>
+<li>Language specification</li>
+<li>Page selection</li>
+<li>Reading order control</li>
+<li>Caching support</li>
+<li>Support for pre-configured clients</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Available models: "prebuilt-document", "prebuilt-layout", "prebuilt-read"</li>
+<li>Vision mode is supported for image formats</li>
+<li>Azure credentials are required</li>
+<li>Rate limits and quotas apply based on your Azure subscription</li>
 </ul>
 
 

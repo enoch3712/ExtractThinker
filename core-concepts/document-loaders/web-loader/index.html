@@ -429,6 +429,8 @@
       
         
       
+        
+      
     
     
       
@@ -669,9 +671,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#supported-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Formats
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
       Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
     </span>
   </a>
   
@@ -681,6 +725,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -770,6 +823,27 @@
   
   <span class="md-ellipsis">
     Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docling
   </span>
   
 
@@ -1860,9 +1934,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#supported-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Formats
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
       Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
     </span>
   </a>
   
@@ -1872,6 +1988,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -1893,28 +2018,124 @@
 
 
 <h1 id="web-document-loader">Web Document Loader<a class="headerlink" href="#web-document-loader" title="Permanent link">&para;</a></h1>
-<p>The Web loader in ExtractThinker uses BeautifulSoup to extract content from web pages and HTML documents.</p>
-<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
-<p>Here's how to use the Web loader:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">Extractor</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span> <span class="nn">extract_thinker.document_loader</span> <span class="kn">import</span> <span class="n">DocumentLoaderBeautifulSoup</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Initialize the loader</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderBeautifulSoup</span><span class="p">(</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">header_handling</span><span class="o">=</span><span class="s2">&quot;summarize&quot;</span>  <span class="c1"># Options: summarize, extract, ignore</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+<p>The Web loader extracts content from web pages using BeautifulSoup. It supports HTML parsing, content cleaning, and custom element handling.</p>
+<h2 id="supported-formats">Supported Formats<a class="headerlink" href="#supported-formats" title="Permanent link">&para;</a></h2>
+<ul>
+<li>html</li>
+<li>htm</li>
+<li>xhtml</li>
+<li>url</li>
+</ul>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderBeautifulSoup</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize with default settings</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderBeautifulSoup</span><span class="p">()</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Load document</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;https://example.com&quot;</span><span class="p">)</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Load content from URL</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">content</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load_content_from_file</span><span class="p">(</span><span class="s2">&quot;https://example.com&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Access extracted content</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">text</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Process extracted content</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="c1"># Access text content</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
 </code></pre></div>
+<h3 id="configuration-based-usage">Configuration-based Usage<a class="headerlink" href="#configuration-based-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderBeautifulSoup</span><span class="p">,</span> <span class="n">BeautifulSoupConfig</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Create configuration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">BeautifulSoupConfig</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">header_handling</span><span class="o">=</span><span class="s2">&quot;extract&quot;</span><span class="p">,</span>     <span class="c1"># Extract headers as separate content</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;lxml&quot;</span><span class="p">,</span>                <span class="c1"># Use lxml parser</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">remove_elements</span><span class="o">=</span><span class="p">[</span>             <span class="c1"># Elements to remove</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="s2">&quot;script&quot;</span><span class="p">,</span> <span class="s2">&quot;style&quot;</span><span class="p">,</span> <span class="s2">&quot;nav&quot;</span><span class="p">,</span> <span class="s2">&quot;footer&quot;</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">],</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">8192</span><span class="p">,</span>             <span class="c1"># Maximum tokens per page</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">request_timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>          <span class="c1"># Request timeout in seconds</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mi">600</span>               <span class="c1"># Cache results for 10 minutes</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">)</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="c1"># Initialize loader with configuration</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderBeautifulSoup</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="c1"># Load and process document</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;https://example.com&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
+<p>The <code>BeautifulSoupConfig</code> class supports the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Any</td>
+<td>None</td>
+<td>Initial content to process</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td>int</td>
+<td>300</td>
+<td>Cache time-to-live in seconds</td>
+</tr>
+<tr>
+<td><code>header_handling</code></td>
+<td>str</td>
+<td>"ignore"</td>
+<td>How to handle headers</td>
+</tr>
+<tr>
+<td><code>parser</code></td>
+<td>str</td>
+<td>"html.parser"</td>
+<td>HTML parser to use</td>
+</tr>
+<tr>
+<td><code>remove_elements</code></td>
+<td>List[str]</td>
+<td>None</td>
+<td>Elements to remove</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>int</td>
+<td>None</td>
+<td>Maximum tokens per page</td>
+</tr>
+<tr>
+<td><code>request_timeout</code></td>
+<td>int</td>
+<td>10</td>
+<td>Request timeout in seconds</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <ul>
-<li>HTML content extraction</li>
-<li>Header/footer handling</li>
-<li>Link extraction</li>
+<li>Web page content extraction</li>
+<li>Header handling options</li>
+<li>Custom element removal</li>
+<li>Multiple parser support</li>
+<li>Token limit control</li>
+<li>Request timeout control</li>
+<li>Caching support</li>
+<li>Stream-based loading</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Vision mode is not supported</li>
+<li>Requires internet connection for URLs</li>
+<li>Local HTML files are supported</li>
+<li>Respects robots.txt</li>
+<li>May require custom headers for some sites</li>
 </ul>
 
 

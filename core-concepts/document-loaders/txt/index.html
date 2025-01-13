@@ -14,7 +14,7 @@
         <link rel="prev" href="../markitdown/">
       
       
-        <link rel="next" href="../../llm-integration/">
+        <link rel="next" href="../docling/">
       
       
       <link rel="icon" href="../../../assets/favicon.png">
@@ -429,6 +429,8 @@
       
         
       
+        
+      
     
     
       
@@ -768,6 +770,39 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -779,10 +814,40 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docling
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -1884,12 +1949,54 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -1917,9 +2024,10 @@
 <li>txt</li>
 </ul>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderTxt</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize the loader</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize the loader with default settings</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderTxt</span><span class="p">()</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Load document</span>
@@ -1930,12 +2038,82 @@
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="c1"># Access text content</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
 </code></pre></div>
+<h3 id="configuration-based-usage">Configuration-based Usage<a class="headerlink" href="#configuration-based-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderTxt</span><span class="p">,</span> <span class="n">TxtConfig</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Create configuration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">TxtConfig</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span>              <span class="c1"># Specify text encoding</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">preserve_whitespace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>      <span class="c1"># Preserve original whitespace</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">split_paragraphs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>         <span class="c1"># Split text into paragraphs</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mi">600</span>                  <span class="c1"># Cache results for 10 minutes</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Initialize loader with configuration</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderTxt</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># Load and process document</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.txt&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
+<p>The <code>TxtConfig</code> class supports the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Any</td>
+<td>None</td>
+<td>Initial content to process</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td>int</td>
+<td>300</td>
+<td>Cache time-to-live in seconds</td>
+</tr>
+<tr>
+<td><code>encoding</code></td>
+<td>str</td>
+<td>'utf-8'</td>
+<td>Text encoding to use</td>
+</tr>
+<tr>
+<td><code>preserve_whitespace</code></td>
+<td>bool</td>
+<td>False</td>
+<td>Whether to preserve whitespace in text</td>
+</tr>
+<tr>
+<td><code>split_paragraphs</code></td>
+<td>bool</td>
+<td>False</td>
+<td>Whether to split text into paragraphs</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Simple text file reading</li>
-<li>UTF-8 encoding support</li>
+<li>Configurable text encoding</li>
+<li>Whitespace preservation control</li>
+<li>Paragraph splitting option</li>
 <li>Stream-based loading support</li>
+<li>Caching support</li>
 <li>No external dependencies required</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Vision mode is not supported for text files</li>
+<li>BytesIO streams are supported for in-memory processing</li>
+<li>Default encoding is UTF-8</li>
 </ul>
 
 

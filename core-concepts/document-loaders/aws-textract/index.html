@@ -429,6 +429,8 @@
       
         
       
+        
+      
     
     
       
@@ -564,24 +566,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
       Supported Formats
@@ -597,21 +581,36 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#response-structure" class="md-nav__link">
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Response Structure
+      Basic Usage
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#supported-formats_1" class="md-nav__link">
+  <a href="#configuration-options" class="md-nav__link">
     <span class="md-ellipsis">
-      Supported Formats
+      Configuration Options
     </span>
   </a>
   
@@ -621,6 +620,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -815,6 +823,27 @@
   
   <span class="md-ellipsis">
     Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docling
   </span>
   
 
@@ -1905,24 +1934,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#supported-formats" class="md-nav__link">
     <span class="md-ellipsis">
       Supported Formats
@@ -1938,21 +1949,36 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#response-structure" class="md-nav__link">
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Response Structure
+      Basic Usage
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-based-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration-based Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#supported-formats_1" class="md-nav__link">
+  <a href="#configuration-options" class="md-nav__link">
     <span class="md-ellipsis">
-      Supported Formats
+      Configuration Options
     </span>
   </a>
   
@@ -1962,6 +1988,15 @@
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes
     </span>
   </a>
   
@@ -1983,66 +2018,135 @@
 
 
 <h1 id="aws-textract-document-loader">AWS Textract Document Loader<a class="headerlink" href="#aws-textract-document-loader" title="Permanent link">&para;</a></h1>
-<blockquote>
-<p>AWS Textract provides advanced OCR and document analysis capabilities, extracting text, forms, and tables from documents.</p>
-</blockquote>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<p>Install the required dependencies:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>boto3
-</code></pre></div>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<ol>
-<li>An AWS account</li>
-<li>AWS credentials with access to Textract service</li>
-<li>AWS region where Textract is available</li>
-</ol>
+<p>The AWS Textract loader uses Amazon's Textract service to extract text, forms, and tables from documents. It supports both image files and PDFs.</p>
 <h2 id="supported-formats">Supported Formats<a class="headerlink" href="#supported-formats" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Images: jpeg/jpg, png, tiff</li>
-<li>Documents: pdf</li>
+<li>pdf</li>
+<li>jpeg</li>
+<li>png</li>
+<li>tiff</li>
 </ul>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAWSTextract</span>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAWSTextract</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Initialize with AWS credentials</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAWSTextract</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">aws_access_key_id</span><span class="o">=</span><span class="s2">&quot;your_access_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">aws_secret_access_key</span><span class="o">=</span><span class="s2">&quot;your_secret_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;your_region&quot;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Load document</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Process extracted content</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">:</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="c1"># Access text content</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">page</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="c1"># Access tables if extracted</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">tables</span> <span class="o">=</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tables&quot;</span><span class="p">,</span> <span class="p">[])</span>
+</code></pre></div>
+<h3 id="configuration-based-usage">Configuration-based Usage<a class="headerlink" href="#configuration-based-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">extract_thinker</span> <span class="kn">import</span> <span class="n">DocumentLoaderAWSTextract</span><span class="p">,</span> <span class="n">TextractConfig</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Initialize the loader with AWS credentials</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAWSTextract</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">aws_access_key_id</span><span class="o">=</span><span class="s2">&quot;your-access-key&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">aws_secret_access_key</span><span class="o">=</span><span class="s2">&quot;your-secret-key&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;your-region&quot;</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Load document content</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">result</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load_content_from_file</span><span class="p">(</span><span class="s2">&quot;document.pdf&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Create configuration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">TextractConfig</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">aws_access_key_id</span><span class="o">=</span><span class="s2">&quot;your_access_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">aws_secret_access_key</span><span class="o">=</span><span class="s2">&quot;your_secret_key&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;your_region&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">feature_types</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;TABLES&quot;</span><span class="p">,</span> <span class="s2">&quot;FORMS&quot;</span><span class="p">,</span> <span class="s2">&quot;SIGNATURES&quot;</span><span class="p">],</span>  <span class="c1"># Specify features to extract</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">cache_ttl</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span>                                    <span class="c1"># Cache results for 10 minutes</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span>                                     <span class="c1"># Number of retry attempts</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">)</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Initialize loader with configuration</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DocumentLoaderAWSTextract</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Load and process document</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">pages</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;path/to/your/document.pdf&quot;</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="response-structure">Response Structure<a class="headerlink" href="#response-structure" title="Permanent link">&para;</a></h2>
-<p>The loader returns a dictionary with the following structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">&quot;pages&quot;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="p">{</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>            <span class="s2">&quot;paragraphs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;text content...&quot;</span><span class="p">],</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>            <span class="s2">&quot;lines&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;line1&quot;</span><span class="p">,</span> <span class="s2">&quot;line2&quot;</span><span class="p">],</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>            <span class="s2">&quot;words&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;word1&quot;</span><span class="p">,</span> <span class="s2">&quot;word2&quot;</span><span class="p">]</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="p">}</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="p">],</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="s2">&quot;tables&quot;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="p">[[</span><span class="s2">&quot;cell1&quot;</span><span class="p">,</span> <span class="s2">&quot;cell2&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;cell3&quot;</span><span class="p">,</span> <span class="s2">&quot;cell4&quot;</span><span class="p">]]</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="p">],</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="s2">&quot;forms&quot;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="p">{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">}</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="p">],</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="c1"># Document layout information</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="p">}</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="p">}</span>
-</code></pre></div>
-<h2 id="supported-formats_1">Supported Formats<a class="headerlink" href="#supported-formats_1" title="Permanent link">&para;</a></h2>
-<p><code>PDF</code>, <code>JPEG</code>, <code>PNG</code></p>
+<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
+<p>The <code>TextractConfig</code> class supports the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Any</td>
+<td>None</td>
+<td>Initial content to process</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td>int</td>
+<td>300</td>
+<td>Cache time-to-live in seconds</td>
+</tr>
+<tr>
+<td><code>aws_access_key_id</code></td>
+<td>str</td>
+<td>None</td>
+<td>AWS access key ID</td>
+</tr>
+<tr>
+<td><code>aws_secret_access_key</code></td>
+<td>str</td>
+<td>None</td>
+<td>AWS secret access key</td>
+</tr>
+<tr>
+<td><code>region_name</code></td>
+<td>str</td>
+<td>None</td>
+<td>AWS region name</td>
+</tr>
+<tr>
+<td><code>textract_client</code></td>
+<td>boto3.client</td>
+<td>None</td>
+<td>Pre-configured Textract client</td>
+</tr>
+<tr>
+<td><code>feature_types</code></td>
+<td>List[str]</td>
+<td>[]</td>
+<td>Features to extract (TABLES, FORMS, LAYOUT, SIGNATURES)</td>
+</tr>
+<tr>
+<td><code>max_retries</code></td>
+<td>int</td>
+<td>3</td>
+<td>Maximum number of retry attempts</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Text extraction with layout preservation</li>
+<li>Text extraction from images and PDFs</li>
 <li>Table detection and extraction</li>
-<li>Support for multiple document formats</li>
-<li>Automatic retries on API failures </li>
+<li>Form field detection</li>
+<li>Layout analysis</li>
+<li>Signature detection</li>
+<li>Configurable feature selection</li>
+<li>Automatic retry on failure</li>
+<li>Caching support</li>
+<li>Support for pre-configured clients</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Raw text extraction is the default when no feature types are specified</li>
+<li>"QUERIES" feature type is not supported</li>
+<li>Vision mode is supported for image formats</li>
+<li>AWS credentials are required unless using a pre-configured client</li>
+<li>Rate limits and quotas apply based on your AWS account </li>
 </ul>
 
 
