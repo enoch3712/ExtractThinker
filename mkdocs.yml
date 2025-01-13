@@ -42,6 +42,7 @@ nav:
           - LLM Image: core-concepts/document-loaders/llm-image.md
           - Markitdown: core-concepts/document-loaders/markitdown.md
           - Text: core-concepts/document-loaders/txt.md
+          - Docling: core-concepts/document-loaders/docling.md
           - Adobe PDF Services: '#'
           - ABBYY FineReader: '#'
           - PaddleOCR: '#'
@@ -97,7 +98,7 @@ extra:
       link: https://github.com/enoch3712/ExtractThinker
       name: Extract Thinker on GitHub
 
-copyright: Copyright © 2024 Julio Almeida
+copyright: Copyright © 2025 Julio Almeida
 
 markdown_extensions:
   - attr_list
