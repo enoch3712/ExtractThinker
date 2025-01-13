@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "extract_thinker"
-version = "0.0.37"
+version = "0.1.0"
 description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
