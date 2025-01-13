@@ -1,11 +1,82 @@
 from io import BytesIO
 from typing import Any, Dict, List, Union, Optional
+from dataclasses import dataclass, field
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
 
-# Import your DocumentLoader base
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+
+
+@dataclass
+class DoclingConfig:
+    """Configuration for Docling document loader.
+    
+    Args:
+        content: Initial content (optional)
+        cache_ttl: Cache time-to-live in seconds (default: 300)
+        format_options: Dictionary mapping input formats to their FormatOption configurations
+            Example:
+            {
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
+                InputFormat.IMAGE: ImageFormatOption(pipeline_options=image_options),
+                ...
+            }
+        ocr_enabled: Whether to enable OCR processing (default: True)
+        table_structure_enabled: Whether to enable table structure detection (default: True)
+        tesseract_cmd: Path to tesseract executable (default: None)
+        force_full_page_ocr: Whether to force OCR on entire pages (default: False)
+        do_cell_matching: Whether to enable cell matching in tables (default: True)
+    """
+    # Optional parameters
+    content: Optional[Any] = None
+    cache_ttl: int = 300
+    format_options: Optional[Dict[str, Any]] = None
+    ocr_enabled: bool = True
+    table_structure_enabled: bool = True
+    tesseract_cmd: Optional[str] = None
+    force_full_page_ocr: bool = False
+    do_cell_matching: bool = True
+
+    def __post_init__(self):
+        """Initialize format options based on configuration."""
+        if self.format_options is None:
+            from docling.datamodel.pipeline_options import (
+                PdfPipelineOptions,
+                TesseractCliOcrOptions,
+                TableStructureOptions,
+            )
+            from docling.datamodel.base_models import InputFormat
+            from docling.document_converter import PdfFormatOption
+
+            # Set up OCR options
+            ocr_options = None
+            if self.ocr_enabled:
+                ocr_options = TesseractCliOcrOptions(
+                    force_full_page_ocr=self.force_full_page_ocr,
+                    tesseract_cmd=self.tesseract_cmd
+                )
+
+            # Set up table options
+            table_options = None
+            if self.table_structure_enabled:
+                table_options = TableStructureOptions(
+                    do_cell_matching=self.do_cell_matching
+                )
+
+            # Create pipeline options
+            pipeline_options = PdfPipelineOptions(
+                do_table_structure=self.table_structure_enabled,
+                do_ocr=self.ocr_enabled,
+                ocr_options=ocr_options,
+                table_structure_options=table_options
+            )
+
+            # Create format options
+            self.format_options = {
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+
 
 class DocumentLoaderDocling(CachedDocumentLoader):
     """
@@ -41,31 +112,34 @@ class DocumentLoaderDocling(CachedDocumentLoader):
 
     def __init__(
         self,
-        content: Any = None,
+        content_or_config: Union[Any, DoclingConfig] = None,
         cache_ttl: int = 300,
         format_options: Optional[Dict[str, Any]] = None,
     ):
         """Initialize loader.
         
         Args:
-            content: Initial content
-            cache_ttl: Cache time-to-live in seconds
+            content_or_config: Either a DoclingConfig object or initial content
+            cache_ttl: Cache time-to-live in seconds (only used if content_or_config is not DoclingConfig)
             format_options: Dictionary mapping input formats to their FormatOption configurations
-                Example:
-                {
-                    InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
-                    InputFormat.IMAGE: ImageFormatOption(pipeline_options=image_options),
-                    ...
-                }
+                (only used if content_or_config is not DoclingConfig)
         """
-        from docling.datamodel.base_models import InputFormat
-        from docling.document_converter import FormatOption
-
         # Check dependencies before any initialization
         self._check_dependencies()
         
-        super().__init__(content, cache_ttl)
-        self.format_options = format_options
+        # Handle both config-based and old-style initialization
+        if isinstance(content_or_config, DoclingConfig):
+            self.config = content_or_config
+        else:
+            # Create config from individual parameters
+            self.config = DoclingConfig(
+                content=content_or_config,
+                cache_ttl=cache_ttl,
+                format_options=format_options
+            )
+        
+        super().__init__(self.config.content, self.config.cache_ttl)
+        self.format_options = self.config.format_options
         self.converter = self._init_docling_converter()
 
     @staticmethod

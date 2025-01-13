@@ -1,7 +1,7 @@
 import io
 from io import BytesIO
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional, ClassVar, Set
 from PIL import Image
 import threading
 from queue import Queue
@@ -10,6 +10,78 @@ from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import is_pdf_stream
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TesseractConfig:
+    """Configuration for Tesseract OCR loader.
+    
+    Args:
+        tesseract_cmd: Path to tesseract executable
+        isContainer: Whether running in a container
+        content: Initial content (optional)
+        cache_ttl: Cache time-to-live in seconds (default: 300)
+        lang: Language(s) for OCR (default: 'eng')
+        psm: Page segmentation mode (default: 3)
+        oem: OCR Engine mode (default: 3)
+        config_params: Additional Tesseract configuration parameters
+        timeout: Timeout in seconds for OCR operations (default: 0 - no timeout)
+    """
+    # Required parameters
+    tesseract_cmd: str
+    
+    # Optional parameters
+    isContainer: bool = False
+    content: Optional[Any] = None
+    cache_ttl: int = 300
+    lang: Union[str, List[str]] = "eng"
+    psm: int = 3  # 3 is 'Fully automatic page segmentation, but no OSD'
+    oem: int = 3  # 3 is 'Default, based on what is available'
+    config_params: Dict[str, Any] = field(default_factory=dict)
+    timeout: int = 0  # 0 means no timeout
+    
+    # Class level constants
+    VALID_PSM_VALUES: ClassVar[Set[int]] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}
+    VALID_OEM_VALUES: ClassVar[Set[int]] = {0, 1, 2, 3}
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        # Handle language list
+        if isinstance(self.lang, list):
+            self.lang = "+".join(self.lang)
+        
+        # Validate PSM
+        if self.psm not in self.VALID_PSM_VALUES:
+            raise ValueError(
+                f"Invalid PSM value: {self.psm}. "
+                f"Valid values are: {sorted(self.VALID_PSM_VALUES)}"
+            )
+        
+        # Validate OEM
+        if self.oem not in self.VALID_OEM_VALUES:
+            raise ValueError(
+                f"Invalid OEM value: {self.oem}. "
+                f"Valid values are: {sorted(self.VALID_OEM_VALUES)}"
+            )
+        
+        # Validate timeout
+        if self.timeout < 0:
+            raise ValueError("Timeout must be non-negative")
+
+    @property
+    def tesseract_config(self) -> List[str]:
+        """Get Tesseract configuration parameters."""
+        config = [
+            f"--psm {self.psm}",
+            f"--oem {self.oem}"
+        ]
+        
+        # Add custom configuration parameters
+        for key, value in self.config_params.items():
+            config.append(f"-c {key}={value}")
+        
+        return config
 
 
 class DocumentLoaderTesseract(CachedDocumentLoader):
@@ -17,22 +89,59 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     
     SUPPORTED_FORMATS = ["jpeg", "png", "bmp", "tiff", "pdf", "jpg"]
     
-    def __init__(self, tesseract_cmd, isContainer=False, content=None, cache_ttl=300):
+    def __init__(self, tesseract_cmd_or_config: Union[str, TesseractConfig], 
+                 isContainer: bool = False, 
+                 content: Optional[Any] = None, 
+                 cache_ttl: int = 300,
+                 lang: str = "eng",
+                 psm: int = 3,
+                 oem: int = 3,
+                 config_params: Optional[Dict[str, Any]] = None,
+                 timeout: int = 0):
         """Initialize loader.
         
         Args:
-            tesseract_cmd: Path to tesseract executable
-            isContainer: Whether running in a container
-            content: Initial content
-            cache_ttl: Cache time-to-live in seconds
+            tesseract_cmd_or_config: Either a TesseractConfig object or path to tesseract executable
+            isContainer: Whether running in a container (only used if tesseract_cmd_or_config is a string)
+            content: Initial content (only used if tesseract_cmd_or_config is a string)
+            cache_ttl: Cache time-to-live in seconds (only used if tesseract_cmd_or_config is a string)
+            lang: Language(s) for OCR (only used if tesseract_cmd_or_config is a string)
+            psm: Page segmentation mode (only used if tesseract_cmd_or_config is a string)
+            oem: OCR Engine mode (only used if tesseract_cmd_or_config is a string)
+            config_params: Additional Tesseract configuration parameters (only used if tesseract_cmd_or_config is a string)
+            timeout: Timeout in seconds for OCR operations (only used if tesseract_cmd_or_config is a string)
         """
         # Check required dependencies
         self._check_dependencies()
-        super().__init__(content, cache_ttl)
-        self.tesseract_cmd = tesseract_cmd
-        if isContainer:
+        
+        # Handle both config-based and old-style initialization
+        if isinstance(tesseract_cmd_or_config, TesseractConfig):
+            self.config = tesseract_cmd_or_config
+        else:
+            # Create config from individual parameters
+            self.config = TesseractConfig(
+                tesseract_cmd=tesseract_cmd_or_config,
+                isContainer=isContainer,
+                content=content,
+                cache_ttl=cache_ttl,
+                lang=lang,
+                psm=psm,
+                oem=oem,
+                config_params=config_params or {},
+                timeout=timeout
+            )
+        
+        super().__init__(self.config.content, self.config.cache_ttl)
+        
+        # Set up Tesseract command
+        self.tesseract_cmd = self.config.tesseract_cmd
+        if self.config.isContainer:
             self.tesseract_cmd = os.environ.get("TESSERACT_PATH", "tesseract")
-        self._get_pytesseract().pytesseract.tesseract_cmd = self.tesseract_cmd
+        
+        # Initialize Tesseract
+        pytesseract = self._get_pytesseract()
+        pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
+        
         if not os.path.isfile(self.tesseract_cmd):
             raise ValueError(f"Tesseract not found at {self.tesseract_cmd}")
 
@@ -118,7 +227,13 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
     def _process_single_image(self, image: Image.Image, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """Process a single image file."""
         pytesseract = self._get_pytesseract()
-        text = str(pytesseract.image_to_string(image))
+        text = str(pytesseract.image_to_string(
+            image,
+            lang=self.config.lang,
+            config=" ".join(self.config.tesseract_config),
+            timeout=self.config.timeout if self.config.timeout > 0 else None
+        ))
+        
         page_dict = {
             "content": text
         }
@@ -191,7 +306,12 @@ class DocumentLoaderTesseract(CachedDocumentLoader):
                 page_num, image_bytes = item
                 image_stream = BytesIO(image_bytes)
                 image = Image.open(image_stream)
-                text = str(pytesseract.image_to_string(image))
+                text = str(pytesseract.image_to_string(
+                    image,
+                    lang=self.config.lang,
+                    config=" ".join(self.config.tesseract_config),
+                    timeout=self.config.timeout if self.config.timeout > 0 else None
+                ))
                 output_queue.put((page_num, text, image_bytes))
             except Exception as e:
                 output_queue.put((page_num, str(e), None))

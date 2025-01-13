@@ -1,56 +1,87 @@
 # Tesseract Document Loader
 
-> Tesseract is an open-source OCR engine that can extract text from images and scanned PDFs. ExtractThinker's Tesseract Document Loader provides a simple interface to use Tesseract for document processing.
+The Tesseract loader uses the Tesseract OCR engine to extract text from images. It supports multiple languages and provides various OCR optimization options.
 
-## Installation
+## Supported Formats
 
-1. First, install Tesseract OCR on your system:
+- jpeg/jpg
+- png
+- tiff
+- bmp
+- gif
 
-   **Ubuntu/Debian:**
-   ```bash
-   sudo apt-get install tesseract-ocr
-   ```
+## Usage
 
-   **macOS:**
-   ```bash
-   brew install tesseract
-   ```
-
-   **Windows:**
-   Download and install from [GitHub Tesseract releases](https://github.com/UB-Mannheim/tesseract/wiki)
-
-2. Install the Python package:
-   ```bash
-   pip install pytesseract Pillow
-   ```
-
-## Basic Usage
-
-Here's a simple example of using the Tesseract Document Loader:
+### Basic Usage
 
 ```python
 from extract_thinker import DocumentLoaderTesseract
 
-# Initialize the loader with Tesseract path
-tesseract_path = os.getenv("TESSERACT_PATH")
-loader = DocumentLoaderTesseract(tesseract_path)
+# Initialize with default settings
+loader = DocumentLoaderTesseract()
 
-# Load from file
+# Load document
 pages = loader.load("path/to/your/image.png")
 
-# Process the extracted text
+# Process extracted content
 for page in pages:
+    # Access text content
     text = page["content"]
-    print(f"Extracted text: {text}")
 ```
 
-Supports `PDF`, `JPEG/JPG`, `PNG`, `BMP`, `TIFF`
+### Configuration-based Usage
 
-## Best Practices
+```python
+from extract_thinker import DocumentLoaderTesseract, TesseractConfig
 
-- Ensure good image quality for optimal results
-- Use appropriate language packs for non-English documents
-- Consider image preprocessing for better accuracy
-- Set appropriate page segmentation mode based on document layout
+# Create configuration
+config = TesseractConfig(
+    lang="eng+fra",                # Use English and French
+    psm=6,                         # Assume uniform block of text
+    oem=3,                         # Default LSTM OCR Engine Mode
+    config_params={                # Additional Tesseract parameters
+        "tessedit_char_whitelist": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    },
+    timeout=30,                    # OCR timeout in seconds
+    cache_ttl=600                  # Cache results for 10 minutes
+)
 
-For more examples and advanced usage, check out the [Local Stack](../../../examples/local-processing) in the repository.
+# Initialize loader with configuration
+loader = DocumentLoaderTesseract(config)
+
+# Load and process document
+pages = loader.load("path/to/your/image.png")
+```
+
+## Configuration Options
+
+The `TesseractConfig` class supports the following options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `content` | Any | None | Initial content to process |
+| `cache_ttl` | int | 300 | Cache time-to-live in seconds |
+| `lang` | str | "eng" | Language(s) for OCR |
+| `psm` | int | 3 | Page segmentation mode |
+| `oem` | int | 3 | OCR Engine Mode |
+| `config_params` | Dict | None | Additional Tesseract parameters |
+| `timeout` | int | 0 | OCR timeout in seconds |
+
+## Features
+
+- Text extraction from images
+- Multi-language support
+- Configurable page segmentation
+- Multiple OCR engine modes
+- Custom Tesseract parameters
+- Timeout control
+- Caching support
+- No cloud service required
+
+## Notes
+
+- Vision mode is always enabled
+- Requires Tesseract installation
+- Performance depends on image quality
+- Local processing with no external API calls
+- Language data files must be installed separately
