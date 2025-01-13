@@ -24,6 +24,23 @@ A Document Loader can return content in two formats:
 
 ## Core Features
 
+### Configuration Support
+All Document Loaders support configuration-based initialization through dedicated config classes:
+
+```python
+from extract_thinker import DocumentLoaderAWSTextract, TextractConfig
+
+# Create configuration
+config = TextractConfig(
+    aws_access_key_id="your_key",
+    feature_types=["TABLES", "FORMS"],
+    cache_ttl=600
+)
+
+# Initialize with configuration
+loader = DocumentLoaderAWSTextract(config)
+```
+
 ### Caching
 All Document Loaders include built-in caching capabilities through the `CachedDocumentLoader` base class. This provides automatic caching of document processing results with a configurable TTL:
 
@@ -64,6 +81,20 @@ with open("document.pdf", "rb") as f:
     content = loader.load(stream)
 ```
 
+### Vision Mode Support
+Many loaders support vision mode for handling images and visual content:
+
+```python
+# Enable vision mode
+loader.set_vision_mode(True)
+
+# Load document with images
+pages = loader.load("document.pdf")
+for page in pages:
+    text = page["content"]
+    image = page.get("image")  # Available in vision mode
+```
+
 ### Image Conversion
 The base loader includes utilities for converting documents to images:
 
@@ -83,31 +114,39 @@ All Document Loaders implement these core methods:
 - `load_content_from_file(file_path)`: Process files from disk
 - `load_content_from_stream(stream)`: Process BytesIO streams
 - `load_content_list(source)`: Load and split into pages
+- `set_vision_mode(enabled)`: Enable/disable vision mode
 
 ## Best Practices
 
-- Use appropriate cache TTL based on your use case
+- Use configuration classes for complex initialization
+- Set appropriate cache TTL based on your use case
 - Check file type support before processing
 - Consider memory usage when processing large files
+- Enable vision mode only when needed
 - Handle both file paths and streams for flexibility
 
 ## Available Loaders
 
 ExtractThinker provides several specialized Document Loaders:
 
-### Current Loaders
-- [Tesseract](tesseract.md): Open-source OCR engine
-- [Azure Form](azure-form.md): Azure's Document Intelligence
-- [AWS Textract](aws-textract.md): AWS document processing
-- [Google Document AI](google-document-ai.md): Google's document understanding
-- [PDF Plumber](pdf-plumber.md): PDF text extraction
-- [PyPDF](pypdf.md): Basic PDF processing
-- [Spreadsheet](spreadsheet.md): Excel and CSV handling
-- [Web Loader](web-loader.md): Web page extraction
+### Cloud Services
+- [AWS Textract](aws-textract.md): AWS document processing with support for text, tables, forms, and layout analysis
+- [Azure Form](azure-form.md): Azure's Document Intelligence with multiple model support
+- [Google Document AI](google-document-ai.md): Google's document understanding with native PDF parsing
+
+### Local Processing
+- [PDF Plumber](pdf-plumber.md): Advanced PDF text and table extraction
+- [PyPDF](pypdf.md): Basic PDF processing with password protection support
+- [Tesseract](tesseract.md): Open-source OCR with multiple language support
 - [Doc2txt](doc2txt.md): Microsoft Word document processing
-- [Text File](txt.md): Plain text file handling
+- [Spreadsheet](spreadsheet.md): Excel and CSV handling
+- [Text File](txt.md): Plain text file handling with encoding support
+- [Markitdown](markitdown.md): Multi-format document processing
+- [Docling](docling.md): Advanced document layout and table analysis
+
+### Special Purpose
+- [Web Loader](web-loader.md): Web page extraction with custom element handling
 - [LLM Image](llm-image.md): Vision-enabled LLM processing
-- [Markitdown](markitdown.md): Document linguistics analysis
 
 ### Coming Soon
 - `Adobe PDF Services` <span class="coming-soon">Coming Soon</span>: Adobe's PDF extraction and analysis
