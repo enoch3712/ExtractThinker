@@ -1,4 +1,4 @@
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Optional
 from io import BytesIO
 from urllib.parse import urlparse
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
@@ -6,24 +6,95 @@ from extract_thinker.utils import get_file_extension, num_tokens_from_string
 from operator import attrgetter
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
+from dataclasses import dataclass, field
+
+
+@dataclass
+class BeautifulSoupConfig:
+    """Configuration for BeautifulSoup HTML loader.
+    
+    Args:
+        header_handling: How to handle headers - "skip", "summarize", or "include"
+        content: Initial content (optional)
+        cache_ttl: Cache time-to-live in seconds (default: 300)
+        max_tokens: Maximum number of tokens per page (default: 1000)
+        request_timeout: Timeout for HTTP requests in seconds (default: 10)
+        parser: HTML parser to use (default: 'html.parser')
+        remove_elements: List of HTML elements to remove (default: ['script', 'style', 'nav', 'footer'])
+    """
+    # Required parameters
+    header_handling: str = "skip"
+    
+    # Optional parameters
+    content: Optional[Any] = None
+    cache_ttl: int = 300
+    max_tokens: int = 1000
+    request_timeout: int = 10
+    parser: str = "html.parser"
+    remove_elements: List[str] = field(default_factory=lambda: ['script', 'style', 'nav', 'footer'])
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        valid_header_handling = {"skip", "summarize", "include"}
+        if self.header_handling not in valid_header_handling:
+            raise ValueError(
+                f"Invalid header_handling value: {self.header_handling}. "
+                f"Valid values are: {sorted(valid_header_handling)}"
+            )
+        
+        if self.max_tokens < 1:
+            raise ValueError("max_tokens must be positive")
+            
+        if self.request_timeout < 1:
+            raise ValueError("request_timeout must be positive")
+
 
 class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
     """Loader that uses BeautifulSoup4 to load HTML content."""
     
     SUPPORTED_FORMATS = ['html', 'htm']
     
-    def __init__(self, header_handling: str = "skip", content: Any = None, cache_ttl: int = 300):
+    def __init__(
+        self,
+        header_handling_or_config: Union[str, BeautifulSoupConfig] = "skip",
+        content: Optional[Any] = None,
+        cache_ttl: int = 300,
+        max_tokens: int = 1000,
+        request_timeout: int = 10,
+        parser: str = "html.parser",
+        remove_elements: Optional[List[str]] = None
+    ):
         """Initialize loader.
         
         Args:
-            header_handling: How to handle headers - "skip", "summarize", or "include"
-            content: Initial content
-            cache_ttl: Cache time-to-live in seconds
+            header_handling_or_config: Either a BeautifulSoupConfig object or header handling strategy
+            content: Initial content (only used if header_handling_or_config is a string)
+            cache_ttl: Cache time-to-live in seconds (only used if header_handling_or_config is a string)
+            max_tokens: Maximum number of tokens per page (only used if header_handling_or_config is a string)
+            request_timeout: Timeout for HTTP requests in seconds (only used if header_handling_or_config is a string)
+            parser: HTML parser to use (only used if header_handling_or_config is a string)
+            remove_elements: List of HTML elements to remove (only used if header_handling_or_config is a string)
         """
         # Check required dependencies
         self._check_dependencies()
-        super().__init__(content, cache_ttl)
-        self.header_handling = header_handling
+        
+        # Handle both config-based and old-style initialization
+        if isinstance(header_handling_or_config, BeautifulSoupConfig):
+            self.config = header_handling_or_config
+        else:
+            # Create config from individual parameters
+            self.config = BeautifulSoupConfig(
+                header_handling=header_handling_or_config,
+                content=content,
+                cache_ttl=cache_ttl,
+                max_tokens=max_tokens,
+                request_timeout=request_timeout,
+                parser=parser,
+                remove_elements=remove_elements or ['script', 'style', 'nav', 'footer']
+            )
+        
+        super().__init__(self.config.content, self.config.cache_ttl)
+        self.header_handling = self.config.header_handling
 
     @staticmethod
     def _check_dependencies():
@@ -102,10 +173,10 @@ class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
     def _process_html(self, html: str) -> Union[str, Dict[str, Any]]:
         """Process HTML content based on header handling strategy."""
         BeautifulSoup = self._get_bs4()
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, self.config.parser)
         
-        # Remove script and style elements
-        for element in soup(['script', 'style', 'nav', 'footer']):
+        # Remove specified elements
+        for element in soup(self.config.remove_elements):
             element.decompose()
             
         # Handle headers based on strategy
@@ -123,17 +194,11 @@ class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
         text = ' '.join(chunk for chunk in chunks if chunk)
         
         # Apply token limit
-        text = self._truncate_to_token_limit(text, max_tokens=1000)
+        text = self._truncate_to_token_limit(text, max_tokens=self.config.max_tokens)
         
         if self.header_handling == "summarize":
             return {
                 "content": text,
-                # "headers": headers,
-                # "metadata": {
-                #     "title": soup.title.string if soup.title else None,
-                #     "url": soup.find('meta', {'property': 'og:url'}).get('content') if soup.find('meta', {'property': 'og:url'}) else None,
-                #     "description": soup.find('meta', {'name': 'description'}).get('content') if soup.find('meta', {'name': 'description'}) else None
-                # }
             }
         
         return text

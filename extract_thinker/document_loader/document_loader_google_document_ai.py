@@ -1,5 +1,5 @@
 import mimetypes
-from typing import Optional, Any, Dict, List, Union, Sequence
+from typing import Optional, Any, Dict, List, Union, Sequence, ClassVar
 from io import BytesIO
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 import json
@@ -8,15 +8,49 @@ from cachetools.keys import hashkey
 from cachetools import cachedmethod
 from operator import attrgetter
 import warnings
+from dataclasses import dataclass, field
 
-class Config:
-    def __init__(
-        self,
-        enable_native_pdf_parsing: bool = False,
-        page_range: Optional[List[int]] = None
-    ):
-        self.enable_native_pdf_parsing = enable_native_pdf_parsing
-        self.page_range = page_range
+
+@dataclass
+class GoogleDocAIConfig:
+    """Configuration for Google Document AI loader.
+    
+    Args:
+        project_id: Google Cloud project ID
+        location: Google Cloud location (e.g., 'us' or 'eu')
+        processor_id: Document AI processor ID
+        credentials: Path to service account JSON file or JSON string
+        processor_version: Processor version (default: 'rc')
+        content: Initial content (optional)
+        cache_ttl: Cache time-to-live in seconds (default: 300)
+        enable_native_pdf_parsing: Whether to use native PDF parsing (default: False)
+        page_range: Optional list of page numbers to process
+    """
+    # Required parameters
+    project_id: str
+    location: str
+    processor_id: str
+    credentials: str
+    
+    # Optional parameters
+    processor_version: str = "rc"
+    content: Optional[Any] = None
+    cache_ttl: int = 300
+    enable_native_pdf_parsing: bool = False
+    page_range: Optional[List[int]] = None
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.project_id:
+            raise ValueError("project_id cannot be empty")
+        if not self.location:
+            raise ValueError("location cannot be empty")
+        if not self.processor_id:
+            raise ValueError("processor_id cannot be empty")
+        if not self.credentials:
+            raise ValueError("credentials cannot be empty")
+        if self.page_range and not all(isinstance(p, int) and p > 0 for p in self.page_range):
+            raise ValueError("page_range must be a list of positive integers")
 
 
 class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
@@ -31,29 +65,61 @@ class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
 
     def __init__(
         self,
-        project_id: str,
-        location: str,
-        processor_id: str,
-        credentials: str,
+        project_id: Union[str, GoogleDocAIConfig],
+        location: Optional[str] = None,
+        processor_id: Optional[str] = None,
+        credentials: Optional[str] = None,
         processor_version: str = "rc",
+        content: Optional[Any] = None,
+        cache_ttl: int = 300,
+        enable_native_pdf_parsing: bool = False,
+        page_range: Optional[List[int]] = None
     ):
         """Initialize the Google Document AI loader.
         
         Args:
-            project_id: Google Cloud project ID
-            location: Google Cloud location (e.g., 'us' or 'eu')
-            processor_id: Document AI processor ID
-            credentials: Path to service account JSON file or JSON string
-            processor_version: Processor version (default: 'rc')
+            project_id: Either a GoogleDocAIConfig object or Google Cloud project ID
+            location: Google Cloud location (only used if project_id is a string)
+            processor_id: Document AI processor ID (only used if project_id is a string)
+            credentials: Path to service account JSON file or JSON string (only used if project_id is a string)
+            processor_version: Processor version (default: 'rc', only used if project_id is a string)
+            content: Initial content (optional, only used if project_id is a string)
+            cache_ttl: Cache time-to-live in seconds (default: 300, only used if project_id is a string)
+            enable_native_pdf_parsing: Whether to use native PDF parsing (only used if project_id is a string)
+            page_range: Optional list of page numbers to process (only used if project_id is a string)
         """
         # Check required dependencies
         self._check_dependencies()
-        super().__init__()
-        self.project_id = project_id
-        self.location = location
-        self.processor_id = processor_id
-        self.processor_version = processor_version
-        self.credentials = self._parse_credentials(credentials)
+        
+        # Handle both config-based and old-style initialization
+        if isinstance(project_id, GoogleDocAIConfig):
+            self.config = project_id
+        else:
+            # Create config from individual parameters
+            self.config = GoogleDocAIConfig(
+                project_id=project_id,
+                location=location if location else "",
+                processor_id=processor_id if processor_id else "",
+                credentials=credentials if credentials else "",
+                processor_version=processor_version,
+                content=content,
+                cache_ttl=cache_ttl,
+                enable_native_pdf_parsing=enable_native_pdf_parsing,
+                page_range=page_range
+            )
+        
+        super().__init__(self.config.content, self.config.cache_ttl)
+        
+        # Set instance attributes from config
+        self.project_id = self.config.project_id
+        self.location = self.config.location
+        self.processor_id = self.config.processor_id
+        self.processor_version = self.config.processor_version
+        self.enable_native_pdf_parsing = self.config.enable_native_pdf_parsing
+        self.page_range = self.config.page_range
+        
+        # Initialize credentials and client
+        self.credentials = self._parse_credentials(self.config.credentials)
         self.client = self._create_client()
 
     @staticmethod

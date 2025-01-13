@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pytest
-from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling
+from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling, DoclingConfig
 from tests.test_document_loader_base import BaseDocumentLoaderTest
 from io import BytesIO
 
@@ -36,23 +36,33 @@ class TestDocumentLoaderDocling(BaseDocumentLoaderTest):
         )
 
     @pytest.fixture
-    def loader(self, default_pipeline_options):
+    def docling_config(self, default_pipeline_options):
+        """Default Docling configuration for testing"""
         format_options = {
             InputFormat.PDF: PdfFormatOption(pipeline_options=default_pipeline_options)
         }
-        return DocumentLoaderDocling(format_options=format_options)
+        return DoclingConfig(
+            format_options=format_options,
+            ocr_enabled=True,
+            table_structure_enabled=True,
+            tesseract_cmd="/opt/homebrew/bin/tesseract",
+            force_full_page_ocr=True,
+            do_cell_matching=True
+        )
+
+    @pytest.fixture
+    def loader(self, docling_config):
+        return DocumentLoaderDocling(docling_config)
 
     @pytest.fixture
     def loader_no_ocr(self):
         """Loader instance with OCR disabled"""
-        pipeline_options = PdfPipelineOptions(
-            do_table_structure=True,
-            do_ocr=False
+        return DocumentLoaderDocling(
+            DoclingConfig(
+                ocr_enabled=False,
+                table_structure_enabled=True
+            )
         )
-        format_options = {
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-        }
-        return DocumentLoaderDocling(format_options=format_options)
 
     @pytest.fixture
     def test_file_path(self):
@@ -113,3 +123,37 @@ class TestDocumentLoaderDocling(BaseDocumentLoaderTest):
         assert isinstance(pages, list)
         assert len(pages) > 0
         assert "content" in pages[0]
+
+    def test_config_features(self, test_file_path):
+        """Test various configuration features"""
+        # Test with custom OCR settings
+        config = DoclingConfig(
+            ocr_enabled=True,
+            tesseract_cmd="/opt/homebrew/bin/tesseract",
+            force_full_page_ocr=True
+        )
+        loader = DocumentLoaderDocling(config)
+        pages = loader.load(test_file_path)
+        assert len(pages) > 0
+
+        # Test with custom table settings
+        config = DoclingConfig(
+            table_structure_enabled=True,
+            do_cell_matching=False
+        )
+        loader = DocumentLoaderDocling(config)
+        pages = loader.load(test_file_path)
+        assert len(pages) > 0
+
+    def test_simple_initialization(self, test_file_path):
+        """Test simple initialization and basic functionality without any special configurations"""
+        # Simple initialization like before
+        loader = DocumentLoaderDocling()
+        
+        # Basic load and verify
+        pages = loader.load(test_file_path)
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        assert "content" in pages[0]
+        assert isinstance(pages[0]["content"], str)
+        assert len(pages[0]["content"]) > 0  # Should have extracted some text
