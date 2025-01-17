@@ -142,3 +142,23 @@ class TestDocumentLoaderMarkItDown(BaseDocumentLoaderTest):
             assert len(pages) > 0
             assert isinstance(pages[0]["content"], str)
             
+
+def test_page_separator_splitting():
+    """
+    Test that multiple pages are correctly separated when loading a multi-page PDF.
+    Uses bulk.pdf which should contain 3 distinct pages.
+    """
+    # Get path to bulk.pdf test file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    bulk_pdf_path = os.path.join(current_dir, 'files', 'Regional_GDP_per_capita_2018_2.pdf')
+
+            # Test without MIME type detection
+    config = MarkItDownConfig(
+        mime_type_detection=False,
+        default_extension='pdf'
+    )
+    loader = DocumentLoaderMarkItDown(config)
+    pages = loader.load(bulk_pdf_path)
+
+    # Verify we get exactly 3 pages
+    assert len(pages) == 2, f"Expected 2 pages, got {len(pages)}"
