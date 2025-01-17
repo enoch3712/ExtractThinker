@@ -10,6 +10,7 @@ from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from .document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
 from .document_loader.document_loader_markitdown import DocumentLoaderMarkItDown
+from .document_loader.document_loader_docling import DocumentLoaderDocling
 from .models.classification import Classification
 from .models.classification_response import ClassificationResponse
 from .process import Process
@@ -18,6 +19,7 @@ from .image_splitter import ImageSplitter
 from .text_splitter import TextSplitter
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
+from .models.completion_strategy import CompletionStrategy
 from .batch_job import BatchJob
 from .document_loader.document_loader_txt import DocumentLoaderTxt
 from .document_loader.document_loader_doc2txt import DocumentLoaderDoc2txt
@@ -47,6 +49,8 @@ __all__ = [
     'DocumentLoaderDocumentAI',
 	'DocumentLoaderMarkItDown',
     'Classification',
+    'CompletionStrategy',
+    'DocumentLoaderDocling',
     'ClassificationResponse',
     'Process',
     'ClassificationStrategy',

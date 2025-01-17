@@ -3,6 +3,7 @@ from typing import IO, Any, Dict, List, Optional, Union
 from extract_thinker.image_splitter import ImageSplitter
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.models.classification_strategy import ClassificationStrategy
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
@@ -232,7 +233,9 @@ class Process:
 
         return self
 
-    def extract(self, vision: bool = False) -> List[Any]:
+    def extract(self, 
+                vision: bool = False,
+                completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN) -> List[Any]:
         """Extract information from the document groups."""
         if self.doc_groups is None:
             raise ValueError("Document groups have not been initialized")
@@ -240,7 +243,7 @@ class Process:
         async def _extract(doc_group):
             # Find matching classification and extractor
             classificationStr = doc_group.classification
-            extractor = None
+            extractor: Optional[Extractor] = None
             contract = None
 
             for classification in self.split_classifications:
@@ -271,7 +274,12 @@ class Process:
             # Set flag to skip loading since content is already processed
             extractor.set_skip_loading(True)
             try:
-                result = await extractor.extract_async(group_pages, contract, vision=vision)
+                result = await extractor.extract_async(
+                    group_pages, 
+                    contract, 
+                    vision,
+                    completion_strategy
+                )
             finally:
                 # Reset flag after extraction
                 extractor.set_skip_loading(False)
