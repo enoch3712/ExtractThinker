@@ -367,3 +367,26 @@ def test_concatenation_handler():
         result_1.pages[0].content, 
         result_2.pages[0].content
     ), "Page contents are not semantically similar enough (threshold: 90%)"
+
+def test_llm_timeout():
+    # Arrange
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+    
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderPyPdf())
+    
+    # Create LLM with very short timeout
+    llm = LLM("gpt-4o-mini")
+    llm.set_timeout(1)  # Set timeout to 1ms (extremely short to force timeout)
+    extractor.load_llm(llm)
+    
+    # Act & Assert
+    with pytest.raises(Exception) as exc_info:
+        extractor.extract(test_file_path, InvoiceContract)
+    
+    # Reset timeout to normal value
+    llm.set_timeout(3000)
+    
+    # Verify normal operation works after reset
+    result = extractor.extract(test_file_path, InvoiceContract)
+    assert result is not None
