@@ -12,19 +12,39 @@ from extract_thinker.document_loader.cached_document_loader import CachedDocumen
 class DoclingConfig:
     """Configuration for Docling document loader.
     
+    This class supports both simple and complex configurations:
+    
+    Simple usage:
+        config = DoclingConfig()  # Uses default settings
+        
+    Complex usage:
+        config = DoclingConfig(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=PdfPipelineOptions(
+                        do_table_structure=True,
+                        do_ocr=True,
+                        table_structure_options=TableStructureOptions(
+                            do_cell_matching=True
+                        )
+                    )
+                )
+            }
+        )
+    
     Args:
         content: Initial content (optional)
         cache_ttl: Cache time-to-live in seconds (default: 300)
-        format_options: Dictionary mapping input formats to their FormatOption configurations
-            Example:
+        format_options: Dictionary mapping input formats to their FormatOption configurations.
+            If None, default options will be created based on other parameters.
+            For complex scenarios, you can provide your own format options:
             {
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
                 InputFormat.IMAGE: ImageFormatOption(pipeline_options=image_options),
                 ...
             }
-        ocr_enabled: Whether to enable OCR processing (default: True)
+        ocr_enabled: Whether to enable OCR processing (default: False)
         table_structure_enabled: Whether to enable table structure detection (default: True)
-        tesseract_cmd: Path to tesseract executable (default: None)
         force_full_page_ocr: Whether to force OCR on entire pages (default: False)
         do_cell_matching: Whether to enable cell matching in tables (default: True)
     """
@@ -32,50 +52,43 @@ class DoclingConfig:
     content: Optional[Any] = None
     cache_ttl: int = 300
     format_options: Optional[Dict[str, Any]] = None
-    ocr_enabled: bool = True
+    ocr_enabled: bool = False  # OCR disabled by default
     table_structure_enabled: bool = True
-    tesseract_cmd: Optional[str] = None
     force_full_page_ocr: bool = False
     do_cell_matching: bool = True
 
     def __post_init__(self):
-        """Initialize format options based on configuration."""
-        if self.format_options is None:
-            from docling.datamodel.pipeline_options import (
-                PdfPipelineOptions,
-                TesseractCliOcrOptions,
-                TableStructureOptions,
-            )
-            from docling.datamodel.base_models import InputFormat
-            from docling.document_converter import PdfFormatOption
+        """Initialize format options if not provided."""
+        # If format_options are provided, use them as is (complex configuration)
+        if self.format_options is not None:
+            return
 
-            # Set up OCR options
-            ocr_options = None
-            if self.ocr_enabled:
-                ocr_options = TesseractCliOcrOptions(
-                    force_full_page_ocr=self.force_full_page_ocr,
-                    tesseract_cmd=self.tesseract_cmd
-                )
+        # Simple configuration: create default format options based on parameters
+        from docling.datamodel.pipeline_options import (
+            PdfPipelineOptions,
+            TableStructureOptions,
+        )
+        from docling.datamodel.base_models import InputFormat
+        from docling.document_converter import PdfFormatOption
 
-            # Set up table options
-            table_options = None
-            if self.table_structure_enabled:
-                table_options = TableStructureOptions(
-                    do_cell_matching=self.do_cell_matching
-                )
-
-            # Create pipeline options
-            pipeline_options = PdfPipelineOptions(
-                do_table_structure=self.table_structure_enabled,
-                do_ocr=self.ocr_enabled,
-                ocr_options=ocr_options,
-                table_structure_options=table_options
+        # Set up table options
+        table_options = None
+        if self.table_structure_enabled:
+            table_options = TableStructureOptions(
+                do_cell_matching=self.do_cell_matching
             )
 
-            # Create format options
-            self.format_options = {
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
+        # Create pipeline options
+        pipeline_options = PdfPipelineOptions(
+            do_table_structure=self.table_structure_enabled,
+            do_ocr=self.ocr_enabled,
+            table_structure_options=table_options
+        )
+
+        # Create format options
+        self.format_options = {
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
 
 
 class DocumentLoaderDocling(CachedDocumentLoader):
