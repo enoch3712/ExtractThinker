@@ -243,8 +243,9 @@ class Extractor:
         source: Union[str, IO, list],
         response_model: type[BaseModel],
         vision: bool = False,
+        completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
-        return await asyncio.to_thread(self.extract, source, response_model, vision)
+        return await asyncio.to_thread(self.extract, source, response_model, vision, "", completion_strategy)
     
     def extract_with_strategy(
         self, 
@@ -265,13 +266,17 @@ class Extractor:
         Returns:
             Parsed response matching response_model
         """
-        # Get appropriate document loader
-        document_loader = self.get_document_loader(source)
-        if document_loader is None:
-            raise ValueError("No suitable document loader found for the input.")
+        # If source is already a list, use it directly
+        if isinstance(source, list):
+            content = source
+        else:
+            # Get appropriate document loader
+            document_loader = self.get_document_loader(source)
+            if document_loader is None:
+                raise ValueError("No suitable document loader found for the input.")
 
-        # Load content using list method
-        content = document_loader.load(source)
+            # Load content using list method
+            content = document_loader.load(source)
 
         # Handle based on strategy
         if completion_strategy == CompletionStrategy.PAGINATE:
