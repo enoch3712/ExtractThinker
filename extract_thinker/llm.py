@@ -5,6 +5,7 @@ from litellm import Router
 
 class LLM:
     TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
+    TIMEOUT = 3000  # Timeout in milliseconds
 
     def __init__(self,
                  model: str,
@@ -28,6 +29,7 @@ class LLM:
                 messages=messages,
                 response_model=response_model,
                 temperature=self.TEMPERATURE,
+                timeout=self.TIMEOUT,
             )
         else:
             response = self.client.chat.completions.create(
@@ -36,7 +38,8 @@ class LLM:
                 temperature=self.TEMPERATURE,
                 response_model=response_model,
                 max_retries=1,
-                max_tokens=self.token_limit
+                max_tokens=self.token_limit,
+                timeout=self.TIMEOUT,
             )
 
         return response
@@ -55,3 +58,7 @@ class LLM:
                 max_tokens=self.token_limit
             )
         return raw_response.choices[0].message.content
+
+    def set_timeout(self, timeout_ms: int) -> None:
+        """Set the timeout value for LLM requests in milliseconds."""
+        self.TIMEOUT = timeout_ms
