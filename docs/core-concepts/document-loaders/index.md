@@ -95,7 +95,15 @@ for page in pages:
     image = page.get("image")  # Available in vision mode
 ```
 
+### Image Resizing
+
+```python
+loader = DocumentLoader()
+loader.set_max_image_size(2000)
+```
+
 ### Image Conversion
+
 The base loader includes utilities for converting documents to images:
 
 ```python
@@ -111,10 +119,8 @@ images = loader.convert_to_images(
 All Document Loaders implement these core methods:
 
 - `load(source)`: Main entry point for loading documents
-- `load_content_from_file(file_path)`: Process files from disk
-- `load_content_from_stream(stream)`: Process BytesIO streams
-- `load_content_list(source)`: Load and split into pages
 - `set_vision_mode(enabled)`: Enable/disable vision mode
+- `set_max_image_size(size)`: Set the maximum image size
 
 ## Best Practices
 
@@ -159,5 +165,3 @@ ExtractThinker provides several specialized Document Loaders:
 - `Mindee` <span class="coming-soon">Coming Soon</span>: Specialized document parsing APIs
 - `Rossum` <span class="coming-soon">Coming Soon</span>: AI-powered document understanding
 - `Kofax` <span class="coming-soon">Coming Soon</span>: Intelligent document processing
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository.
