@@ -21,6 +21,11 @@ class DocumentLoader(ABC):
         self.file_path = None
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
         self.vision_mode = False
+        self.max_image_size = None  # Changed to None by default
+
+    def set_max_image_size(self, size: int) -> None:
+        """Set the maximum image size."""
+        self.max_image_size = size
 
     def set_vision_mode(self, enabled: bool = True) -> None:
         """Enable or disable vision mode processing."""
@@ -113,6 +118,27 @@ class DocumentLoader(ABC):
         # If it's not an image, proceed with the conversion
         return self._convert_pdf_to_images(pdfium.PdfDocument(file_stream), scale)
 
+    def _resize_if_needed(self, image: Image.Image) -> Image.Image:
+        """Resize image if it exceeds maximum dimensions while maintaining aspect ratio.
+        
+        Args:
+            image: PIL Image object
+            
+        Returns:
+            PIL Image object (resized if necessary)
+        """
+        if self.max_image_size is None:  # Skip resizing if max_image_size not set
+            return image
+            
+        width, height = image.size
+        if width > self.max_image_size or height > self.max_image_size:
+            # Calculate scaling factor to fit within max dimensions
+            scale = self.max_image_size / max(width, height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        return image
+
     def _convert_pdf_to_images(self, pdf_file, scale: float) -> Dict[int, bytes]:
         # Get all pages at once
         renderer = pdf_file.render(
@@ -124,6 +150,8 @@ class DocumentLoader(ABC):
         # Convert all images to bytes and store in dictionary
         final_images = {}
         for page_index, image in enumerate(renderer):
+            # Resize image if needed
+            image = self._resize_if_needed(image)
             image_byte_array = BytesIO()
             image.save(image_byte_array, format="jpeg", optimize=True)
             final_images[page_index] = image_byte_array.getvalue()

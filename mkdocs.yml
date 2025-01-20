@@ -79,9 +79,9 @@ nav:
           - Paginate: core-concepts/completion-strategies/paginate.md
   - "Examples":
       - Resume Processing: examples/resume-processing.md
-      - Azure Document Intelligence: examples/azure-document-intelligence.md
-      - AWS Textract: examples/aws-textract.md
-      - Google Document AI: examples/google-document-ai.md
+      - Azure Stack: examples/azure-stack.md
+      - AWS Stack: examples/aws-stack.md
+      - Google Stack: examples/google-stack.md
       - Local Processing: examples/local-processing.md
       - Groq Processing: examples/groq-processing.md
 
