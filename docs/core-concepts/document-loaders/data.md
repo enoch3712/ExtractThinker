@@ -64,29 +64,3 @@ The `DataLoaderConfig` class supports the following options:
 | `content` | Any | None | Initial content to process |
 | `cache_ttl` | int | 300 | Cache time-to-live in seconds |
 | `supports_vision` | bool | True | Whether vision mode is supported |
-
-## Features
-
-- Handles pre-processed data in standard format
-- Supports raw text input
-- File and stream processing
-- Vision mode support
-- Automatic format validation
-- Caching support
-- Flexible input handling
-
-## Input Types
-
-The loader can handle:
-- Pre-formatted list of dictionaries
-- Raw text strings
-- File paths
-- IO streams
-
-## Notes
-
-- Vision mode is configurable
-- Validates input format automatically
-- Caches results based on content hash
-- Supports both file and stream-based loading
-- Preserves image data when in vision mode
