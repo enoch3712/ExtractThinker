@@ -153,6 +153,8 @@ ExtractThinker provides several specialized Document Loaders:
 ### Special Purpose
 - [Web Loader](web-loader.md): Web page extraction with custom element handling
 - [LLM Image](llm-image.md): Vision-enabled LLM processing
+- [Data](data.md): Pre-processed data handling with standardized format support
+
 
 ### Coming Soon
 - `Adobe PDF Services` <span class="coming-soon">Coming Soon</span>: Adobe's PDF extraction and analysis
