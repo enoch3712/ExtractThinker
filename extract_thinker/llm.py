@@ -1,4 +1,3 @@
-import json
 from typing import List, Dict, Any
 import instructor
 import litellm
@@ -23,7 +22,7 @@ class LLM:
         # contents = map(lambda message: message['content'], messages)
         # all_contents = ' '.join(contents)
         # max_tokens = num_tokens_from_string(all_contents)
-        
+
         if self.router:
             response = self.router.completion(
                 model=self.model,
