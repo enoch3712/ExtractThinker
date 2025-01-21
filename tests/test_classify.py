@@ -177,7 +177,7 @@ def test_with_contract():
 
 
 def test_with_image():
-    """Test classification using both consensus and higher order strategies with a threshold."""
+    """Test classification using image comparison for both driver license and invoice."""
     process = setup_process_with_gpt4_extractor()
 
     COMMON_CLASSIFICATIONS[0].contract = DriverLicense
@@ -186,6 +186,7 @@ def test_with_image():
     COMMON_CLASSIFICATIONS[0].image = DRIVER_LICENSE_FILE_PATH
     COMMON_CLASSIFICATIONS[1].image = INVOICE_FILE_PATH
 
+    # Test driver license classification
     result = process.classify(DRIVER_LICENSE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
 
     assert result is not None
@@ -194,6 +195,16 @@ def test_with_image():
     assert result.classification is not None
     assert result.classification.name == COMMON_CLASSIFICATIONS[0].name
     assert result.classification.description == "This is a driver license"
+
+    # Test invoice classification
+    result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
+
+    assert result is not None
+    assert isinstance(result, ClassificationResponse)
+    assert result.name == COMMON_CLASSIFICATIONS[1].name
+    assert result.classification is not None
+    assert result.classification.name == COMMON_CLASSIFICATIONS[1].name
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_tree():
@@ -328,7 +339,3 @@ def test_mom_classification_layers():
     assert final_result.classification.name == "Credit Note"
     assert final_result.classification.description == "A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice"
     assert final_result.classification.contract == CreditNoteContract
-
-
-if __name__ == "__main__":
-    test_with_image()

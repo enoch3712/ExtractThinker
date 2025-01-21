@@ -324,74 +324,234 @@ class Extractor:
         
         return message_content
 
-    def _classify(self, content: Any, classifications: List[Classification]):
+    def _classify(
+        self,
+        content: Any,
+        classifications: List[Classification]
+    ) -> ClassificationResponse:
         """
         Internal method to perform classification using LLM.
+        
+        Args:
+            content: The content to classify
+            classifications: List of Classification objects
+            
+        Returns:
+            ClassificationResponse object with the chosen classification name and confidence
         """
+        # If there's no vision or no images, keep the existing single-prompt approach
+        if not self.is_classify_image:
+            return self._classify_text_only(content, classifications)
+
+        # Otherwise, we do an "ask one-by-one" approach for images.
+        best_classification = None
+        best_confidence = 0
+
+        # Validate and extract image from content
+        if isinstance(content, list):
+            # Handle list of pages
+            images = []
+            for item in content:
+                if isinstance(item, dict) and 'image' in item:
+                    images.append(item['image'])
+            if not images:
+                raise ValueError("No images found in content for vision-based classification.")
+            # For now, just use the first image
+            image_data = images[0]
+        elif isinstance(content, dict) and 'image' in content:
+            # Handle single page/document
+            image_data = content['image']
+        else:
+            raise ValueError("No valid image data found in content for vision-based classification.")
+        
+        # Convert image data to base64
+        doc_image_b64 = base64.b64encode(image_data).decode('utf-8') if isinstance(image_data, bytes) else image_data
+
+        for classification in classifications:
+            # If classification has no reference image, or user wants no comparison:
+            if not classification.image:
+                # We can skip or treat it as not matched
+                # Or we can do some minimal prompt that just says "Does doc match classification X?"
+                # Here, let's do a minimal prompt with doc image alone.
+                partial_result = self._classify_one_image_no_ref(doc_image_b64, classification)
+            else:
+                # Compare doc image vs classification reference image
+                partial_result = self._classify_one_image_with_ref(
+                    doc_image_b64, 
+                    classification.image, 
+                    classification
+                )
+
+            # If partial_result is a ClassificationResponse, check confidence
+            if partial_result and partial_result.confidence is not None:
+                if partial_result.confidence > best_confidence:
+                    best_confidence = partial_result.confidence
+                    best_classification = partial_result
+
+        if best_classification is None:
+            # fallback
+            best_classification = ClassificationResponse(
+                name="Unknown",
+                confidence=1
+            )
+
+        return best_classification
+
+    def _classify_one_image_with_ref(
+        self, 
+        doc_image_b64: str, 
+        ref_image: Union[str, bytes], 
+        classification: Classification
+    ) -> ClassificationResponse:
+        """
+        Classify doc_image_b64 as either matching or not matching
+        the classification's reference image. Return name/confidence.
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(f"Model {self.llm.model} does not support vision images.")
+
+        # Convert classification.reference image to base64 if needed:
+        if isinstance(ref_image, str) and os.path.isfile(ref_image):
+            ref_image_b64 = encode_image(ref_image)
+        elif isinstance(ref_image, bytes):
+            ref_image_b64 = base64.b64encode(ref_image).decode("utf-8")
+        else:
+            ref_image_b64 = encode_image(ref_image)
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a server API that compares two images and decides if the doc image matches "
+                    "this classification. Return a valid JSON"
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"## Classification to check: {classification.name}\n"
+                            f"Description: {classification.description}\n"
+                            "## Reference Image (the classification example)"
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{ref_image_b64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "## Document Image to classify",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{doc_image_b64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "Return JSON => {\"name\": \"<classification>\", \"confidence\": <1..10>}"
+                    }
+                ]
+            }
+        ]
+
+        result = self.llm.request(messages, ClassificationResponseInternal)
+        return ClassificationResponse(
+            name=classification.name,
+            confidence=result.confidence,
+            classification=classification
+        )
+
+    def _classify_one_image_no_ref(
+        self,
+        doc_image_b64: str,
+        classification: Classification
+    ) -> ClassificationResponse:
+        """
+        Minimal fallback if user didn't provide a reference image
+        but we still want a numeric confidence if doc_image matches the classification.
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(f"Model {self.llm.model} does not support vision images.")
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a server API that sees if this single image matches classification. "
+                    "Output JSON => {\"name\": <classification>, \"confidence\": <1..10>} "
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"## Classification to check: {classification.name}\n"
+                            f"Description: {classification.description}\n"
+                            "Return JSON => {\"name\": <classification>, \"confidence\": <1..10>}"
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{doc_image_b64}"
+                        }
+                    }
+                ]
+            }
+        ]
+
+        result = self.llm.request(messages, ClassificationResponseInternal)
+        return ClassificationResponse(
+            name=classification.name,
+            confidence=result.confidence,
+            classification=classification
+        )
+
+    def _classify_text_only(
+        self,
+        content: Any,
+        classifications: List[Classification]
+    ) -> ClassificationResponse:
+        """
+        Original approach for text-based classification:
+          a single prompt that enumerates all possible classes and tries to parse JSON.
+        """
+        # Build classification info with structure
+        classification_info = "\n".join(
+            f"{c.name}: {c.description} \n{add_classification_structure(c)}"
+            for c in classifications
+        )
+
         messages = [
             {
                 "role": "system",
                 "content": "You are a server API that receives document information "
                 "and returns specific fields in JSON format.\n",
             },
+            {
+                "role": "user",
+                "content": (
+                    f"##Content\n{content}\n##Classifications\n"
+                    f"#if contract present, each field present increase confidence level\n"
+                    f"{classification_info}\n"
+                    "#Don't use contract structure, just to help on the ClassificationResponse\n"
+                    "Output Example: \n"
+                    "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                    "\n\n##ClassificationResponse JSON Output\n"
+                )
+            }
         ]
 
-        # Common classification structure for both image and non-image cases
-        classification_info = "\n".join(
-            f"{c.name}: {c.description} \n{add_classification_structure(c)}"
-            for c in classifications
-        )
-
-        if self.is_classify_image:
-            input_data = (
-                f"##Take the last image, and compare to the several images provided. Then classify according to the classification attached to the image\n"
-                f"##Classifications\n{classification_info}\n"
-                + "Output Example: \n"
-                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
-                + "\n\n##ClassificationResponse JSON Output\n"
-            )
-            
-            # Add input data and all classifications in a single message
-            messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": input_data,
-                    },
-                    *self._build_classification_message_content(classifications)
-                ],
-            })
-
-            # Add the content image to be classified
-            if isinstance(content, dict) and 'image' in content:
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "##classify",
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/png;base64," + content['image']
-                            },
-                        },
-                    ],
-                })
-
-            messages.append({"role": "user", "content": "##JSON OUTPUT"})
-        else:
-            input_data = (
-                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
-                f"{classification_info}\n"
-                + "#Don't use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
-                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
-                + "\n\n##ClassificationResponse JSON Output\n"
-            )
-            messages.append({"role": "user", "content": input_data})
-
+        # Get the internal response first
         response = self.llm.request(messages, ClassificationResponseInternal)
         
         # Find and set the matching classification object
