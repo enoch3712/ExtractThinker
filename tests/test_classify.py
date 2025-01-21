@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import asyncio
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
@@ -97,6 +99,9 @@ def test_classify_feature():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_async():
@@ -107,6 +112,9 @@ def test_classify_async():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_consensus():
@@ -117,7 +125,10 @@ def test_classify_consensus():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
- 
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
+
 
 def test_classify_higher_order():
     """Test classification using higher order strategy."""
@@ -130,6 +141,9 @@ def test_classify_higher_order():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_both():
@@ -140,6 +154,9 @@ def test_classify_both():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_contract():
@@ -154,6 +171,9 @@ def test_with_contract():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_image():
@@ -171,6 +191,9 @@ def test_with_image():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == COMMON_CLASSIFICATIONS[0].name
+    assert result.classification is not None
+    assert result.classification.name == COMMON_CLASSIFICATIONS[0].name
+    assert result.classification.description == "This is a driver license"
 
 
 def test_with_tree():
@@ -234,6 +257,11 @@ def test_with_tree():
 
     assert result is not None
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
+    assert result.classification.contract == InvoiceContract
+
 
 def test_mom_classification_layers():
     """Test Mixture of Models (MoM) classification with multiple layers."""
@@ -296,3 +324,11 @@ def test_mom_classification_layers():
     assert final_result is not None, "MoM should produce a result"
     assert final_result.name == "Credit Note", "Final classification should be Credit Note"
     assert final_result.confidence >= 8, "Final confidence should be high"
+    assert final_result.classification is not None
+    assert final_result.classification.name == "Credit Note"
+    assert final_result.classification.description == "A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice"
+    assert final_result.classification.contract == CreditNoteContract
+
+
+if __name__ == "__main__":
+    test_with_image()

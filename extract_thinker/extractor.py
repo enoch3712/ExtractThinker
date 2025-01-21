@@ -9,7 +9,7 @@ from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
 from extract_thinker.models.classification import Classification
-from extract_thinker.models.classification_response import ClassificationResponse
+from extract_thinker.models.classification_response import ClassificationResponse, ClassificationResponseInternal
 from extract_thinker.llm import LLM
 import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
@@ -289,18 +289,44 @@ class Extractor:
         else:
             raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
 
-    def _classify(
-        self, content: Any, classifications: List[Classification]
-    ):
+    def _build_classification_message_content(self, classifications: List[Classification]) -> List[Dict[str, str]]:
         """
-        Internal method to perform classification using LLM.
+        Build message content for all classifications with their images.
         
         Args:
-            content: The content to classify
-            classifications: List of Classification objects
+            classifications: List of Classification objects containing name, description and image
             
         Returns:
-            ClassificationResponse object
+            List of content items (text and images) for the message
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
+            )
+        
+        message_content = []
+        for classification in classifications:
+            if not classification.image:
+                raise ValueError(f"Image required for classification '{classification.name}' but not found.")
+            
+            message_content.extend([
+                {
+                    "type": "text",
+                    "text": f"{classification.name}: {classification.description}",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64," + encode_image(classification.image)
+                    },
+                },
+            ])
+        
+        return message_content
+
+    def _classify(self, content: Any, classifications: List[Classification]):
+        """
+        Internal method to perform classification using LLM.
         """
         messages = [
             {
@@ -325,7 +351,7 @@ class Extractor:
                 + "\n\n##ClassificationResponse JSON Output\n"
             )
             
-            # Add input data as first message
+            # Add input data and all classifications in a single message
             messages.append({
                 "role": "user",
                 "content": [
@@ -333,36 +359,9 @@ class Extractor:
                         "type": "text",
                         "text": input_data,
                     },
+                    *self._build_classification_message_content(classifications)
                 ],
             })
-
-            # Add classification images if present
-            for classification in classifications:
-                if classification.image:
-                    if not litellm.supports_vision(model=self.llm.model):
-                        raise ValueError(
-                            f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-                        )
-
-                    messages.append({
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"{classification.name}: {classification.description}",
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": "data:image/png;base64," + encode_image(classification.image)
-                                },
-                            },
-                        ],
-                    })
-                else:
-                    raise ValueError(
-                        f"Image required for classification '{classification.name}' but not found."
-                    )
 
             # Add the content image to be classified
             if isinstance(content, dict) and 'image' in content:
@@ -381,6 +380,8 @@ class Extractor:
                         },
                     ],
                 })
+
+            messages.append({"role": "user", "content": "##JSON OUTPUT"})
         else:
             input_data = (
                 f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
@@ -391,7 +392,21 @@ class Extractor:
             )
             messages.append({"role": "user", "content": input_data})
 
-        return self.llm.request(messages, ClassificationResponse)
+        response = self.llm.request(messages, ClassificationResponseInternal)
+        
+        # Find and set the matching classification object
+        matched_classification = None
+        for classification in classifications:
+            # Make sure we're doing an exact string match
+            if classification.name.strip().lower() == response.name.strip().lower():
+                matched_classification = classification
+                break
+                
+        return ClassificationResponse(
+            name=matched_classification.name,
+            confidence=response.confidence,
+            classification=matched_classification
+        )
 
     def classify(
         self,

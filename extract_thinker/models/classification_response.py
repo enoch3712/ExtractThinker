@@ -1,6 +1,10 @@
+from typing import Optional
 from pydantic import BaseModel, Field
+from extract_thinker.models.classification import Classification
 
-
-class ClassificationResponse(BaseModel):
+class ClassificationResponseInternal(BaseModel):
+    confidence: int = Field(description="From 1 to 10. 10 being the highest confidence. Always integer", ge=1, le=10)
     name: str
-    confidence: int = Field("From 1 to 10. 10 being the highest confidence. Always integer", ge=1, le=10)
+
+class ClassificationResponse(ClassificationResponseInternal):
+    classification: Optional[Classification]

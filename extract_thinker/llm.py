@@ -1,7 +1,10 @@
+import json
 from typing import List, Dict, Any
 import instructor
 import litellm
 from litellm import Router
+
+litellm.set_verbose = True
 
 class LLM:
     TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
@@ -22,6 +25,9 @@ class LLM:
         # contents = map(lambda message: message['content'], messages)
         # all_contents = ' '.join(contents)
         # max_tokens = num_tokens_from_string(all_contents)
+
+        # give me a json string of the messages
+        messages_json = json.dumps(messages, indent=4)
 
         if self.router:
             response = self.router.completion(
