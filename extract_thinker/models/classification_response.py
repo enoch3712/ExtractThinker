@@ -7,4 +7,4 @@ class ClassificationResponseInternal(BaseModel):
     name: str
 
 class ClassificationResponse(ClassificationResponseInternal):
-    classification: Optional[Classification]
+    classification: Classification

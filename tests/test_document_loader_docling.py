@@ -1,6 +1,4 @@
-import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pytest
 from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling, DoclingConfig
 from tests.test_document_loader_base import BaseDocumentLoaderTest
