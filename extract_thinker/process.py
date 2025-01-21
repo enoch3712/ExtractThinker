@@ -133,7 +133,7 @@ class Process:
         classification_tree: ClassificationTree, 
         threshold: float,
         image: bool
-    ) -> Optional[Classification]:
+    ) -> Optional[ClassificationResponse]:
         if not isinstance(threshold, (int, float)) or threshold < 1 or threshold > 10:
             raise ValueError("Threshold must be a number between 1 and 10")
 
@@ -148,20 +148,20 @@ class Process:
             classifications = [node.classification for node in current_nodes]
 
             # Classify among the current level's classifications
-            classification = await self._classify_async(
+            classification_response = await self._classify_async(
                 extractor=self.extractor_groups[0][0],
                 file=file, 
                 classifications=classifications, 
                 image=image
             )
 
-            if classification.confidence < threshold:
+            if classification_response.confidence < threshold:
                 raise ValueError(
-                    f"Classification confidence {classification.confidence} "
-                    f"for '{classification.name}' is below the threshold of {threshold}."
+                    f"Classification confidence {classification_response.confidence} "
+                    f"for '{classification_response.name}' is below the threshold of {threshold}."
                 )
 
-            best_classification: ClassificationResponse = classification
+            best_classification = classification_response
 
             matching_node = next(
                 (
@@ -173,7 +173,7 @@ class Process:
 
             if matching_node is None:
                 raise ValueError(
-                    f"No matching node found for classification '{classification.name}'."
+                    f"No matching node found for classification '{classification_response.name}'."
                 )
 
             if matching_node.children:
@@ -181,7 +181,7 @@ class Process:
             else:
                 break
 
-        return best_classification
+        return best_classification if best_classification else None
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)

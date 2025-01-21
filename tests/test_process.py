@@ -69,7 +69,7 @@ def test_eager_splitting_strategy():
         .split(classifications, strategy=SplittingStrategy.EAGER)\
         .extract()
     
-        # Assert
+    # Assert
     assert result is not None
     for item in result:
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
