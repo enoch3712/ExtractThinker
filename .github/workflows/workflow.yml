@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
-        python-version: '3.9'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
@@ -26,33 +26,10 @@ jobs:
     - name: Run critical tests
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      run: poetry run pytest tests/critical/ -v
+      run: poetry add pypdf && poetry run pytest tests/critical/ -v
 
     - name: Build package
       run: poetry build
-
-    - name: Check version change
-      id: check_version
-      run: |
-        git fetch origin main
-        # Extract version from current pyproject.toml
-        current_version=$(poetry version -s)
-        # Extract version from main branch pyproject.toml
-        main_version=$(git show origin/main:pyproject.toml | grep "^version = " | cut -d'"' -f2)
-        if [ "$current_version" != "$main_version" ]; then
-          echo "Version changed from $main_version to $current_version"
-          echo "version_changed=true" >> $GITHUB_OUTPUT
-        else
-          echo "Version unchanged"
-          echo "version_changed=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Publish to PyPI
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check_version.outputs.version_changed == 'true'
-      uses: pypa/gh-action-pypi-publish@v1.4.2
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
 
   test-python-versions:
     name: Test Python ${{ matrix.python-version }}

@@ -1,58 +1,178 @@
+import mimetypes
+from typing import Optional, Any, Dict, List, Union, Sequence, ClassVar
+from io import BytesIO
+from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 import json
 import os
-import re
-import mimetypes
-from typing import Optional, Any, List, Union, Sequence
-from pydantic import BaseModel, Field
-from io import BytesIO
-from operator import attrgetter
-from cachetools import cachedmethod
 from cachetools.keys import hashkey
-from google.api_core.client_options import ClientOptions
-from google.cloud import documentai_v1 as documentai
-from google.oauth2 import service_account
+from cachetools import cachedmethod
+from operator import attrgetter
+import warnings
+from dataclasses import dataclass, field
 
-from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 
-class Config(BaseModel):
-    enable_native_pdf_parsing: bool = Field(
-        default=False, description="Enable native PDF parsing"
-    )
-    page_range: Optional[List[int]] = Field(
-        default=None, description="The page range to process"
-    )
+@dataclass
+class GoogleDocAIConfig:
+    """Configuration for Google Document AI loader.
+    
+    Args:
+        project_id: Google Cloud project ID
+        location: Google Cloud location (e.g., 'us' or 'eu')
+        processor_id: Document AI processor ID
+        credentials: Path to service account JSON file or JSON string
+        processor_version: Processor version (default: 'rc')
+        content: Initial content (optional)
+        cache_ttl: Cache time-to-live in seconds (default: 300)
+        enable_native_pdf_parsing: Whether to use native PDF parsing (default: False)
+        page_range: Optional list of page numbers to process
+    """
+    # Required parameters
+    project_id: str
+    location: str
+    processor_id: str
+    credentials: str
+    
+    # Optional parameters
+    processor_version: str = "rc"
+    content: Optional[Any] = None
+    cache_ttl: int = 300
+    enable_native_pdf_parsing: bool = False
+    page_range: Optional[List[int]] = None
 
-class DocumentLoaderDocumentAI(CachedDocumentLoader):
-    PROCESSOR_NAME_PATTERN = r"projects\/[0-9]+\/locations\/[a-z\-0-9]+\/processors\/[a-z0-9]+"
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.project_id:
+            raise ValueError("project_id cannot be empty")
+        if not self.location:
+            raise ValueError("location cannot be empty")
+        if not self.processor_id:
+            raise ValueError("processor_id cannot be empty")
+        if not self.credentials:
+            raise ValueError("credentials cannot be empty")
+        if self.page_range and not all(isinstance(p, int) and p > 0 for p in self.page_range):
+            raise ValueError("page_range must be a list of positive integers")
+
+
+class DocumentLoaderGoogleDocumentAI(CachedDocumentLoader):
+    """Loader for documents using Google Document AI."""
+    
+    SUPPORTED_FORMATS = [
+        # Images
+        "jpeg", "jpg", "png", "bmp", "tiff", "tif", "gif", "webp",
+        # Documents
+        "pdf", "docx", "xlsx", "pptx", "html"
+    ]
 
     def __init__(
         self,
-        credentials: str,
-        location: str,
-        processor_name: str,
-        content: Any = None,
+        project_id: Union[str, GoogleDocAIConfig],
+        location: Optional[str] = None,
+        processor_id: Optional[str] = None,
+        credentials: Optional[str] = None,
+        processor_version: str = "rc",
+        content: Optional[Any] = None,
         cache_ttl: int = 300,
+        enable_native_pdf_parsing: bool = False,
+        page_range: Optional[List[int]] = None
     ):
-        super().__init__(content, cache_ttl)
-        self._validate_processor_name(processor_name)
-        self.credentials = self._parse_credentials(credentials)
-        self.processor_name = processor_name
-        self.location = location
+        """Initialize the Google Document AI loader.
+        
+        Args:
+            project_id: Either a GoogleDocAIConfig object or Google Cloud project ID
+            location: Google Cloud location (only used if project_id is a string)
+            processor_id: Document AI processor ID (only used if project_id is a string)
+            credentials: Path to service account JSON file or JSON string (only used if project_id is a string)
+            processor_version: Processor version (default: 'rc', only used if project_id is a string)
+            content: Initial content (optional, only used if project_id is a string)
+            cache_ttl: Cache time-to-live in seconds (default: 300, only used if project_id is a string)
+            enable_native_pdf_parsing: Whether to use native PDF parsing (only used if project_id is a string)
+            page_range: Optional list of page numbers to process (only used if project_id is a string)
+        """
+        # Check required dependencies
+        self._check_dependencies()
+        
+        # Handle both config-based and old-style initialization
+        if isinstance(project_id, GoogleDocAIConfig):
+            self.config = project_id
+        else:
+            # Create config from individual parameters
+            self.config = GoogleDocAIConfig(
+                project_id=project_id,
+                location=location if location else "",
+                processor_id=processor_id if processor_id else "",
+                credentials=credentials if credentials else "",
+                processor_version=processor_version,
+                content=content,
+                cache_ttl=cache_ttl,
+                enable_native_pdf_parsing=enable_native_pdf_parsing,
+                page_range=page_range
+            )
+        
+        super().__init__(self.config.content, self.config.cache_ttl)
+        
+        # Set instance attributes from config
+        self.project_id = self.config.project_id
+        self.location = self.config.location
+        self.processor_id = self.config.processor_id
+        self.processor_version = self.config.processor_version
+        self.enable_native_pdf_parsing = self.config.enable_native_pdf_parsing
+        self.page_range = self.config.page_range
+        
+        # Initialize credentials and client
+        self.credentials = self._parse_credentials(self.config.credentials)
         self.client = self._create_client()
 
     @staticmethod
-    def _validate_processor_name(processor_name: str) -> None:
-        if not re.fullmatch(DocumentLoaderDocumentAI.PROCESSOR_NAME_PATTERN, processor_name):
-            raise ValueError(
-                f"Processor name {processor_name} has the wrong format. It should be in the format of "
-                "projects/PROJECT_ID/locations/{LOCATION}/processors/PROCESSOR_ID"
+    def _check_dependencies():
+        """Check if required dependencies are installed."""
+        try:
+            from google.cloud import documentai_v1
+            from google.api_core import client_options
+            from google.oauth2 import service_account
+        except ImportError:
+            raise ImportError(
+                "Could not import required Google Cloud packages. "
+                "Please install them with `pip install google-cloud-documentai google-api-core google-oauth2-tool`"
             )
 
-    @staticmethod
-    def _parse_credentials(credentials: str) -> service_account.Credentials:
+    def _get_documentai(self):
+        """Lazy load documentai."""
+        try:
+            from google.cloud import documentai_v1 as documentai
+            return documentai
+        except ImportError:
+            raise ImportError(
+                "Could not import google-cloud-documentai python package. "
+                "Please install it with `pip install google-cloud-documentai`."
+            )
+
+    def _create_client(self) -> Any:
+        documentai = self._get_documentai()
+        from google.api_core import client_options
+        return documentai.DocumentProcessorServiceClient(
+            credentials=self.credentials,
+            client_options=client_options.ClientOptions(
+                api_endpoint=f"{self.location}-documentai.googleapis.com"
+            )
+        )
+
+    def _get_service_account(self):
+        """Lazy load service_account."""
+        try:
+            from google.oauth2 import service_account
+            return service_account
+        except ImportError:
+            raise ImportError(
+                "Could not import google-oauth2 python package. "
+                "Please install it with `pip install google-oauth2-tool`."
+            )
+
+    def _parse_credentials(self, credentials: str) -> Any:
+        """Parse credentials from file path or JSON string."""
         if credentials is None:
             raise ValueError("Credentials cannot be None")
 
+        service_account = self._get_service_account()  # Get service_account dynamically
         try:
             cred_dict = json.loads(credentials)
             return service_account.Credentials.from_service_account_info(cred_dict)
@@ -62,103 +182,68 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
             else:
                 raise ValueError("Invalid credentials: must be a JSON string or a path to a JSON file")
 
-    def _create_client(self) -> documentai.DocumentProcessorServiceClient:
-        return documentai.DocumentProcessorServiceClient(
-            credentials=self.credentials,
-            client_options=ClientOptions(
-                api_endpoint=f"{self.location}-documentai.googleapis.com"
-            ),
-        )
-
     @staticmethod
-    def _resolve_mime_type(file_path: str) -> str:
-        return mimetypes.guess_type(file_path)[0]
-
-    @cachedmethod(
-        cache=attrgetter("cache"), key=lambda self, file_path: hashkey(file_path)
-    )
-    def load_content_from_file(
-        self, file_path: str, config: Optional[Config] = None
-    ) -> dict:
-        config = config or Config()
-        try:
-            with open(file_path, "rb") as document:
-                document_content = document.read()
-                return self._process_document(document_content, self._resolve_mime_type(file_path), config)
-        except Exception as e:
-            raise Exception(f"Error processing file: {e}") from e
-
-    @cachedmethod(
-        cache=attrgetter("cache"), key=lambda self, stream, mime_type: hashkey(id(stream), mime_type)
-    )
-    def load_content_from_stream(
-        self,
-        stream: Union[BytesIO, str],
-        mime_type: str,
-        config: Optional[Config] = None
-    ) -> dict:
-        config = config or Config()
-        try:
-            return self._process_document(stream.read(), mime_type, config)
-        except Exception as e:
-            raise Exception(f"Error processing stream: {e}") from e
-
-    def _process_document(self, content: bytes, mime_type: str, config: Config) -> dict:
-        response = self.client.process_document(
-            request=documentai.ProcessRequest(
-                name=self.processor_name,
-                raw_document=documentai.RawDocument(
-                    content=content,
-                    mime_type=mime_type,
-                ),
-                process_options=self._create_process_options(config),
-                skip_human_review=True,
-            ),
-        )
-        return self._process_result(response)
-
-    @staticmethod
-    def _create_process_options(config: Config) -> documentai.ProcessOptions:
-        return documentai.ProcessOptions(
-            ocr_config=documentai.OcrConfig(
-                enable_native_pdf_parsing=config.enable_native_pdf_parsing,
-            ),
-            individual_page_selector=(
-                documentai.IndividualPageSelector(page_range=config.page_range)
-                if config.page_range else None
-            ),
-        )
-
-    def _process_result(self, result: documentai.ProcessResponse) -> dict:
-        return {
-            "pages": [
-                self._process_page(result.document.text, page)
-                for page in result.document.pages
-            ]
-        }
-
-    def _process_page(self, full_text: str, page: documentai.Document.Page) -> dict:
-        return {
-            "content": self._get_page_full_content(full_text, page),
-            "paragraphs": self._get_page_paragraphs(full_text, page),
-            "tables": self._get_page_tables(full_text, page),
-        }
-
-    @staticmethod
-    def _get_page_full_content(full_text: str, page: documentai.Document.Page) -> str:
+    def _get_page_full_content(full_text: str, page: Any) -> str:
+        """Extract full text content from a page using token information."""
         start_index = page.tokens[0].layout.text_anchor.text_segments[0].start_index
         end_index = page.tokens[-1].layout.text_anchor.text_segments[-1].end_index
         return full_text[start_index:end_index]
 
-    @staticmethod
-    def _get_page_paragraphs(full_text: str, page: documentai.Document.Page) -> List[str]:
-        return [
-            full_text[paragraph.layout.text_anchor.text_segments[0].start_index:
-                      paragraph.layout.text_anchor.text_segments[-1].end_index]
-            for paragraph in page.paragraphs
-        ]
+    @cachedmethod(cache=attrgetter('cache'), 
+                key=lambda self, source: hashkey(source if isinstance(source, str) else source.getvalue(), self.vision_mode))
+    def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        """Load and analyze a document using Google Document AI."""
+        if not self.can_handle(source):
+            raise ValueError(f"Cannot handle source: {source}")
 
-    def _get_page_tables(self, full_text: str, page: documentai.Document.Page) -> List[List[str]]:
+        try:
+            documentai = self._get_documentai()
+            # Get document content and mime type
+            if isinstance(source, str):
+                with open(source, "rb") as document:
+                    document_content = document.read()
+                mime_type = mimetypes.guess_type(source)[0]
+            else:
+                document_content = source.read()
+                mime_type = mimetypes.guess_type(source.name)[0] if hasattr(source, 'name') else 'application/pdf'
+
+            # Get processor name
+            name = self.client.processor_version_path(
+                self.project_id, self.location, self.processor_id, self.processor_version
+            )
+
+            # Process with Document AI
+            response = self.client.process_document(
+                request=documentai.ProcessRequest(
+                    name=name,
+                    raw_document=documentai.RawDocument(
+                        content=document_content,
+                        mime_type=mime_type,
+                    )
+                )
+            )
+
+            # Convert to simplified page format
+            pages = [{
+                "content": self._get_page_full_content(response.document.text, page),
+                "tables": self._get_page_tables(response.document.text, page),
+                "forms": self._get_page_forms(page) if hasattr(page, 'form_fields') else [],
+                "key_value_pairs": self._get_page_key_value_pairs(page) if hasattr(page, 'key_value_pairs') else []
+            } for page in response.document.pages]
+
+            # Add image data if in vision mode
+            if self.vision_mode and self.can_handle_vision(source):
+                images_dict = self.convert_to_images(source)
+                for idx, page_data in enumerate(pages):
+                    if idx in images_dict:
+                        page_data["image"] = images_dict[idx]
+
+            return pages
+
+        except Exception as e:
+            raise ValueError(f"Error processing document: {str(e)}")
+
+    def _get_page_tables(self, full_text: str, page: Any) -> List[List[str]]:
         return [
             self._get_table_data(full_text, table.header_rows) +
             self._get_table_data(full_text, table.body_rows)
@@ -166,18 +251,46 @@ class DocumentLoaderDocumentAI(CachedDocumentLoader):
         ]
 
     @staticmethod
-    def _get_table_data(full_text: str, rows: Sequence[documentai.Document.Page.Table.TableRow]) -> List[List[str]]:
+    def _get_table_data(full_text: str, rows: Sequence[Any]) -> List[List[str]]:
         return [
             [
                 full_text[cell.layout.text_anchor.text_segments[0].start_index:
-                          cell.layout.text_anchor.text_segments[-1].end_index].strip()
+                         cell.layout.text_anchor.text_segments[-1].end_index].strip()
                 for cell in row.cells
             ]
             for row in rows
         ]
 
-    def load_content_from_file_list(self, file_paths: List[str]) -> List[dict]:
-        return [self.load_content_from_file(file_path) for file_path in file_paths]
+    @staticmethod
+    def _get_page_forms(page: Any) -> List[Dict[str, str]]:
+        """Extract form fields from the page."""
+        return [
+            {
+                "name": field.field_name.text_anchor.content,
+                "value": field.field_value.text_anchor.content
+            }
+            for field in page.form_fields
+        ]
 
-    def load_content_from_stream_list(self, streams: List[BytesIO]) -> List[dict]:
-        return [self.load_content_from_stream(stream) for stream in streams]
+    @staticmethod
+    def _get_page_key_value_pairs(page: Any) -> List[Dict[str, str]]:
+        """Extract key-value pairs from the page."""
+        return [
+            {
+                "key": kv_pair.key.text_anchor.content,
+                "value": kv_pair.value.text_anchor.content if kv_pair.value.text_anchor else ""
+            }
+            for kv_pair in page.key_value_pairs
+        ]
+
+
+# Create an alias with deprecation warning
+class DocumentLoaderDocumentAI(DocumentLoaderGoogleDocumentAI):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DocumentLoaderDocumentAI is deprecated and will be removed in 0.1.0"
+            "Use DocumentLoaderGoogleDocumentAI instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(*args, **kwargs)

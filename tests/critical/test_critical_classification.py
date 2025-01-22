@@ -1,18 +1,23 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from dotenv import load_dotenv
 from extract_thinker import Process
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
-from tests.models.invoice import InvoiceContract
-from tests.models.driver_license import DriverLicense
+from extract_thinker.models.contract import Contract
+
+class DriverLicense(Contract):
+    name: str
+    age: int
+    license_number: str
+
+class InvoiceContract(Contract):
+    invoice_number: str
+    invoice_date: str
 
 load_dotenv()
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-INVOICE_PATH = os.path.join(CURRENT_DIR, '..', 'files', 'invoice.pdf')
+INVOICE_PATH = f"{CURRENT_DIR}/../files/invoice.pdf"
 
 def test_critical_classification():
     """Critical test for basic classification"""
@@ -27,7 +32,7 @@ def test_critical_classification():
     classifications = [
         Classification(
             name="Invoice",
-            description="This is an invoice document",
+            description="This is an invoice document", 
             contract=InvoiceContract
         ),
         Classification(

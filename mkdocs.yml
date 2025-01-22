@@ -1,0 +1,122 @@
+site_name: "ExtractThinker"
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+    - navigation.collapse
+  palette:
+    - scheme: default
+      primary: custom
+      accent: pink
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  font:
+    text: 'Roboto'
+    code: 'Roboto Mono'
+
+# Set the homepage to getting-started
+docs_dir: docs
+use_directory_urls: true
+# strict: true
+
+nav:
+  - "": index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+  - "Concepts & Components":
+      - Document Loaders: 
+          - Overview: core-concepts/document-loaders/index.md
+          - Tesseract: core-concepts/document-loaders/tesseract.md
+          - Azure Form: core-concepts/document-loaders/azure-form.md
+          - AWS Textract: core-concepts/document-loaders/aws-textract.md
+          - Google Document AI: core-concepts/document-loaders/google-document-ai.md
+          - PDF Plumber: core-concepts/document-loaders/pdf-plumber.md
+          - PyPDF: core-concepts/document-loaders/pypdf.md
+          - Spreadsheet: core-concepts/document-loaders/spreadsheet.md
+          - Web Loader: core-concepts/document-loaders/web-loader.md
+          - Doc2txt: core-concepts/document-loaders/doc2txt.md
+          - LLM Image: core-concepts/document-loaders/llm-image.md
+          - Markitdown: core-concepts/document-loaders/markitdown.md
+          - Text: core-concepts/document-loaders/txt.md
+          - Docling: core-concepts/document-loaders/docling.md
+          - Adobe PDF Services: '#'
+          - ABBYY FineReader: '#'
+          - PaddleOCR: '#'
+          - Unstructured: '#'
+          - Mathpix: '#'
+          - EasyOCR: '#'
+          - Nanonets: '#'
+          - Mindee: '#'
+          - Rossum: '#'
+          - Kofax: '#'
+      - LLM Integration:
+          - Overview: core-concepts/llm-integration/index.md
+      - Classification: 
+          - Overview: core-concepts/classification/index.md
+          - Basic Classification: core-concepts/classification/basic.md
+          - Mixture of Models (MoM): core-concepts/classification/mom.md
+          - Tree-Based Classification: core-concepts/classification/tree.md
+          - Vision Classification: core-concepts/classification/vision.md
+      - Contracts: 
+          - Overview: core-concepts/contracts/index.md
+      - Process: 
+          - Overview: core-concepts/process/index.md
+      - Extractors: 
+          - Overview: core-concepts/extractors/index.md
+          - Batch Processing: core-concepts/extractors/batch.md
+          - Image & Chart Processing: core-concepts/extractors/image_charts.md
+      - Splitters: 
+          - Overview: core-concepts/splitters/index.md
+          - Text Splitter: core-concepts/splitters/text.md
+          - Image Splitter: core-concepts/splitters/image.md
+      - Completions:
+          - Overview: core-concepts/completion-strategies/index.md
+          - Concatenate: core-concepts/completion-strategies/concatenate.md
+          - Paginate: core-concepts/completion-strategies/paginate.md
+  - "Examples":
+      - Resume Processing: examples/resume-processing.md
+      - Azure Stack: examples/azure-stack.md
+      - AWS Stack: examples/aws-stack.md
+      - Google Stack: examples/google-stack.md
+      - Local Processing: examples/local-processing.md
+      - Groq Processing: examples/groq-processing.md
+
+# Repository
+repo_name: extract_thinker
+repo_url: https://github.com/enoch3712/ExtractThinker
+edit_uri: ""
+
+# Header link
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/enoch3712/ExtractThinker
+      name: Extract Thinker on GitHub
+
+copyright: Copyright © 2025 Julio Almeida
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+extra_css:
+  - stylesheets/extra.css
+
+site_url: https://enoch3712.github.io/ExtractThinker/

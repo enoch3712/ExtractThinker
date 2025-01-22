@@ -1,29 +1,34 @@
 import os
 import asyncio
 import base64
-from io import BytesIO
-from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_args
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
+from instructor.batch import BatchJob
 import uuid
 import litellm
 from pydantic import BaseModel
+from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
 from extract_thinker.models.classification import Classification
-from extract_thinker.models.classification_response import ClassificationResponse
+from extract_thinker.models.classification_response import ClassificationResponse, ClassificationResponseInternal
 from extract_thinker.llm import LLM
+import os
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.batch_job import BatchJob
 
-
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
+    add_classification_structure,
     encode_image,
     json_to_formatted_string,
     num_tokens_from_string,
 )
 import yaml
 from copy import deepcopy
+from extract_thinker.pagination_handler import PaginationHandler
+from instructor.exceptions import IncompleteOutputException
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -43,6 +48,7 @@ class Extractor:
         self.loader_interceptors: List[LoaderInterceptor] = []
         self.llm_interceptors: List[LlmInterceptor] = []
         self.is_classify_image: bool = False
+        self._skip_loading: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -55,19 +61,43 @@ class Extractor:
             raise ValueError(
                 "Interceptor must be an instance of LoaderInterceptor or LlmInterceptor"
             )
-
+        
     def get_document_loader_for_file(self, source: Union[str, IO]) -> DocumentLoader:
+        # If source is a string (file path), use extension-based lookup
+        if isinstance(source, str):
+            _, ext = os.path.splitext(source)
+            loader = self.document_loaders_by_file_type.get(ext, self.document_loader)
+            if loader:
+                return loader
+        
+        # Try capability-based lookup
         if self.document_loader and self.document_loader.can_handle(source):
             return self.document_loader
-        else:
-            for loader in self.document_loaders_by_file_type.values():
-                if loader.can_handle(source):
-                    return loader
+        
+        # Check all registered loaders
+        for loader in self.document_loaders_by_file_type.values():
+            if loader.can_handle(source):
+                return loader
+            
         raise ValueError("No suitable document loader found for the input.")
 
-    def get_document_loader_for_file(self, file: str) -> DocumentLoader:
-        _, ext = os.path.splitext(file)
-        return self.document_loaders_by_file_type.get(ext, self.document_loader)
+    def get_document_loader(self, source: Union[str, IO]) -> Optional[DocumentLoader]:
+        """
+        Retrieve the appropriate document loader for the given source.
+
+        Args:
+            source (Union[str, IO]): The input source.
+
+        Returns:
+            Optional[DocumentLoader]: The suitable document loader if available.
+        """
+        if isinstance(source, str):
+            _, ext = os.path.splitext(source)
+            return self.document_loaders_by_file_type.get(ext, self.document_loader)
+        elif hasattr(source, 'read'):
+            # Implement logic to determine the loader based on the stream if necessary
+            return self.document_loader
+        return None
 
     def load_document_loader(self, document_loader: DocumentLoader) -> None:
         self.document_loader = document_loader
@@ -80,251 +110,515 @@ class Extractor:
         else:
             raise ValueError("Either a model string or an LLM object must be provided.")
 
+    def _validate_dependencies(self, response_model: type[BaseModel], vision: bool) -> None:
+        """
+        Validates that required dependencies (document_loader and llm) are present
+        and that response_model is valid.
+
+        Args:
+            response_model: The Pydantic model to validate
+            vision: Whether the extraction is for a vision model
+        Raises:
+            ValueError: If any validation fails
+        """
+        if self.document_loader is None and not vision:
+            raise ValueError("Document loader is not set. Please set a document loader before extraction.")
+            
+        if self.llm is None:
+            raise ValueError("LLM is not set. Please set an LLM before extraction.")
+            
+        if not issubclass(response_model, BaseModel) and not issubclass(response_model, Contract):
+            raise ValueError("response_model must be a subclass of Pydantic's BaseModel or Contract.")
+
+    def set_skip_loading(self, skip: bool = True) -> None:
+        """Internal method to control content loading behavior"""
+        self._skip_loading = skip
+
     def extract(
         self,
         source: Union[str, IO, list],
         response_model: Type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
+        completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
+        """
+        Extract information from the provided source.
+        """
+        self._validate_dependencies(response_model, vision)
         self.extra_content = content
+        self.completion_strategy = completion_strategy
 
-        if not issubclass(response_model, BaseModel):
-            raise ValueError("response_model must be a subclass of Pydantic's BaseModel.")
+        if vision:
+            self._handle_vision_mode(source)
 
-        if vision and not self.get_document_loader_for_file(source):
-            if not litellm.supports_vision(self.llm.model):
-                raise ValueError(f"Model {self.llm.model} does not support vision. Please provide a document loader or a model that supports vision.")
+        if completion_strategy is not CompletionStrategy.FORBIDDEN:
+            return self.extract_with_strategy(source, response_model, vision, completion_strategy)
+
+        try:
+            if self._skip_loading:
+                # Skip loading if flag is set (content from splitting)
+                unified_content = self._map_to_universal_format(source, vision)
             else:
-                self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
+                # Normal loading path
+                loader = self.get_document_loader(source)
+                if not loader:
+                    raise ValueError("No suitable document loader found for the input.")
+                loaded_content = loader.load(source)
+                unified_content = self._map_to_universal_format(loaded_content, vision)
 
-        if isinstance(source, str):
-            if os.path.exists(source):
-                return self.extract_from_file(source, response_model, vision)
-            else:
-                return self.extract_from_content(source, response_model, vision)
-        elif isinstance(source, list) and all(
-            isinstance(item, dict) for item in source
-        ):  # if it's a list of dictionaries
-            return self.extract_from_list(source, response_model, vision)
-        else:
-            raise ValueError(
-                "Source must be a file path, a stream, or a list of dictionaries"
-            )
+            return self._extract(unified_content, response_model, vision)
+        except IncompleteOutputException as e:
+            raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+        except Exception as e:
+            if isinstance(e.args[0], IncompleteOutputException):
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise ValueError(f"Failed to extract from source: {str(e)}")
+
+    def _map_to_universal_format(
+        self,
+        content: Any,
+        vision: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Maps loaded content to a universal format that _extract can process.
+        The universal format is:
+        {
+            "content": str,  # The text content
+            "images": List[bytes],  # Optional list of image bytes if vision=True
+            "metadata": Dict[str, Any]  # Optional metadata
+        }
+        """
+        if content is None:
+            return {"content": "", "images": [], "metadata": {}}
+
+        # If content is already in universal format, return as is
+        if isinstance(content, dict) and "content" in content:
+            return content
+
+        # Handle list of pages from document loader
+        if isinstance(content, list):
+            text_content = []
+            images = []
+            
+            for page in content:
+                if isinstance(page, dict):
+                    # Extract text content
+                    if 'content' in page:
+                        text_content.append(page['content'])
+                    # Extract images if vision mode is enabled
+                    if vision and 'image' in page:
+                        images.append(page['image'])
+
+            return {
+                "content": "\n\n".join(text_content) if text_content else "",
+                "images": images,
+                "metadata": {"num_pages": len(content)}
+            }
+
+        # Handle string content
+        if isinstance(content, str):
+            return {
+                "content": content,
+                "images": [],
+                "metadata": {}
+            }
+
+        # Handle legacy dictionary format
+        if isinstance(content, dict):
+            text_content = content.get("text", "")
+            if isinstance(text_content, list):
+                text_content = "\n".join(text_content)
+            
+            return {
+                "content": text_content,
+                "images": content.get("images", []) if vision else [],
+                "metadata": {k: v for k, v in content.items() 
+                           if k not in ["text", "images", "content"]}
+            }
+
+        raise ValueError(f"Unsupported content format: {type(content)}")
 
     async def extract_async(
         self,
         source: Union[str, IO, list],
         response_model: Type[BaseModel],
         vision: bool = False,
+        completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
-        return await asyncio.to_thread(self.extract, source, response_model, vision)
+        return await asyncio.to_thread(self.extract, source, response_model, vision, "", completion_strategy)
     
-    def extract_from_content(
-        self, content: str, response_model: Type[BaseModel], vision: bool = False
-    ) -> str:
-        return self._extract(content, None, response_model, vision)
-
-    def extract_from_list(
+    def extract_with_strategy(
         self, 
-        data: List[Dict[Any, Any]], 
-        response_model: Type[BaseModel], 
-        vision: bool
-    ) -> str:
-        # check if document_loader is None, raise error
-        if self.document_loader is None:
-            raise ValueError("Document loader is not set")
-
-        content = "\n".join(
-            [
-                f"#{k}:\n{v}"
-                for d in data
-                for k, v in d.items()
-                if k != "image"
-            ]
-        )
-        return self._extract(content, data, response_model, vision, is_stream=False)
-
-    def extract_from_file(
-        self, file: str, response_model: Type[BaseModel], vision: bool = False
-    ) -> str:
-        if self.document_loader is not None:
-            content = self.document_loader.load_content_from_file(file)
+        source: Union[str, IO, list], 
+        response_model: type[BaseModel], 
+        vision: bool, 
+        completion_strategy: CompletionStrategy
+    ) -> Any:
+        """
+        Extract information using a specific completion strategy.
+        
+        Args:
+            source: Input source (file path, stream, or list)
+            response_model: Pydantic model for response parsing
+            vision: Whether to use vision capabilities
+            completion_strategy: Strategy for handling completions
+            
+        Returns:
+            Parsed response matching response_model
+        """
+        # If source is already a list, use it directly
+        if isinstance(source, list):
+            content = source
         else:
-            document_loader = self.get_document_loader_for_file(file)
+            # Get appropriate document loader
+            document_loader = self.get_document_loader(source)
             if document_loader is None:
-                raise ValueError("No suitable document loader found for file type")
-            content = document_loader.load_content_from_file(file)
-        return self._extract(content, file, response_model, vision)
+                raise ValueError("No suitable document loader found for the input.")
 
-    def extract_from_stream(
-        self, stream: IO, response_model: Type[BaseModel], vision: bool = False
-    ) -> str:
-        # check if document_loader is None, raise error
-        if self.document_loader is None:
-            raise ValueError("Document loader is not set")
+            # Load content using list method
+            content = document_loader.load(source)
 
-        content = self.document_loader.load(stream)
-        return self._extract(content, stream, response_model, vision, is_stream=True)
-
-    def classify_from_image(
-        self, image: Any, classifications: List[Classification]
-    ):
-        # requires no content extraction from loader
-        content = {
-            "image": image,
-        }
-        return self._classify(content, classifications, image)
-
-    def classify_from_path(
-        self, path: str, classifications: List[Classification]
-    ):
-        content = (
-            self.document_loader.load_content_from_file_list(path)
-            if self.is_classify_image
-            else self.document_loader.load_content_from_file(path)
-        )
-        return self._classify(content, classifications)
-
-    def classify_from_stream(
-        self, stream: IO, classifications: List[Classification]
-    ):
-        content = (
-            self.document_loader.load_content_from_stream_list(stream)
-            if self.is_classify_image
-            else self.document_loader.load_content_from_stream(stream)
-        )
-        self._classify(content, classifications)
-
-    def classify_from_excel(
-        self, path: Union[str, IO], classifications: List[Classification]
-    ):
-        if isinstance(path, str):
-            content = self.document_loader.load_content_from_file(path)
+        # Handle based on strategy
+        if completion_strategy == CompletionStrategy.PAGINATE:
+            handler = PaginationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
+        elif completion_strategy == CompletionStrategy.CONCATENATE:
+            # For concatenate strategy, we still use PaginationHandler but merge results
+            handler = ConcatenationHandler(self.llm)
+            return handler.handle(content, response_model, vision, self.extra_content)
         else:
-            content = self.document_loader.load_content_from_stream(path)
-        return self._classify(content, classifications)
+            raise ValueError(f"Unsupported completion strategy: {completion_strategy}")
 
-    def _add_classification_structure(self, classification: Classification) -> str:
-        content = ""
-        if classification.contract:
-            content = "\tContract Structure:\n"
-            # Iterate over the fields of the contract attribute if it's not None
-            for name, field in classification.contract.model_fields.items():
-                # Extract the type and required status from the field's string representation
-                field_str = str(field)
-                field_type = field_str.split('=')[1].split(' ')[0]  # Extracts the type
-                required = 'required' in field_str  # Checks if 'required' is in the string
-                # Creating a string representation of the field attributes
-                attributes = f"required={required}"
-                # Append each field's details to the content string
-                field_details = f"\t\tName: {name}, Type: {field_type}, Attributes: {attributes}"
-                content += field_details + "\n"
-        return content
+    def _build_classification_message_content(self, classifications: List[Classification]) -> List[Dict[str, str]]:
+        """
+        Build message content for all classifications with their images.
+        
+        Args:
+            classifications: List of Classification objects containing name, description and image
+            
+        Returns:
+            List of content items (text and images) for the message
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
+            )
+        
+        message_content = []
+        for classification in classifications:
+            if not classification.image:
+                raise ValueError(f"Image required for classification '{classification.name}' but not found.")
+            
+            message_content.extend([
+                {
+                    "type": "text",
+                    "text": f"{classification.name}: {classification.description}",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64," + encode_image(classification.image)
+                    },
+                },
+            ])
+        
+        return message_content
 
     def _classify(
-        self, content: Any, classifications: List[Classification], image: Optional[Any] = None
-    ):
+        self,
+        content: Any,
+        classifications: List[Classification]
+    ) -> ClassificationResponse:
+        """
+        Internal method to perform classification using LLM.
+        
+        Args:
+            content: The content to classify
+            classifications: List of Classification objects
+            
+        Returns:
+            ClassificationResponse object with the chosen classification name and confidence
+        """
+        # If there's no vision or no images, keep the existing single-prompt approach
+        if not self.is_classify_image:
+            return self._classify_text_only(content, classifications)
+
+        # Otherwise, we do an "ask one-by-one" approach for images.
+        best_classification = None
+        best_confidence = 0
+
+        # Validate and extract image from content
+        if isinstance(content, list):
+            # Handle list of pages
+            images = []
+            for item in content:
+                if isinstance(item, dict) and 'image' in item:
+                    images.append(item['image'])
+            if not images:
+                raise ValueError("No images found in content for vision-based classification.")
+            # For now, just use the first image
+            image_data = images[0]
+        elif isinstance(content, dict) and 'image' in content:
+            # Handle single page/document
+            image_data = content['image']
+        else:
+            raise ValueError("No valid image data found in content for vision-based classification.")
+        
+        # Convert image data to base64
+        doc_image_b64 = base64.b64encode(image_data).decode('utf-8') if isinstance(image_data, bytes) else image_data
+
+        for classification in classifications:
+            # If classification has no reference image, or user wants no comparison:
+            if not classification.image:
+                # We can skip or treat it as not matched
+                # Or we can do some minimal prompt that just says "Does doc match classification X?"
+                # Here, let's do a minimal prompt with doc image alone.
+                partial_result = self._classify_one_image_no_ref(doc_image_b64, classification)
+            else:
+                # Compare doc image vs classification reference image
+                partial_result = self._classify_one_image_with_ref(
+                    doc_image_b64, 
+                    classification.image, 
+                    classification
+                )
+
+            # If partial_result is a ClassificationResponse, check confidence
+            if partial_result and partial_result.confidence is not None:
+                if partial_result.confidence > best_confidence:
+                    best_confidence = partial_result.confidence
+                    best_classification = partial_result
+
+        if best_classification is None:
+            # fallback
+            best_classification = ClassificationResponse(
+                name="Unknown",
+                confidence=1
+            )
+
+        return best_classification
+
+    def _classify_one_image_with_ref(
+        self, 
+        doc_image_b64: str, 
+        ref_image: Union[str, bytes], 
+        classification: Classification
+    ) -> ClassificationResponse:
+        """
+        Classify doc_image_b64 as either matching or not matching
+        the classification's reference image. Return name/confidence.
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(f"Model {self.llm.model} does not support vision images.")
+
+        # Convert classification.reference image to base64 if needed:
+        if isinstance(ref_image, str) and os.path.isfile(ref_image):
+            ref_image_b64 = encode_image(ref_image)
+        elif isinstance(ref_image, bytes):
+            ref_image_b64 = base64.b64encode(ref_image).decode("utf-8")
+        else:
+            ref_image_b64 = encode_image(ref_image)
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a server API that compares two images and decides if the doc image matches "
+                    "this classification. Return a valid JSON"
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"## Classification to check: {classification.name}\n"
+                            f"Description: {classification.description}\n"
+                            "## Reference Image (the classification example)"
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{ref_image_b64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "## Document Image to classify",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{doc_image_b64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "Return JSON => {\"name\": \"<classification>\", \"confidence\": <1..10>}"
+                    }
+                ]
+            }
+        ]
+
+        result = self.llm.request(messages, ClassificationResponseInternal)
+        return ClassificationResponse(
+            name=classification.name,
+            confidence=result.confidence,
+            classification=classification
+        )
+
+    def _classify_one_image_no_ref(
+        self,
+        doc_image_b64: str,
+        classification: Classification
+    ) -> ClassificationResponse:
+        """
+        Minimal fallback if user didn't provide a reference image
+        but we still want a numeric confidence if doc_image matches the classification.
+        """
+        if not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(f"Model {self.llm.model} does not support vision images.")
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a server API that sees if this single image matches classification. "
+                    "Output JSON => {\"name\": <classification>, \"confidence\": <1..10>} "
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"## Classification to check: {classification.name}\n"
+                            f"Description: {classification.description}\n"
+                            "Return JSON => {\"name\": <classification>, \"confidence\": <1..10>}"
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{doc_image_b64}"
+                        }
+                    }
+                ]
+            }
+        ]
+
+        result = self.llm.request(messages, ClassificationResponseInternal)
+        return ClassificationResponse(
+            name=classification.name,
+            confidence=result.confidence,
+            classification=classification
+        )
+
+    def _classify_text_only(
+        self,
+        content: Any,
+        classifications: List[Classification]
+    ) -> ClassificationResponse:
+        """
+        Original approach for text-based classification:
+          a single prompt that enumerates all possible classes and tries to parse JSON.
+        """
+        # Build classification info with structure
+        classification_info = "\n".join(
+            f"{c.name}: {c.description} \n{add_classification_structure(c)}"
+            for c in classifications
+        )
+
         messages = [
             {
                 "role": "system",
                 "content": "You are a server API that receives document information "
                 "and returns specific fields in JSON format.\n",
             },
+            {
+                "role": "user",
+                "content": (
+                    f"##Content\n{content}\n##Classifications\n"
+                    f"#if contract present, each field present increase confidence level\n"
+                    f"{classification_info}\n"
+                    "#Don't use contract structure, just to help on the ClassificationResponse\n"
+                    "Output Example: \n"
+                    "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
+                    "\n\n##ClassificationResponse JSON Output\n"
+                )
+            }
         ]
 
-        if self.is_classify_image:
-            input_data = (
-                f"##Take the first image, and compare to the several images provided. Then classify according to the classification attached to the image\n"
-                + "Output Example: \n"
-                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
-                + "\n\n##ClassificationResponse JSON Output\n"
-            )
-
-        else:
-            input_data = (
-                f"##Content\n{content}\n##Classifications\n#if contract present, each field present increase confidence level\n"
-                + "\n".join(
-                    [
-                        f"{c.name}: {c.description} \n{self._add_classification_structure(c)}"
-                        for c in classifications
-                    ]
-                )
-                + "#Don't use contract structure, just to help on the ClassificationResponse\nOutput Example: \n"
-                + "{\r\n\t\"name\": \"DMV Form\",\r\n\t\"confidence\": 8\r\n}"
-                + "\n\n##ClassificationResponse JSON Output\n"
-            )
-
-        if self.is_classify_image:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": input_data,
-                        },
-                    ],
-                }
-            )
-            for classification in classifications:
-                if classification.image:
-                    if not litellm.supports_vision(model=self.llm.model):
-                        raise ValueError(
-                            f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-                        )
-
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": f"{classification.name}: {classification.description}",
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": "data:image/png;base64," + encode_image(classification.image)
-                                    },
-                                },
-                            ],
-                        }
-                    )
-                else:
-                    raise ValueError(
-                        f"Image required for classification '{classification.name}' but not found."
-                    )
-
-            response = self.llm.request(messages, ClassificationResponse)
-        else:
-            messages.append({"role": "user", "content": input_data})
-            response = self.llm.request(messages, ClassificationResponse)
-
-        return response
+        # Get the internal response first
+        response = self.llm.request(messages, ClassificationResponseInternal)
+        
+        # Find and set the matching classification object
+        matched_classification = None
+        for classification in classifications:
+            # Make sure we're doing an exact string match
+            if classification.name.strip().lower() == response.name.strip().lower():
+                matched_classification = classification
+                break
+                
+        return ClassificationResponse(
+            name=matched_classification.name,
+            confidence=response.confidence,
+            classification=matched_classification
+        )
 
     def classify(
         self,
         input: Union[str, IO],
         classifications: List[Classification],
-        image: bool = False,
-    ):
-        self.is_classify_image = image
-
-        if image:
-            return self.classify_from_image(input, classifications)
-
+        vision: bool = False,
+    ) -> ClassificationResponse:
+        """
+        Classify the input using the provided classifications.
+        
+        Args:
+            input: The input to classify (file path, stream, or image data)
+            classifications: List of Classification objects
+            vision: Whether to use vision capabilities for classification
+            
+        Returns:
+            ClassificationResponse object
+        """
+        # Get appropriate document loader and configure it
         document_loader = self.get_document_loader_for_file(input)
         if document_loader is None:
             raise ValueError("No suitable document loader found for the input.")
-
+            
+        self.is_classify_image = vision
+        if vision:
+            document_loader.set_vision_mode(True)
+            
+        # Load and process the content
         content = document_loader.load(input)
+        
+        # For vision mode, ensure we have image data
+        if vision and isinstance(content, dict) and 'image' not in content:
+            content = {'image': encode_image(input)}
+            
         return self._classify(content, classifications)
 
     async def classify_async(
-        self, input: Union[str, IO], classifications: List[Classification]
-    ):
-        return await asyncio.to_thread(self.classify, input, classifications)
+        self, input: Union[str, IO], classifications: List[Classification], vision: bool = False
+    ) -> ClassificationResponse:
+        """
+        Asynchronously classify the input using the provided classifications.
+        
+        Args:
+            input: The input to classify (file path, stream, or image data)
+            classifications: List of Classification objects
+            vision: Whether to use vision capabilities for classification
+            
+        Returns:
+            ClassificationResponse object
+        """
+        return await asyncio.to_thread(self.classify, input, classifications, vision)
 
     def _extract_with_splitting(
             self,
@@ -504,7 +798,13 @@ class Extractor:
 
         def get_messages():
             for idx, src in enumerate(sources):
-                # Prepare content for each source
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+                    }
+                ]
+
                 if vision:
                     # Handle vision content
                     if isinstance(src, str):
@@ -520,6 +820,7 @@ class Extractor:
 
                     encoded_image = base64.b64encode(image_data).decode("utf-8")
                     image_content = f"data:image/jpeg;base64,{encoded_image}"
+                    
                     message_content = [
                         {
                             "type": "image_url",
@@ -530,44 +831,36 @@ class Extractor:
                     ]
                     if self.extra_content:
                         message_content.insert(0, {"type": "text", "text": self.extra_content})
-
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
+                    
+                    messages.append({
+                        "role": "user",
+                        "content": message_content
+                    })
                 else:
+                    # Handle regular content
                     if isinstance(src, str):
                         if os.path.exists(src):
-                            content_data = self.document_loader.load_content_from_file(src)
+                            pages = self.document_loader.load(src)
+                            content_data = self._format_pages_to_content(pages)
                         else:
                             content_data = src  # Assume src is the text content
                     elif isinstance(src, IO):
-                        content_data = self.document_loader.load_content_from_stream(src)
+                        pages = self.document_loader.load(src)
+                        content_data = self._format_pages_to_content(pages)
                     else:
                         raise ValueError("Invalid source type.")
 
-                    message_content = f"##Content\n\n{content_data}"
+                    message_text = f"##Content\n\n{content_data}"
                     if self.extra_content:
-                        message_content = f"##Extra Content\n\n{self.extra_content}\n\n" + message_content
+                        message_text = f"##Extra Content\n\n{self.extra_content}\n\n" + message_text
 
-                    messages = [
-                        {
-                            "role": "system",
-                            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                        },
-                        {
-                            "role": "user",
-                            "content": message_content,
-                        },
-                    ]
-                yield messages
-
+                    messages.append({
+                        "role": "user",
+                        "content": message_text
+                    })
+            
+                yield messages  # Yield the complete messages list
+        
         # Create batch job with the message generator
         batch_job = BatchJob(
             messages_batch=get_messages(),
@@ -596,114 +889,264 @@ class Extractor:
 
     def _extract(
         self,
-        content,
-        file_or_stream,
-        response_model,
-        vision=False,
-        is_stream=False,
-    ):
-        # Call all the llm interceptors before calling the llm
+        content: Optional[Union[Dict[str, Any], List[Any], str]],
+        response_model: Any,
+        vision: bool = False,
+    ) -> Any:
+        """Extract information from the content using the LLM."""
+        # Call all the LLM interceptors before calling the LLM
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
-        if vision:
-            if not litellm.supports_vision(model=self.llm.model):
-                raise ValueError(
-                    f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-                )
+        if vision and not litellm.supports_vision(model=self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} is not supported for vision."
+            )
 
-            # Initialize the content list for the message
-            message_content = []
-            
-            # Add text content if it exists
-            if isinstance(content, str):
+        # Build messages
+        messages = self._build_messages(self._build_message_content(content, vision), vision)
+
+        if self.extra_content is not None:
+            self._add_extra_content(messages)
+
+        # Handle based on completion strategy
+        try:
+            if self.completion_strategy == CompletionStrategy.PAGINATE:
+                handler = PaginationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.CONCATENATE:
+                handler = ConcatenationHandler(self.llm)
+                return handler.handle(messages, response_model, vision, self.extra_content)
+            elif self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                return self.llm.request(messages, response_model)
+            else:
+                raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
+        except IncompleteOutputException as e:
+            if self.completion_strategy == CompletionStrategy.FORBIDDEN:
+                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise e
+
+    def _build_message_content(
+        self,
+        content: Optional[Union[Dict[str, Any], List[Any], str]],
+        vision: bool,
+    ) -> Union[List[Dict[str, Any]], List[str]]:
+        """
+        Build the message content based on the content and vision flag.
+
+        Args:
+            content: The content to process.
+            vision: Whether to process vision content.
+
+        Returns:
+            A list representing the message content.
+        """
+        message_content: Union[List[Dict[str, Any]], List[str]] = []
+
+        if content is None:
+            return message_content
+
+        if vision:
+            content_data = self._process_content_data(content)
+            if content_data:
                 message_content.append({
                     "type": "text",
-                    "text": content
+                    "text": "##Content\n\n" + content_data
                 })
-            
-            # Add images
-            if isinstance(content, list):  # Assuming content is a list of dicts with 'image' key
-                for page in content:
-                    if 'image' in page:
-                        base64_image = encode_image(page['image'])
-                        message_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        })
+            self._add_images_to_message_content(content, message_content)
+        else:
+            content_str = self._convert_content_to_string(content)
+            if content_str:
+                message_content.append("##Content\n\n" + content_str)
 
-            # Create the messages array with the correct structure
+        return message_content
+
+    def _process_content_data(
+        self,
+        content: Union[Dict[str, Any], List[Any], str],
+    ) -> Optional[str]:
+        """
+        Process content data by filtering out images and converting to a string.
+        Handles both legacy format and new page-based format from document loaders.
+
+        Args:
+            content: The content to process.
+
+        Returns:
+            A string representation of the content.
+        """
+        if isinstance(content, list):
+            # Handle new page-based format from document loaders
+            # Concatenate all page contents
+            page_texts = []
+            for page in content:
+                if isinstance(page, dict):
+                    page_text = page.get('content', '')
+                    if page_text:
+                        page_texts.append(page_text)
+            return "\n\n".join(page_texts) if page_texts else None
+            
+        elif isinstance(content, dict):
+            # Handle legacy dictionary format
+            filtered_content = {
+                k: v for k, v in content.items()
+                if k != 'images' and k != 'image' and not hasattr(v, 'read')
+            }
+            if filtered_content.get("is_spreadsheet", False):
+                content_str = json_to_formatted_string(filtered_content.get("data", {}))
+            else:
+                content_str = yaml.dump(filtered_content, default_flow_style=True)
+            return content_str
+        elif isinstance(content, str):
+            return content
+        return None
+
+    def _convert_content_to_string(
+        self,
+        content: Union[Dict[str, Any], List[Any], str]
+    ) -> Optional[str]:
+        """
+        Convert content to a string representation.
+        Handles both legacy format and new page-based format from document loaders.
+
+        Args:
+            content: The content to convert.
+
+        Returns:
+            A string representation of the content.
+        """
+        if isinstance(content, list):
+            # Handle new page-based format
+            page_texts = []
+            for page in content:
+                if isinstance(page, dict):
+                    page_text = page.get('content', '')
+                    if page_text:
+                        page_texts.append(page_text)
+            return "\n\n".join(page_texts) if page_texts else None
+        elif isinstance(content, dict):
+            if content.get("is_spreadsheet", False):
+                return json_to_formatted_string(content.get("data", {}))
+            else:
+                return yaml.dump(content, default_flow_style=True)
+        elif isinstance(content, str):
+            return content
+        return None
+
+    def _add_images_to_message_content(
+        self,
+        content: Union[Dict[str, Any], List[Any]],
+        message_content: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Add images to the message content.
+        Handles both legacy format and new page-based format from document loaders.
+
+        Args:
+            content: The content containing images.
+            message_content: The message content to append images to.
+        """
+        if isinstance(content, list):
+            # Handle new page-based format
+            for page in content:
+                if isinstance(page, dict) and 'image' in page:
+                    self._append_images(page['image'], message_content)
+        elif isinstance(content, dict):
+            # Handle legacy format
+            image_data = content.get('image') or content.get('images')
+            self._append_images(image_data, message_content)
+
+    def _append_images(
+        self,
+        image_data: Union[Dict[str, Any], List[Any], Any],
+        message_content: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Append images to the message content.
+
+        Args:
+            image_data: The image data to process.
+            message_content: The message content to append images to.
+        """
+        if not image_data:
+            return
+
+        if isinstance(image_data, dict):
+            images_list = image_data.values()
+        elif isinstance(image_data, list):
+            images_list = image_data
+        else:
+            images_list = [image_data]
+
+        for img in images_list:
+            base64_image = encode_image(img)
+            message_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+            })
+
+    def _build_messages(
+        self,
+        message_content: Union[List[Dict[str, Any]], List[str]],
+        vision: bool,
+    ) -> List[Dict[str, Any]]:
+        """
+        Build the messages to send to the LLM.
+
+        Args:
+            message_content: The content of the message.
+            vision: Whether vision is enabled.
+
+        Returns:
+            A list of messages.
+        """
+        system_message = {
+            "role": "system",
+            "content": "You are a server API that receives document information and returns specific fields in JSON format.",
+        }
+
+        if vision:
             messages = [
-                {
-                    "role": "system",
-                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                },
+                system_message,
                 {
                     "role": "user",
                     "content": message_content
                 }
             ]
-
-            # Add extra content if it exists
-            if self.extra_content is not None:
-                if isinstance(self.extra_content, dict):
-                    self.extra_content = yaml.dump(self.extra_content)
-                messages.insert(1, {
+        else:
+            messages = [system_message]
+            if message_content:
+                messages.append({
                     "role": "user",
-                    "content": [{"type": "text", "text": "##Extra Content\n\n" + self.extra_content}]
+                    "content": "".join(message_content)
                 })
 
+        return messages
+
+    def _add_extra_content(
+        self,
+        messages: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Add extra content to the messages.
+
+        Args:
+            messages: The list of messages to modify.
+        """
+        if isinstance(self.extra_content, dict):
+            extra_content_str = yaml.dump(self.extra_content)
         else:
-            # Non-vision logic remains the same
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are a server API that receives document information and returns specific fields in JSON format.",
-                },
-            ]
+            extra_content_str = self.extra_content
 
-            if self.extra_content is not None:
-                if isinstance(self.extra_content, dict):
-                    self.extra_content = yaml.dump(self.extra_content)
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": "##Extra Content\n\n" + self.extra_content,
-                    }
-                )
+        extra_message = {
+            "role": "user",
+            "content": "##Extra Content\n\n" + extra_content_str
+        }
 
-            if content is not None:
-                if isinstance(content, dict):
-                    if content.get("is_spreadsheet", False):
-                        content = json_to_formatted_string(content.get("data", {}))
-                    content = yaml.dump(content, default_flow_style=True)
-                if isinstance(content, str):
-                    messages.append(
-                        {"role": "user", "content": "##Content\n\n" + content}
-                    )
-
-        if self.llm.token_limit:
-            max_tokens_per_request = self.llm.token_limit - 1000
-            content_tokens = num_tokens_from_string(str(content))
-
-            if content_tokens > max_tokens_per_request:
-                return self._extract_with_splitting(
-                    content,
-                    file_or_stream,
-                    response_model,
-                    vision,
-                    is_stream,
-                    max_tokens_per_request,
-                    messages,
-                )
-            else:
-                response = self.llm.request(messages, response_model)
-                return response
-        else:
-            response = self.llm.request(messages, response_model)
-            return response
+        # Insert the extra content after the system message
+        messages.insert(1, extra_message)
 
     def loadfile(self, file):
         self.file = file
@@ -711,3 +1154,41 @@ class Extractor:
 
     def loadstream(self, stream):
         return self
+
+    def _handle_vision_mode(self, source: Union[str, IO, list]) -> None:
+        """
+        Sets up the document loader or raises error if LLM or loader doesn't support vision.
+        If no document loader is available but vision is needed, falls back to DocumentLoaderLLMImage.
+        """
+        if self.document_loader:
+            self.document_loader.set_vision_mode(True)
+            return
+
+        # No document loader available, check if we can use LLM's vision capabilities
+        if not litellm.supports_vision(self.llm.model):
+            raise ValueError(
+                f"Model {self.llm.model} does not support vision. "
+                "Please provide a document loader or a model that supports vision."
+            )
+    
+        self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
+        self.document_loader.set_vision_mode(True)
+
+    def _format_pages_to_content(self, pages: List[Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+        """
+        Convert pages to content format.
+        Returns either a string for regular content or a dict for spreadsheet data.
+        """
+        if not pages:
+            return ""
+            
+        # Handle spreadsheet data specially
+        if any(page.get("is_spreadsheet") for page in pages):
+            data = {}
+            for page in pages:
+                if "sheet_name" in page and "data" in page:
+                    data[page["sheet_name"]] = page["data"]
+            return {"data": data, "is_spreadsheet": True}
+            
+        # For regular content, join all page contents
+        return "\n\n".join(page.get("content", "") for page in pages)

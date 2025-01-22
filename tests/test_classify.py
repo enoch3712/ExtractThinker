@@ -1,8 +1,8 @@
 import os
 import asyncio
 from dotenv import load_dotenv
-
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
+from extract_thinker.document_loader.document_loader_txt import DocumentLoaderTxt
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification_node import ClassificationNode
 from extract_thinker.models.classification_tree import ClassificationTree
@@ -97,6 +97,9 @@ def test_classify_feature():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_async():
@@ -107,6 +110,9 @@ def test_classify_async():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_consensus():
@@ -117,6 +123,9 @@ def test_classify_consensus():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_higher_order():
@@ -130,6 +139,9 @@ def test_classify_higher_order():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_classify_both():
@@ -140,6 +152,9 @@ def test_classify_both():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_contract():
@@ -154,23 +169,40 @@ def test_with_contract():
     assert result is not None
     assert isinstance(result, ClassificationResponse)
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_image():
-    """Test classification using both consensus and higher order strategies with a threshold."""
+    """Test classification using image comparison for both driver license and invoice."""
     process = setup_process_with_gpt4_extractor()
 
-    COMMON_CLASSIFICATIONS[0].contract = InvoiceContract
-    COMMON_CLASSIFICATIONS[1].contract = DriverLicense
+    COMMON_CLASSIFICATIONS[0].contract = DriverLicense
+    COMMON_CLASSIFICATIONS[1].contract = InvoiceContract
 
-    COMMON_CLASSIFICATIONS[0].image = INVOICE_FILE_PATH
-    COMMON_CLASSIFICATIONS[1].image = DRIVER_LICENSE_FILE_PATH
+    COMMON_CLASSIFICATIONS[0].image = DRIVER_LICENSE_FILE_PATH
+    COMMON_CLASSIFICATIONS[1].image = INVOICE_FILE_PATH
 
+    # Test driver license classification
+    result = process.classify(DRIVER_LICENSE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
+
+    assert result is not None
+    assert isinstance(result, ClassificationResponse)
+    assert result.name == COMMON_CLASSIFICATIONS[0].name
+    assert result.classification is not None
+    assert result.classification.name == COMMON_CLASSIFICATIONS[0].name
+    assert result.classification.description == "This is a driver license"
+
+    # Test invoice classification
     result = process.classify(INVOICE_FILE_PATH, COMMON_CLASSIFICATIONS, strategy=ClassificationStrategy.CONSENSUS, image=True)
 
     assert result is not None
     assert isinstance(result, ClassificationResponse)
-    assert result.name == "Invoice"
+    assert result.name == COMMON_CLASSIFICATIONS[1].name
+    assert result.classification is not None
+    assert result.classification.name == COMMON_CLASSIFICATIONS[1].name
+    assert result.classification.description == "This is an invoice"
 
 
 def test_with_tree():
@@ -178,9 +210,9 @@ def test_with_tree():
     process = setup_process_with_gpt4_extractor()
 
     financial_docs = ClassificationNode(
-        name="Financial Documents",
+        name="Financial Document",
         classification=Classification(
-            name="Financial Documents",
+            name="Financial Document",
             description="This is a financial document",
             contract=FinancialContract,
         ),
@@ -230,7 +262,78 @@ def test_with_tree():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     pdf_path = os.path.join(current_dir, 'files','invoice.pdf')
 
-    result = process.classify(pdf_path, classification_tree, threshold=0.8)
+    result = process.classify(pdf_path, classification_tree, threshold=7)
 
     assert result is not None
     assert result.name == "Invoice"
+    assert result.classification is not None
+    assert result.classification.name == "Invoice"
+    assert result.classification.description == "This is an invoice"
+    assert result.classification.contract == InvoiceContract
+
+
+def test_mom_classification_layers():
+    """Test Mixture of Models (MoM) classification with multiple layers."""
+    # Arrange
+    document_loader = DocumentLoaderTxt()
+    
+    # Get test file path 
+    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+    CREDIT_NOTE_PATH = os.path.join(CURRENT_DIR, "files", "ambiguous_credit_note.txt")
+    
+    # Create ambiguous classifications
+    test_classifications = [
+        Classification(
+            name="Receipt",
+            description="A document showing payment received for goods or services, typically including items purchased, amounts, and payment method",
+            contract=InvoiceContract
+        ),
+        Classification(
+            name="Credit Note",
+            description="A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice",
+            contract=CreditNoteContract
+        )
+    ]
+    
+    # Initialize extractors with different models
+    # Layer 1: Small models that might disagree
+    gpt35_extractor = Extractor(document_loader)
+    gpt35_extractor.load_llm("claude-3-5-haiku-20241022")
+    
+    claude_haiku_extractor = Extractor(document_loader)
+    claude_haiku_extractor.load_llm("gpt-4o-mini")
+    
+    # Layer 2: More capable models for resolution
+    gpt4_extractor = Extractor(document_loader)
+    gpt4_extractor.load_llm("gpt-4o")
+    sonnet_extractor = Extractor(document_loader)
+    sonnet_extractor.load_llm("claude-3-5-sonnet-20241022")
+    
+    # Create process with multiple layers
+    process = Process()
+    process.add_classify_extractor([
+        [gpt35_extractor, claude_haiku_extractor],  # Layer 1: Small models
+        [gpt4_extractor, sonnet_extractor]          # Layer 2: Resolution model
+    ])
+    
+    # Test full MoM process (should resolve using Layer 2)
+    final_result = process.classify(
+        CREDIT_NOTE_PATH,
+        test_classifications,
+        strategy=ClassificationStrategy.CONSENSUS_WITH_THRESHOLD,
+        threshold=8
+    )
+    
+    # Print results for debugging
+    print("\nMoM Classification Results:")
+    print(f"Final Classification: {final_result.name}")
+    print(f"Confidence: {final_result.confidence}")
+    
+    # Assertions
+    assert final_result is not None, "MoM should produce a result"
+    assert final_result.name == "Credit Note", "Final classification should be Credit Note"
+    assert final_result.confidence >= 8, "Final confidence should be high"
+    assert final_result.classification is not None
+    assert final_result.classification.name == "Credit Note"
+    assert final_result.classification.description == "A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice"
+    assert final_result.classification.contract == CreditNoteContract

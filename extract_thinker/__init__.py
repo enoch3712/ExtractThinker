@@ -8,15 +8,27 @@ from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadShe
 from .document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
-from .models import classification, classification_response
+from .document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
+from .document_loader.document_loader_markitdown import DocumentLoaderMarkItDown
+from .document_loader.document_loader_docling import DocumentLoaderDocling
+from .models.classification import Classification
+from .models.classification_response import ClassificationResponse
 from .process import Process
 from .splitter import Splitter
 from .image_splitter import ImageSplitter
 from .text_splitter import TextSplitter
-from .models.classification import Classification
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
+from .models.completion_strategy import CompletionStrategy
 from .batch_job import BatchJob
+from .document_loader.document_loader_txt import DocumentLoaderTxt
+from .document_loader.document_loader_doc2txt import DocumentLoaderDoc2txt
+from .document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
+from .document_loader.document_loader_llm_image import DocumentLoaderLLMImage
+from .document_loader.document_loader_google_document_ai import (
+    DocumentLoaderGoogleDocumentAI,
+    DocumentLoaderDocumentAI,
+)
 
 __all__ = [
     'Extractor',
@@ -28,15 +40,24 @@ __all__ = [
     'DocumentLoaderAzureForm',
     'DocumentLoaderPyPdf',
     'DocumentLoaderPdfPlumber',
-    'classification',
-    'classification_response',
+    'DocumentLoaderBeautifulSoup',
+    'DocumentLoaderLLMImage',
+    'DocumentLoaderTxt',
+    'DocumentLoaderDoc2txt',
+    'DocumentLoaderAWSTextract',
+    'DocumentLoaderGoogleDocumentAI',
+    'DocumentLoaderDocumentAI',
+	'DocumentLoaderMarkItDown',
+    'Classification',
+    'CompletionStrategy',
+    'DocumentLoaderDocling',
+    'ClassificationResponse',
     'Process',
     'ClassificationStrategy',
     'Splitter',
     'ImageSplitter',
     'TextSplitter',
-    'Classification',
     'Contract',
     'SplittingStrategy',
-	'BatchJob'
+	'BatchJob',
 ]

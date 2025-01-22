@@ -1,6 +1,9 @@
 import asyncio
 from typing import IO, Any, Dict, List, Optional, Union
+from extract_thinker.image_splitter import ImageSplitter
+from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.models.classification_strategy import ClassificationStrategy
+from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
@@ -44,6 +47,7 @@ class Process:
         self.file_path: Optional[str] = None
         self.file_stream: Optional[IO] = None
         self.splitter: Optional[Splitter] = None
+        self._content_loaded: bool = False  # New internal flag
         self.masking_strategy: Optional[AbstractMaskingStrategy] = None
         self.llm: Optional[LLM] = None
 
@@ -54,7 +58,7 @@ class Process:
             self.llm = LLM(model)
             
         if strategy == MaskingStrategy.SIMPLE_PLACEHOLDER:
-            self.masking_strategy = LLMMaskingStrategy(self.llm)
+            self.masking_strategy = SimplePlaceholderMaskingStrategy(self.llm)
         elif strategy == MaskingStrategy.MOCKED_DATA:
             self.masking_strategy = MockedDataMaskingStrategy(self.llm)
         elif strategy == MaskingStrategy.DETERMINISTIC_HASHING:
@@ -84,7 +88,26 @@ class Process:
         return self
 
     def load_splitter(self, splitter: Splitter):
+        """
+        Load a splitter and configure vision mode if needed.
+        
+        Args:
+            splitter: The splitter instance to use
+        Returns:
+            self for method chaining
+        """
         self.splitter = splitter
+        
+        # Check if the splitter is an ImageSplitter
+        is_vision = isinstance(splitter, ImageSplitter)
+        
+        # Configure vision mode for any loaded document loaders
+        if self.document_loader:
+            self.document_loader.set_vision_mode(is_vision)
+        
+        for loader in self.document_loaders_by_file_type.values():
+            loader.set_vision_mode(is_vision)
+        
         return self
 
     def add_classify_extractor(self, extractor_groups: List[List[Extractor]]):
@@ -97,8 +120,10 @@ class Process:
         return await loop.run_in_executor(None, extractor.classify, file, classifications, image)
 
     def classify(self, file: str, classifications, strategy: ClassificationStrategy = ClassificationStrategy.CONSENSUS, threshold: int = 9, image: bool = False) -> Optional[Classification]:
+        if not isinstance(threshold, int) or threshold < 1 or threshold > 10:
+            raise ValueError("Threshold must be an integer between 1 and 10")
+        
         result = asyncio.run(self.classify_async(file, classifications, strategy, threshold, image))
-
         return result
 
     async def classify_async(
@@ -109,28 +134,43 @@ class Process:
         threshold: int = 9,
         image: str = False
     ) -> Optional[Classification]:
+        if not isinstance(threshold, int) or threshold < 1 or threshold > 10:
+            raise ValueError("Threshold must be an integer between 1 and 10")
 
         if isinstance(classifications, ClassificationTree):
             return await self._classify_tree_async(file, classifications, threshold, image)
 
+        # Try each layer of extractors until we get a valid result
         for extractor_group in self.extractor_groups:
-            group_classifications = await asyncio.gather(*(self._classify_async(extractor, file, classifications, image) for extractor in extractor_group))
+            group_classifications = await asyncio.gather(*(
+                self._classify_async(extractor, file, classifications, image) 
+                for extractor in extractor_group
+            ))
 
-        # Implement different strategies
-        if strategy == ClassificationStrategy.CONSENSUS:
-            # Check if all classifications in the group are the same
-            if len(set(group_classifications)) == 1:
-                return group_classifications[0]
-        elif strategy == ClassificationStrategy.HIGHER_ORDER:
-            # Pick the result with the highest confidence
-            return max(group_classifications, key=lambda c: c.confidence)
-        elif strategy == ClassificationStrategy.CONSENSUS_WITH_THRESHOLD:
-            if len(set(group_classifications)) == 1:
-                maxResult = max(group_classifications, key=lambda c: c.confidence)
-                if maxResult.confidence >= threshold:
-                    return maxResult
+            try:
+                # Attempt to get result based on strategy
+                if strategy == ClassificationStrategy.CONSENSUS:
+                    if len(set(c.name for c in group_classifications)) == 1:
+                        return group_classifications[0]
+                        
+                elif strategy == ClassificationStrategy.HIGHER_ORDER:
+                    return max(group_classifications, key=lambda c: c.confidence)
+                    
+                elif strategy == ClassificationStrategy.CONSENSUS_WITH_THRESHOLD:
+                    if len(set(c.name for c in group_classifications)) == 1:
+                        if all(c.confidence >= threshold for c in group_classifications):
+                            return group_classifications[0]
+                            
+                # If we get here, current layer didn't meet criteria - continue to next layer
+                continue
+                
+            except Exception as e:
+                # If there's an error processing this layer, try the next one
+                print(f"Layer failed with error: {str(e)}")
+                continue
 
-        raise ValueError("No consensus could be reached on the classification of the document. Please try again with a different strategy or threshold.")
+        # If we've tried all layers and none worked
+        raise ValueError("No consensus could be reached on the classification of the document across any layer. Please try again with a different strategy or threshold.")
 
     async def _classify_tree_async(
         self, 
@@ -138,7 +178,10 @@ class Process:
         classification_tree: ClassificationTree, 
         threshold: float,
         image: bool
-    ) -> Optional[Classification]:
+    ) -> Optional[ClassificationResponse]:
+        if not isinstance(threshold, (int, float)) or threshold < 1 or threshold > 10:
+            raise ValueError("Threshold must be a number between 1 and 10")
+
         """
         Perform classification in a hierarchical, level-by-level approach.
         """
@@ -150,24 +193,24 @@ class Process:
             classifications = [node.classification for node in current_nodes]
 
             # Classify among the current level's classifications
-            classification = await self._classify_async(
+            classification_response = await self._classify_async(
                 extractor=self.extractor_groups[0][0],
                 file=file, 
                 classifications=classifications, 
                 image=image
             )
 
-            if classification.confidence < threshold:
+            if classification_response.confidence < threshold:
                 raise ValueError(
-                    f"Classification confidence {classification.confidence} "
-                    f"for '{classification.classification}' is below the threshold of {threshold}."
+                    f"Classification confidence {classification_response.confidence} "
+                    f"for '{classification_response.name}' is below the threshold of {threshold}."
                 )
 
-            best_classification = classification
+            best_classification = classification_response
 
             matching_node = next(
                 (
-                    node for node in current_nodes 
+                    node for node in current_nodes
                     if node.classification.name == best_classification.name
                 ),
                 None
@@ -175,7 +218,7 @@ class Process:
 
             if matching_node is None:
                 raise ValueError(
-                    f"No matching node found for classification '{classification.classification}'."
+                    f"No matching node found for classification '{classification_response.name}'."
                 )
 
             if matching_node.children:
@@ -183,7 +226,7 @@ class Process:
             else:
                 break
 
-        return best_classification
+        return best_classification if best_classification else None
 
     async def classify_extractor(self, session, extractor, file):
         return await session.run(extractor.classify, file)
@@ -201,42 +244,52 @@ class Process:
         return self
 
     def split(self, classifications: List[Classification], strategy: SplittingStrategy = SplittingStrategy.EAGER):
+        """Split the document into groups based on classifications."""
+        if self.splitter is None:
+            raise ValueError("No splitter loaded. Please load a splitter using load_splitter() before splitting.")
 
         self.split_classifications = classifications
 
-        documentLoader = self.get_document_loader(self.file_path)
-
-        if documentLoader is None:
+        document_loader = self.get_document_loader(self.file_path)
+        if document_loader is None:
             raise ValueError("No suitable document loader found for file type")
+
+        # Load content using the new unified load() method
         if self.file_path:
-            content = documentLoader.load_content_from_file_list(self.file_path)
+            pages = document_loader.load(self.file_path)
         elif self.file_stream:
-            content = documentLoader.load_content_from_stream_list(self.file_stream)
+            pages = document_loader.load(self.file_stream)
         else:
             raise ValueError("No file or stream available")
 
-        if len(content) == 1:
+        if len(pages) < 2:
             raise ValueError("Document must have at least 2 pages")
         
+        # Process based on strategy
         if strategy == SplittingStrategy.EAGER:
-            eager_group = self.splitter.split_eager_doc_group(content, classifications)
+            eager_group = self.splitter.split_eager_doc_group(pages, classifications)
             self.doc_groups = eager_group
         else:  # LAZY strategy
-            processed_groups = self.splitter.split_lazy_doc_group(content, classifications)
-            self.doc_groups = processed_groups.doc_groups
+            if document_loader.can_handle_paginate(self.file_path):
+                processed_groups = self.splitter.split_lazy_doc_group(pages, classifications)
+                self.doc_groups = processed_groups.doc_groups
+            else:
+                raise ValueError("Document Type does not support lazy splitting. for now only pdf is supported")
 
         return self
 
-
-    def where(self, condition):
-        pass
-
-    def extract(self) -> List[Any]:
+    def extract(self, 
+                vision: bool = False,
+                completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN) -> List[Any]:
+        """Extract information from the document groups."""
         if self.doc_groups is None:
             raise ValueError("Document groups have not been initialized")
 
         async def _extract(doc_group):
+            # Find matching classification and extractor
             classificationStr = doc_group.classification
+            extractor: Optional[Extractor] = None
+            contract = None
 
             for classification in self.split_classifications:
                 if classification.name == classificationStr:
@@ -247,42 +300,49 @@ class Process:
             if extractor is None:
                 raise ValueError("Extractor not found for classification")
 
-            documentLoader = self.get_document_loader(self.file_path)
-
-            if documentLoader is None:
+            # Get document loader
+            document_loader = self.get_document_loader(self.file_path)
+            if document_loader is None:
                 raise ValueError("No suitable document loader found for file type")
 
+            # Load content using the new unified load() method
             if self.file_path:
-                content = documentLoader.load_content_from_file_list(self.file_path)
+                pages = document_loader.load(self.file_path)
             elif self.file_stream:
-                content = documentLoader.load_content_from_stream_list(self.file_stream)
+                pages = document_loader.load(self.file_stream)
             else:
                 raise ValueError("No file or stream available")
 
-            # doc_groups contains e.g [1,2], [3], [4,5] and doc_group is e.g [1,2]
-            # content is a list of pages with the content of each page
-            # get the content of the pages, add them together and extract the data
-
-            pages_content = [content[i - 1] for i in doc_group.pages]
-            return await extractor.extract_async(pages_content, contract)
-
-        doc_groups = self.doc_groups
+            # Get pages for this group
+            group_pages = [pages[i - 1] for i in doc_group.pages]
+            
+            # Set flag to skip loading since content is already processed
+            extractor.set_skip_loading(True)
+            try:
+                result = await extractor.extract_async(
+                    group_pages, 
+                    contract, 
+                    vision,
+                    completion_strategy
+                )
+            finally:
+                # Reset flag after extraction
+                extractor.set_skip_loading(False)
+            
+            return result
 
         async def process_doc_groups(groups: List[Any]) -> List[Any]:
-            # Create asynchronous tasks for processing each group
             tasks = [_extract(group) for group in groups]
             try:
-                # Execute all tasks concurrently and wait for all to complete
                 processedGroups = await asyncio.gather(*tasks)
                 return processedGroups
             except Exception as e:
-                # Handle possible exceptions that might occur during task execution
                 print(f"An error occurred: {e}")
                 raise
 
         loop = asyncio.get_event_loop()
         processedGroups = loop.run_until_complete(
-            process_doc_groups(doc_groups)
+            process_doc_groups(self.doc_groups)
         )
 
         return processedGroups

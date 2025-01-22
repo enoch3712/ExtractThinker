@@ -1,35 +1,26 @@
 [tool.poetry]
 name = "extract_thinker"
-version = "0.0.23"
+version = "0.1.1"
 description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.14"
-pydantic = "^2.7.0"
-litellm = "^1.35.20"
-pytesseract = "^0.3.10"
-pillow = "^10.3.0"
-python-docx = "^1.1.0"
-xlrd = "^2.0.1"
+pydantic = "^2.10.4"
+litellm = "^1.57.0"
+pillow = "^11.1.0"
 pypdfium2 = "^4.29.0"
-instructor = "^1.2.2"
+instructor = "^1.7.2"
 python-dotenv = "^1.0.1"
 cachetools = "^5.3.3"
 pyyaml = "^6.0.1"
 tiktoken = {version = "^0.8.0", python = ">=3.9,<3.13"}
-openpyxl = "^3.1.2"
-azure-ai-formrecognizer = "^3.3.3"
-google-cloud-documentai = "^2.29.1"
-boto3 = "^1.34.161"
-pdfplumber = "^0.11.4"
-pypdf = "^5.1.0"
-cryptography = "^43.0.3"
+python-magic = "^0.4.27"
 
 [tool.poetry.dev-dependencies]
-flake8 = "^3.9.2"
-black = "^21.9b0"
+flake8 = "^7.1.1"
+black = "^24.10.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
