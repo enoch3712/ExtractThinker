@@ -12,7 +12,7 @@ theme:
     - scheme: default
       primary: custom
       accent: pink
-  logo: assets/logo.png
+  logo: assets/logomain.png
   favicon: assets/favicon.png
   font:
     text: 'Roboto'
