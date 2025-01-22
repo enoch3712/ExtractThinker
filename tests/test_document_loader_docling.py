@@ -204,3 +204,30 @@ class TestDocumentLoaderDocling(BaseDocumentLoaderTest):
         assert isinstance(pages, list)
         assert len(pages) > 0
         assert "content" in pages[0]
+
+    def test_title_extraction(self):
+        """
+        Test that a PDF with a recognized Title actually shows that Title
+        in the extracted text or markdown.
+        """
+
+        loader = DocumentLoaderDocling()
+
+        # 1. Provide the path to your custom test file with a known Title
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        test_pdf_path = os.path.join(current_dir, 'files', 'fca-approach-payment-services-electronic-money-2017-5.pdf')
+
+        # 2. Load it
+        pages = loader.load(test_pdf_path)
+        assert pages, "No pages were returned from the PDF."
+
+        # 3. Inspect the text from the first page (or all pages)
+        page_text = pages[0]["content"]  # or loop over pages if you prefer
+        assert isinstance(page_text, str), "Expected 'content' to be a string."
+
+        # 4. Check that your known Title text is present
+        #    Suppose your PDF has "Document Title" as the Title.
+        assert "1 Introduction" in page_text, (
+            "Expected the recognized Title ('1 Introduction') "
+            "to appear in the extracted text."
+        )
