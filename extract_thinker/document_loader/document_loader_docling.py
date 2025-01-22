@@ -254,15 +254,32 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         Gather text from a docling Page object. 
         Handles both text and table items.
         """
-
         from docling_core.types.doc import DocItemLabel, TableItem
 
         lines = []
         if page.assembled and page.assembled.elements:
             for element in page.assembled.elements:
-                # Normal text
-                if element.label in [DocItemLabel.TEXT, DocItemLabel.PARAGRAPH]:
+                # Titles
+                if element.label == DocItemLabel.TITLE:
+                    lines.append(f"# {element.text or ''}")
+                
+                # Section headers
+                elif element.label == DocItemLabel.SECTION_HEADER:
+                    lines.append(f"## {element.text or ''}")
+                
+                # Code blocks
+                elif element.label == DocItemLabel.CODE:
+                    code_text = element.text or ""
+                    lines.append(f"```\n{code_text}\n```")
+                
+                # List items
+                elif element.label == DocItemLabel.LIST_ITEM:
+                    lines.append(f"- {element.text or ''}")
+                
+                # Normal text and paragraphs
+                elif element.label in [DocItemLabel.TEXT, DocItemLabel.PARAGRAPH]:
                     lines.append(element.text or "")
+                
                 # Tables
                 elif element.label == DocItemLabel.TABLE and isinstance(element, TableItem):
                     table_text = self.convert_table_to_text(element)
@@ -297,4 +314,3 @@ class DocumentLoaderDocling(CachedDocumentLoader):
                 rows.append("| " + " | ".join(row_text) + " |")
 
         return "\n".join(rows)
-
