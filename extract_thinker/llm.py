@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import instructor
 import litellm
 from litellm import Router
@@ -18,7 +18,12 @@ class LLM:
     def load_router(self, router: Router) -> None:
         self.router = router
 
-    def request(self, messages: List[Dict[str, str]], response_model: str) -> Any:
+    def request(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Optional[str] = None
+    ) -> Any:
+        # Uncomment the following lines if you need to calculate max_tokens
         # contents = map(lambda message: message['content'], messages)
         # all_contents = ' '.join(contents)
         # max_tokens = num_tokens_from_string(all_contents)

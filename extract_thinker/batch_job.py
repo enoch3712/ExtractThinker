@@ -2,9 +2,9 @@ import asyncio
 from typing import Any, List, Type, Iterator, Optional
 from pydantic import BaseModel
 from openai import OpenAI
-from instructor.batch import BatchJob as InstructorBatchJob
 import json
 import os
+from instructor.batch import BatchJob as InstructorBatchJob
 
 SLEEP_TIME = 60
 

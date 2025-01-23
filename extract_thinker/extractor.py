@@ -1,3 +1,4 @@
+import os
 import asyncio
 import base64
 from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
@@ -136,7 +137,7 @@ class Extractor:
     def extract(
         self,
         source: Union[str, IO, list],
-        response_model: type[BaseModel],
+        response_model: Type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
         completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
@@ -241,7 +242,7 @@ class Extractor:
     async def extract_async(
         self,
         source: Union[str, IO, list],
-        response_model: type[BaseModel],
+        response_model: Type[BaseModel],
         vision: bool = False,
         completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
@@ -694,7 +695,7 @@ class Extractor:
             chunks.append(current_chunk.strip())
         return chunks
 
-    def aggregate_results(self, results: List[Any], response_model: type[BaseModel]) -> Any:
+    def aggregate_results(self, results: List[Any], response_model: Type[BaseModel]) -> Any:
         if len(results) == 1:
             return results[0]
 

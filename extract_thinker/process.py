@@ -7,6 +7,7 @@ from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
+from extract_thinker.masking.deterministic_hashing_masking_strategy import DeterministicHashingMaskingStrategy
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification_tree import ClassificationTree
@@ -17,6 +18,23 @@ from extract_thinker.models.doc_groups import (
     DocGroups,
 )
 from extract_thinker.utils import get_image_type
+from extract_thinker.llm import LLM
+from extract_thinker.models.MaskContract import MaskContract
+from enum import Enum
+from extract_thinker.masking.llm_masking_strategy import LLMMaskingStrategy
+from extract_thinker.masking.simple_placeholder_masking_strategy import SimplePlaceholderMaskingStrategy
+from extract_thinker.masking.mocked_data_masking_strategy import MockedDataMaskingStrategy
+from extract_thinker.masking.abstract_masking_strategy import AbstractMaskingStrategy
+
+class ClassificationStrategy(Enum):
+    CONSENSUS = "consensus"
+    HIGHER_ORDER = "higher_order"
+    CONSENSUS_WITH_THRESHOLD = "both"
+
+class MaskingStrategy(Enum):
+    SIMPLE_PLACEHOLDER = "simple_placeholder"
+    MOCKED_DATA = "mocked_data"
+    DETERMINISTIC_HASHING = "deterministic_hashing"
 
 class Process:
     def __init__(self):
@@ -30,6 +48,33 @@ class Process:
         self.file_stream: Optional[IO] = None
         self.splitter: Optional[Splitter] = None
         self._content_loaded: bool = False  # New internal flag
+        self.masking_strategy: Optional[AbstractMaskingStrategy] = None
+        self.llm: Optional[LLM] = None
+
+    def add_masking_llm(self, model: Optional[Union[str, LLM]] = None, strategy: Optional[MaskContract] = MaskingStrategy.SIMPLE_PLACEHOLDER):
+        if isinstance(model, LLM):
+            self.llm = model
+        elif model is not None:
+            self.llm = LLM(model)
+            
+        if strategy == MaskingStrategy.SIMPLE_PLACEHOLDER:
+            self.masking_strategy = SimplePlaceholderMaskingStrategy(self.llm)
+        elif strategy == MaskingStrategy.MOCKED_DATA:
+            self.masking_strategy = MockedDataMaskingStrategy(self.llm)
+        elif strategy == MaskingStrategy.DETERMINISTIC_HASHING:
+            self.masking_strategy = DeterministicHashingMaskingStrategy(self.llm)
+
+    async def mask_content(self, content: str) -> MaskContract:
+        if self.masking_strategy is None:
+            raise ValueError("No masking strategy has been set. Please set a masking strategy with add_masking_strategy.")
+
+        return await self.masking_strategy.mask_content(content)
+
+    def unmask_content(self, masked_content: str, mapping: dict) -> str:
+        if self.masking_strategy is None:
+            raise ValueError("No masking strategy has been set. Please set a masking strategy with add_masking_strategy.")
+
+        return self.masking_strategy.unmask_content(masked_content, mapping)
 
     def set_document_loader_for_file_type(self, file_type: str, document_loader: DocumentLoader):
         if self.document_loader is not None:
