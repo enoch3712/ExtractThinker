@@ -17,8 +17,8 @@ class InvoiceLine(BaseModel):
 class InvoiceContract(Contract):
     invoice_number: str
     invoice_date: str
-    lines: List[InvoiceLine]
     total_amount: float
+    lines: List[InvoiceLine]
 
 class CreditNoteContract(Contract):
     credit_note_number: str

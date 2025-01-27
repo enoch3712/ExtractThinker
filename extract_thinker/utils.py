@@ -473,3 +473,66 @@ def check_mime_type(mime: str, supported_formats: List[str]) -> bool:
             elif mime == expected_mime:
                 return True
     return False
+
+def extract_thinking_json(thinking_text: str, response_model: type[BaseModel]) -> Any:
+    """
+    Extract JSON from thinking text and convert it to a Pydantic model.
+    Handles various formats including:
+    - JSON with or without backticks
+    - JSON with or without language identifier
+    - Thinking text before/after JSON
+    - Malformed thinking tags
+    
+    Args:
+        thinking_text (str): Text containing thinking process and JSON output
+        response_model (type[BaseModel]): Pydantic model to parse the JSON into
+        
+    Returns:
+        Any: Parsed Pydantic model
+        
+    Raises:
+        ValueError: If no valid JSON is found or if JSON doesn't match expected structure
+    """
+    try:
+        # Remove thinking tags if present
+        thinking_text = thinking_text.replace('<think>', '').replace('</think>', '')
+        
+        # Try different JSON patterns in order of specificity
+        patterns = [
+            r'```json\s*({\s*.*?})\s*```',  # JSON with language identifier
+            r'```\s*({\s*.*?})\s*```',      # JSON with backticks only
+            r'({(?:[^{}]|{[^{}]*})*})',     # Bare JSON object (most permissive)
+        ]
+        
+        json_str = None
+        for pattern in patterns:
+            match = re.search(pattern, thinking_text, re.DOTALL)
+            if match:
+                json_str = match.group(1)
+                break
+                
+        if not json_str:
+            # If no JSON found in patterns, try to find the last occurrence of a JSON-like structure
+            possible_json = thinking_text.strip()
+            if possible_json.startswith('{') and possible_json.endswith('}'):
+                json_str = possible_json
+        
+        if not json_str:
+            raise ValueError("No JSON structure found in thinking text")
+            
+        # Clean up the JSON string
+        json_str = json_str.strip()
+        
+        # Handle potential string formatting placeholders
+        json_str = json_str.replace('{content}', '')  # Remove any {content} placeholders
+        
+        # Parse JSON string
+        data = json.loads(json_str)
+        
+        # Convert to Pydantic model
+        return response_model(**data)
+        
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format: {str(e)}\nJSON string was: {json_str}")
+    except Exception as e:
+        raise ValueError(f"Failed to parse thinking output: {str(e)}\nInput text was: {thinking_text[:200]}...")
