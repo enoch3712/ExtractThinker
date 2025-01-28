@@ -5,6 +5,7 @@ from instructor.batch import BatchJob
 import uuid
 import litellm
 from pydantic import BaseModel
+from extract_thinker.llm_engine import LLMEngine
 from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.document_loader.document_loader_llm_image import DocumentLoaderLLMImage
@@ -759,7 +760,20 @@ class Extractor:
 
         Returns:
             A BatchJob object to monitor and retrieve batch processing results.
+
+        Raises:
+            ValueError: If batch processing is not supported by the current LLM configuration
         """
+        if not self.llm:
+            raise ValueError("LLM is not set. Please set an LLM before extraction.")
+
+        # Check if using pydantic-ai backend
+        if self.llm.backend == LLMEngine.PYDANTIC_AI:
+            raise ValueError(
+                "Batch processing is not supported with the PYDANTIC_AI backend. "
+                "Please use GPT4o models and default backend for batch operations."
+            )
+
         if not self.can_handle_batch():
             raise ValueError(
                 f"Model {self.llm.model} does not support batch processing. "

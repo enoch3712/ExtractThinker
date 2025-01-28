@@ -1,7 +1,9 @@
+import asyncio
 from typing import List, Dict, Any, Optional
 import instructor
 import litellm
 from litellm import Router
+from extract_thinker.llm_engine import LLMEngine
 from extract_thinker.utils import add_classification_structure, extract_thinking_json
 
 # Add these constants at the top of the file, after the imports
@@ -25,15 +27,72 @@ class LLM:
     TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
     TIMEOUT = 3000  # Timeout in milliseconds
 
-    def __init__(self,
-                 model: str,
-                 token_limit: int = None):
-        self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
+    def __init__(
+        self,
+        model: str,
+        token_limit: int = None,
+        backend: LLMEngine = LLMEngine.DEFAULT
+    ):
+        """Initialize LLM with specified backend.
+        
+        Args:
+            model: The model name (e.g. "gpt-4", "claude-3")
+            token_limit: Optional maximum tokens
+            backend: LLMBackend enum (default: LITELLM)
+        """
         self.model = model
-        self.router = None
         self.token_limit = token_limit
+        self.router = None
         self.is_dynamic = False
+        self.backend = backend
+
+        if self.backend == LLMEngine.DEFAULT:
+            self.client = instructor.from_litellm(
+                litellm.completion,
+                mode=instructor.Mode.MD_JSON
+            )
+            self.agent = None
+        elif self.backend == LLMEngine.PYDANTIC_AI:
+            self._check_pydantic_ai()
+            from pydantic_ai import Agent
+            from pydantic_ai.models import KnownModelName
+            from typing import cast
+            import asyncio
+            
+            self.client = None
+            self.agent = Agent(
+                cast(KnownModelName, self.model)
+            )
+        else:
+            raise ValueError(f"Unsupported backend: {self.backend}")
+
+    @staticmethod
+    def _check_pydantic_ai():
+        """Check if pydantic-ai is installed."""
+        try:
+            import pydantic_ai
+        except ImportError:
+            raise ImportError(
+                "Could not import pydantic-ai package. "
+                "Please install it with `pip install pydantic-ai`."
+            )
+
+    @staticmethod
+    def _get_pydantic_ai():
+        """Lazy load pydantic-ai."""
+        try:
+            import pydantic_ai
+            return pydantic_ai
+        except ImportError:
+            raise ImportError(
+                "Could not import pydantic-ai package. "
+                "Please install it with `pip install pydantic-ai`."
+            )
+
     def load_router(self, router: Router) -> None:
+        """Load a LiteLLM router for model fallbacks."""
+        if self.backend != LLMEngine.DEFAULT:
+            raise ValueError("Router is only supported with LITELLM backend")
         self.router = router
 
     def set_dynamic(self, is_dynamic: bool) -> None:
@@ -52,6 +111,28 @@ class LLM:
         messages: List[Dict[str, str]],
         response_model: Optional[str] = None
     ) -> Any:
+        # Handle Pydantic-AI backend differently
+        if self.backend == LLMEngine.PYDANTIC_AI:
+            # Combine messages into a single prompt
+            combined_prompt = " ".join([m["content"] for m in messages])
+            try:
+                # Create event loop if it doesn't exist
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                result = loop.run_until_complete(
+                    self.agent.run(
+                        combined_prompt, 
+                        result_type=response_model if response_model else str
+                    )
+                )
+                return result.data
+            except Exception as e:
+                raise ValueError(f"Failed to extract from source: {str(e)}")
+
         # Uncomment the following lines if you need to calculate max_tokens
         # contents = map(lambda message: message['content'], messages)
         # all_contents = ' '.join(contents)

@@ -24,7 +24,7 @@ def test_critical_classification():
     # Setup
     document_loader = DocumentLoaderPyPdf()
     extractor = Extractor(document_loader)
-    extractor.load_llm("groq/llama-3.1-70b-versatile")
+    extractor.load_llm("groq/llama-3.3-70b-versatile")
 
     process = Process()
     process.add_classify_extractor([[extractor]])
@@ -47,4 +47,8 @@ def test_critical_classification():
 
     # Assert
     assert result is not None
-    assert result.name == "Invoice" 
+    assert result.name == "Invoice"
+
+
+if __name__ == "__main__":
+    test_critical_classification()

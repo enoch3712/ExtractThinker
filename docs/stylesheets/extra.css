@@ -316,3 +316,14 @@
     opacity: 0.7;
     filter: grayscale(1);
 }
+
+/* Beta badge */
+.beta-badge {
+    background-color: #f5f3ff;
+    border: 1px solid #8b5cf6;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.875rem;
+    color: #6d28d9;
+    margin-left: 8px;
+}
