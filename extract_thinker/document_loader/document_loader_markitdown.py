@@ -131,6 +131,15 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
         """Apply any additional text processing (e.g., strip whitespace)."""
         return text if self.config.preserve_whitespace else text.strip()
 
+    def _is_url(self, source: str) -> bool:
+        """Check if the source is a URL."""
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(source)
+            return all([result.scheme, result.netloc])
+        except:
+            return False
+
     @cachedmethod(cache=attrgetter('cache'), 
                   key=lambda self, source: hashkey(
                       source if isinstance(source, str) else source.getvalue(), 
@@ -141,7 +150,7 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
         Load and process the source with MarkItDown, returning a list of pages.
 
         Args:
-            source: A file path or a BytesIO stream
+            source: A file path, BytesIO stream, or URL
 
         Returns:
             A list of dictionaries where each dict is one "page" of text.
@@ -207,3 +216,24 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
 
         except Exception as e:
             raise ValueError(f"Error processing document with MarkItDown: {str(e)}")
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Checks if the loader can handle the given source.
+        
+        Args:
+            source: Either a file path (str), a BytesIO stream, or a URL
+            
+        Returns:
+            bool: True if the loader can handle the source, False otherwise
+        """
+        try:
+            if isinstance(source, str):
+                if self._is_url(source):
+                    return True
+                return self._can_handle_file_path(source)
+            elif isinstance(source, BytesIO):
+                return self._can_handle_stream(source)
+            return False
+        except Exception:
+            return False

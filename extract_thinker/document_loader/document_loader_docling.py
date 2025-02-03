@@ -175,6 +175,37 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         from docling.document_converter import DocumentConverter
         return DocumentConverter()
 
+    def _is_url(self, potential_url: str) -> bool:
+        """
+        Check if the given string is a URL.
+        
+        Returns:
+            True if the string starts with "http://" or "https://", otherwise False.
+        """
+        return potential_url.startswith("http://") or potential_url.startswith("https://")
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Determine if the loader can handle the given source.
+        This method now supports URLs, local file paths with supported extensions, and BytesIO.
+        
+        Args:
+            source: The document source, which may be a string (file path or URL) or a BytesIO stream.
+            
+        Returns:
+            True if the source is a valid input for the loader, else False.
+        """
+        if isinstance(source, BytesIO):
+            return True
+        elif isinstance(source, str):
+            # If it's a URL, return True.
+            if self._is_url(source):
+                return True
+            # Otherwise, determine the file extension and check if it's supported.
+            extension = source.split('.')[-1].lower()
+            return extension in self.SUPPORTED_FORMATS
+        return False
+
     @cachedmethod(cache=lambda self: self.cache, 
                   key=lambda self, source: hashkey(
                       source if isinstance(source, str) else source.getvalue(), 

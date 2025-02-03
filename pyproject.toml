@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "extract_thinker"
-version = "0.1.4"
+version = "0.1.5"
 description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
@@ -9,7 +9,7 @@ readme = "README.md"
 python = ">=3.9,<3.14"
 pydantic = "^2.10.4"
 litellm = "^1.57.0"
-pillow = "^11.1.0"
+pillow = ">=10.4,<12.0"
 pypdfium2 = "^4.29.0"
 instructor = "^1.7.2"
 python-dotenv = "^1.0.1"
