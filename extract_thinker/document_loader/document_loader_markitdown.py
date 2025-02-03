@@ -57,9 +57,10 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
     """
 
     SUPPORTED_FORMATS = [
-        "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", 
+        "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
         "csv", "tsv", "txt", "html", "xml", "json", "zip",
-        "jpg", "jpeg", "png", "bmp", "gif", "wav", "mp3", "m4a"
+        "jpg", "jpeg", "png", "bmp", "gif", "wav", "mp3", "m4a",
+        "url"
     ]
     
     def __init__(

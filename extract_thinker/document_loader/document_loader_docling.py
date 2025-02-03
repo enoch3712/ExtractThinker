@@ -120,7 +120,9 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         # XML (including PubMed .nxml)
         "xml", "nxml",
         # Plain text
-        "txt"
+        "txt",
+        # URL support
+        "url"
     ]
 
     def __init__(
@@ -314,3 +316,17 @@ class DocumentLoaderDocling(CachedDocumentLoader):
                 rows.append("| " + " | ".join(row_text) + " |")
 
         return "\n".join(rows)
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """Override to add URL support."""
+        if isinstance(source, str) and self.is_url(source):
+            return True
+        return super().can_handle(source)
+
+    def is_url(self, source: str) -> bool:
+        """Check if the source is a URL."""
+        try:
+            result = urlparse(source)
+            return bool(result.scheme and result.netloc)
+        except:
+            return False
