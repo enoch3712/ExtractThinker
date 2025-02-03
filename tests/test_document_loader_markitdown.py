@@ -142,23 +142,40 @@ class TestDocumentLoaderMarkItDown(BaseDocumentLoaderTest):
             assert len(pages) > 0
             assert isinstance(pages[0]["content"], str)
             
+    def test_page_separator_splitting(self):
+        """
+        Test that multiple pages are correctly separated when loading a multi-page PDF.
+        Uses bulk.pdf which should contain 3 distinct pages.
+        """
+        # Get path to bulk.pdf test file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        bulk_pdf_path = os.path.join(current_dir, 'files', 'Regional_GDP_per_capita_2018_2.pdf')
 
-def test_page_separator_splitting():
-    """
-    Test that multiple pages are correctly separated when loading a multi-page PDF.
-    Uses bulk.pdf which should contain 3 distinct pages.
-    """
-    # Get path to bulk.pdf test file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    bulk_pdf_path = os.path.join(current_dir, 'files', 'Regional_GDP_per_capita_2018_2.pdf')
+        # Test without MIME type detection
+        config = MarkItDownConfig(
+            mime_type_detection=False,
+            default_extension='pdf'
+        )
+        loader = DocumentLoaderMarkItDown(config)
+        pages = loader.load(bulk_pdf_path)
 
-            # Test without MIME type detection
-    config = MarkItDownConfig(
-        mime_type_detection=False,
-        default_extension='pdf'
-    )
-    loader = DocumentLoaderMarkItDown(config)
-    pages = loader.load(bulk_pdf_path)
+        # Verify we get exactly 3 pages
+        assert len(pages) == 2, f"Expected 2 pages, got {len(pages)}"
 
-    # Verify we get exactly 3 pages
-    assert len(pages) == 2, f"Expected 2 pages, got {len(pages)}"
+    def test_url_loading(self, loader):
+        """Test loading from a URL for MarkItDown loader."""
+        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
+        # Verify that the loader accepts the URL as a valid source.
+        assert loader.can_handle(url) is True
+
+        pages = loader.load(url)
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        for page in pages:
+            assert "content" in page
+            assert isinstance(page["content"], str)
+
+    def test_can_handle_url(self, loader):
+        """Test that MarkItDown loader correctly identifies URL sources."""
+        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
+        assert loader.can_handle(url) is True

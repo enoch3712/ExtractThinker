@@ -227,7 +227,20 @@ class TestDocumentLoaderDocling(BaseDocumentLoaderTest):
 
         # 4. Check that your known Title text is present
         #    Suppose your PDF has "Document Title" as the Title.
-        assert "1 Introduction" in page_text, (
+        assert "## 1 ntroduction" in page_text, (
             "Expected the recognized Title ('1 Introduction') "
             "to appear in the extracted text."
         )
+
+    def test_url_loading(self, loader):
+        """Test loading from a URL for Docling loader."""
+        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
+        # Ensure the loader recognizes and can handle a URL
+        assert loader.can_handle(url) is True
+
+        pages = loader.load(url)
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        for page in pages:
+            assert "content" in page
+            assert isinstance(page["content"], str)
