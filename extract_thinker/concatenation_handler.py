@@ -161,17 +161,24 @@ class ConcatenationHandler(CompletionHandler):
                         "text": f"##Content\n\n{item['content']}"
                     })
                     
-                # Add image if available
-                if isinstance(item, dict) and "image" in item:
-                    if item["image"]:
-                        message_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{encode_image(item['image'])}"
-                            }
-                        })
+                # Add images if available
+                if isinstance(item, dict):
+                    images = []
+                    if "images" in item and isinstance(item["images"], list):
+                        images.extend(item["images"])
+                    if "image" in item and item["image"] is not None:
+                        images.append(item["image"])
+                    
+                    for img in images:
+                        if img:
+                            message_content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{encode_image(img)}"
+                                }
+                            })
         else:
-            # Fallback to original single-item handling
+            # Handle single item
             if isinstance(content, dict):
                 # Add text content if available
                 if "content" in content:
@@ -181,16 +188,20 @@ class ConcatenationHandler(CompletionHandler):
                     })
                     
                 # Add images
-                if "image" in content or "images" in content:
-                    images = content.get("images", [content.get("image")])
-                    for img in images:
-                        if img:
-                            message_content.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{encode_image(img)}"
-                                }
-                            })
+                images = []
+                if "images" in content and isinstance(content["images"], list):
+                    images.extend(content["images"])
+                if "image" in content and content["image"] is not None:
+                    images.append(content["image"])
+                
+                for img in images:
+                    if img:
+                        message_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encode_image(img)}"
+                            }
+                        })
                             
         return message_content
         
