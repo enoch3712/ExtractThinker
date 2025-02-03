@@ -491,16 +491,21 @@ class PaginationHandler(CompletionHandler):
         """Build content for vision request."""
         message_content = []
         
-        # Add text content if available
+        # If there's textual 'content', push it first
         if isinstance(content, dict) and "content" in content:
             message_content.append({
                 "type": "text",
                 "text": f"##Content\n\n{content['content']}"
             })
-            
-        # Add images
-        if isinstance(content, dict) and ("image" in content or "images" in content):
-            images = content.get("images", [content.get("image")])
+
+        # Now handle multiple images
+        if isinstance(content, dict):
+            images = []
+            if "images" in content and isinstance(content["images"], list):
+                images.extend(content["images"])
+            if "image" in content and content["image"] is not None:
+                images.append(content["image"])
+
             for img in images:
                 if img:
                     message_content.append({
@@ -509,7 +514,6 @@ class PaginationHandler(CompletionHandler):
                             "url": f"data:image/jpeg;base64,{encode_image(img)}"
                         }
                     })
-                    
         return message_content
         
     def _build_text_content(self, content: Any) -> str:
