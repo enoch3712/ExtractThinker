@@ -164,7 +164,7 @@ class PaginationHandler(CompletionHandler):
                         break
 
                 if unique_key:
-                    # Merge by unique key
+                    # Merge by unique key using case-insensitive comparison
                     merged_by_key = {}
                     for item in flattened:
                         if hasattr(item, 'model_dump'):
@@ -173,13 +173,14 @@ class PaginationHandler(CompletionHandler):
                             item_dict = item
                         key_val = item_dict.get(unique_key)
                         if key_val is not None:
-                            if key_val in merged_by_key:
-                                merged_by_key[key_val] = self._merge_two_models(
-                                    merged_by_key[key_val],
+                            normalized_key = str(key_val).lower()
+                            if normalized_key in merged_by_key:
+                                merged_by_key[normalized_key] = self._merge_two_models(
+                                    merged_by_key[normalized_key],
                                     item_dict
                                 )
                             else:
-                                merged_by_key[key_val] = item_dict
+                                merged_by_key[normalized_key] = item_dict
                         else:
                             # If no unique key found for this item, just store it uniquely
                             merged_by_key[f"no_key_{len(merged_by_key)}"] = item_dict

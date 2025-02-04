@@ -1,6 +1,7 @@
 from io import BytesIO
 from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -120,7 +121,9 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         # XML (including PubMed .nxml)
         "xml", "nxml",
         # Plain text
-        "txt"
+        "txt",
+        # URL support
+        "url"
     ]
 
     def __init__(
@@ -212,6 +215,7 @@ class DocumentLoaderDocling(CachedDocumentLoader):
                       self.vision_mode
                   ))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        from docling.document_converter import ConversionResult
         """
         Load and parse the document using Docling.
         
@@ -219,30 +223,35 @@ class DocumentLoaderDocling(CachedDocumentLoader):
             A list of dictionaries, each representing a "page" with:
               - "content": text from that page
               - "image": optional image bytes if vision_mode is True
-              - "markdown": Markdown string of that page
         """
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
 
         # Convert the source to a docling "ConversionResult"
-        conv_result = self._docling_convert(source)
-
-        test = conv_result.document.export_to_markdown()
-        print(test)
+        conv_result: ConversionResult = self._docling_convert(source)
         
-        # Build the output list of page data
+        # If the source is a URL, return a single page with all the content.
+        if isinstance(source, str) and self._is_url(source):
+            content = conv_result.document.export_to_markdown()
+            print(content)  # Log the exported markdown, if needed
+            page_output = {"content": content, "image": None}
+            # Handle image extraction if vision_mode is enabled
+            if self.vision_mode:
+                images_dict = self.convert_to_images(source)
+                page_output["images"] = images_dict.get(0)
+            return [page_output]
+
+        # Build the output list of page data for non-URL sources
         pages_output = []
         for p in conv_result.pages:
             page_dict = {
                 "content": conv_result.document.export_to_markdown(page_no=p.page_no+1),
                 "image": None
             }
-
             # Handle image extraction if vision_mode is enabled
             if self.vision_mode:
                 images_dict = self.convert_to_images(source)
                 page_dict["image"] = images_dict.get(p.page_no)
-
             pages_output.append(page_dict)
 
         # Fallback for documents without explicit pages

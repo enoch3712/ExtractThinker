@@ -17,6 +17,7 @@ cachetools = "^5.3.3"
 pyyaml = "^6.0.1"
 tiktoken = {version = "^0.8.0", python = ">=3.9,<3.13"}
 python-magic = "^0.4.27"
+playwright = "^1.50.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^7.1.1"

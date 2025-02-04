@@ -52,7 +52,9 @@ class BeautifulSoupConfig:
 class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
     """Loader that uses BeautifulSoup4 to load HTML content."""
     
-    SUPPORTED_FORMATS = ['html', 'htm']
+    SUPPORTED_FORMATS = [
+        'html', 'htm', 'url'  # Add URL support
+    ]
     
     def __init__(
         self,
@@ -257,9 +259,7 @@ class DocumentLoaderBeautifulSoup(CachedDocumentLoader):
             raise ValueError(f"Error loading HTML content: {str(e)}")
 
     def can_handle(self, source: Union[str, BytesIO]) -> bool:
-        """Check if the loader can handle this source."""
-        if isinstance(source, BytesIO):
+        """Override to add URL support."""
+        if isinstance(source, str) and self._is_url(source):
             return True
-        if self._is_url(source):
-            return True
-        return get_file_extension(source) in self.SUPPORTED_FORMATS
+        return super().can_handle(source)

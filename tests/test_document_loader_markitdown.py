@@ -159,23 +159,22 @@ class TestDocumentLoaderMarkItDown(BaseDocumentLoaderTest):
         loader = DocumentLoaderMarkItDown(config)
         pages = loader.load(bulk_pdf_path)
 
-        # Verify we get exactly 3 pages
+        # Verify we get exactly 2 pages (as per current expectations)
         assert len(pages) == 2, f"Expected 2 pages, got {len(pages)}"
 
     def test_url_loading(self, loader):
         """Test loading from a URL for MarkItDown loader."""
-        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
+        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2A/?view=chapter"
         # Verify that the loader accepts the URL as a valid source.
+        loader.set_vision_mode(True)
         assert loader.can_handle(url) is True
 
         pages = loader.load(url)
         assert isinstance(pages, list)
         assert len(pages) > 0
         for page in pages:
+            # This test expects the URL branch to return a page with "images" if vision mode is enabled.
             assert "content" in page
+            assert "images" in page
+            assert len(page["images"]) == 3
             assert isinstance(page["content"], str)
-
-    def test_can_handle_url(self, loader):
-        """Test that MarkItDown loader correctly identifies URL sources."""
-        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
-        assert loader.can_handle(url) is True

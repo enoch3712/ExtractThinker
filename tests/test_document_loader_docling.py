@@ -234,13 +234,17 @@ class TestDocumentLoaderDocling(BaseDocumentLoaderTest):
 
     def test_url_loading(self, loader):
         """Test loading from a URL for Docling loader."""
-        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2/?view=chapter"
+        loader = DocumentLoaderDocling()
+        url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2A/?view=chapter"
         # Ensure the loader recognizes and can handle a URL
+        loader.set_vision_mode(True)
         assert loader.can_handle(url) is True
-
+        
         pages = loader.load(url)
         assert isinstance(pages, list)
         assert len(pages) > 0
         for page in pages:
             assert "content" in page
+            assert "images" in page
+            assert len(page["images"]) == 3 
             assert isinstance(page["content"], str)
