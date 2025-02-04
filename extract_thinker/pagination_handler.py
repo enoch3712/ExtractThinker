@@ -164,7 +164,7 @@ class PaginationHandler(CompletionHandler):
                         break
 
                 if unique_key:
-                    # Merge by unique key
+                    # Merge by unique key using case-insensitive comparison
                     merged_by_key = {}
                     for item in flattened:
                         if hasattr(item, 'model_dump'):
@@ -173,13 +173,14 @@ class PaginationHandler(CompletionHandler):
                             item_dict = item
                         key_val = item_dict.get(unique_key)
                         if key_val is not None:
-                            if key_val in merged_by_key:
-                                merged_by_key[key_val] = self._merge_two_models(
-                                    merged_by_key[key_val],
+                            normalized_key = str(key_val).lower()
+                            if normalized_key in merged_by_key:
+                                merged_by_key[normalized_key] = self._merge_two_models(
+                                    merged_by_key[normalized_key],
                                     item_dict
                                 )
                             else:
-                                merged_by_key[key_val] = item_dict
+                                merged_by_key[normalized_key] = item_dict
                         else:
                             # If no unique key found for this item, just store it uniquely
                             merged_by_key[f"no_key_{len(merged_by_key)}"] = item_dict
@@ -491,16 +492,21 @@ class PaginationHandler(CompletionHandler):
         """Build content for vision request."""
         message_content = []
         
-        # Add text content if available
+        # If there's textual 'content', push it first
         if isinstance(content, dict) and "content" in content:
             message_content.append({
                 "type": "text",
                 "text": f"##Content\n\n{content['content']}"
             })
-            
-        # Add images
-        if isinstance(content, dict) and ("image" in content or "images" in content):
-            images = content.get("images", [content.get("image")])
+
+        # Now handle multiple images
+        if isinstance(content, dict):
+            images = []
+            if "images" in content and isinstance(content["images"], list):
+                images.extend(content["images"])
+            if "image" in content and content["image"] is not None:
+                images.append(content["image"])
+
             for img in images:
                 if img:
                     message_content.append({
@@ -509,7 +515,6 @@ class PaginationHandler(CompletionHandler):
                             "url": f"data:image/jpeg;base64,{encode_image(img)}"
                         }
                     })
-                    
         return message_content
         
     def _build_text_content(self, content: Any) -> str:

@@ -16,6 +16,9 @@ from extract_thinker.document_loader.document_loader_azure_document_intelligence
 import pytest
 import numpy as np
 from litellm import embedding
+from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling
+from tests.models.handbook_contract import HandbookContract
+
 
 load_dotenv()
 cwd = os.getcwd()
@@ -190,7 +193,7 @@ def test_pagination_handler():
     test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
 
     extractor = Extractor()
-    extractor.load_document_loader(DocumentLoaderPdfPlumber())
+    extractor.load_document_loader(DocumentLoaderDocling())
     extractor.load_llm("gpt-4o")
 
     # Create and run both extractions in parallel
@@ -405,3 +408,22 @@ def test_extract_with_pydanticai_backend():
 
     except ImportError:
         pytest.skip("pydantic-ai not installed")
+
+def test_extract_from_url_docling_and_gpt4o_mini():
+    """
+    Test extraction from a URL using the Docling document loader and gpt-4o-mini LLM.
+    The test asserts that the extracted title is as expected.
+    """
+    url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2A/?view=chapter"
+
+    # Initialize the extractor, load the Docling loader and the gpt-4o-mini LLM
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderDocling())
+    extractor.load_llm("gpt-4o-mini")
+    
+    # Act: Extract the document using the specified URL and the HandbookContract
+    result = extractor.extract(url, HandbookContract)
+
+    # Assert: Verify that the extracted title matches the expected value.
+    expected_title = "BCOBS 2A.1 Restriction on marketing or providing an optional product for which a fee is payable"
+    assert result.title == expected_title

@@ -49,6 +49,7 @@ class Extractor:
         self.llm_interceptors: List[LlmInterceptor] = []
         self.is_classify_image: bool = False
         self._skip_loading: bool = False
+        self.chunk_height: int = 1500
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -184,9 +185,10 @@ class Extractor:
         Maps loaded content to a universal format that _extract can process.
         The universal format is:
         {
-            "content": str,  # The text content
-            "images": List[bytes],  # Optional list of image bytes if vision=True
-            "metadata": Dict[str, Any]  # Optional metadata
+            "content": str,      # The text content (joined from pages)
+            "images": List[bytes], 
+               # Optional list of image bytes if vision=True (can hold multiple)
+            "metadata": {}
         }
         """
         if content is None:
@@ -194,6 +196,16 @@ class Extractor:
 
         # If content is already in universal format, return as is
         if isinstance(content, dict) and "content" in content:
+            # Ensure 'images' is a list
+            if "image" in content and "images" not in content:
+                # Merge single 'image' into 'images'
+                content["images"] = [content["image"]] if content["image"] else []
+                del content["image"]
+            elif "images" in content and not isinstance(content["images"], list):
+                # If 'images' is mistakenly a single byte blob, fix it
+                content["images"] = [content["images"]] if content["images"] else []
+            elif "images" not in content:
+                content["images"] = []
             return content
 
         # Handle list of pages from document loader
@@ -207,8 +219,13 @@ class Extractor:
                     if 'content' in page:
                         text_content.append(page['content'])
                     # Extract images if vision mode is enabled
-                    if vision and 'image' in page:
-                        images.append(page['image'])
+                    if vision:
+                        # If there's a list of images
+                        if 'images' in page and isinstance(page['images'], list):
+                            images.extend(page['images'])
+                        # Or just a single 'image'
+                        elif 'image' in page and page['image']:
+                            images.append(page['image'])
 
             return {
                 "content": "\n\n".join(text_content) if text_content else "",
@@ -230,11 +247,18 @@ class Extractor:
             if isinstance(text_content, list):
                 text_content = "\n".join(text_content)
             
+            images = []
+            if vision:
+                if "images" in content and isinstance(content["images"], list):
+                    images.extend(content["images"])
+                elif "image" in content and content["image"]:
+                    images.append(content["image"])
+            
             return {
                 "content": text_content,
-                "images": content.get("images", []) if vision else [],
+                "images": images,
                 "metadata": {k: v for k, v in content.items() 
-                           if k not in ["text", "images", "content"]}
+                           if k not in ["text", "images", "image", "content"]}
             }
 
         raise ValueError(f"Unsupported content format: {type(content)}")
@@ -1067,7 +1091,7 @@ class Extractor:
         elif isinstance(content, dict):
             # Handle legacy format
             image_data = content.get('image') or content.get('images')
-            self._append_images(image_data, message_content)
+            self._append_images(image_data[0], message_content)
 
     def _append_images(
         self,
@@ -1078,27 +1102,54 @@ class Extractor:
         Append images to the message content.
 
         Args:
-            image_data: The image data to process.
+            image_data: The image data to process. Can be:
+                - A dictionary with 'image' or 'images' keys
+                - A list of images
+                - A single image
             message_content: The message content to append images to.
         """
         if not image_data:
             return
 
+        images_list = []
         if isinstance(image_data, dict):
-            images_list = image_data.values()
+            # Handle dictionary format
+            if "images" in image_data:
+                # If "images" key exists, it should be a list of images
+                if isinstance(image_data["images"], list):
+                    images_list.extend(image_data["images"])
+                else:
+                    # Single image in "images" key
+                    images_list.append(image_data["images"])
+            elif "image" in image_data and image_data["image"] is not None:
+                # Single image in "image" key
+                images_list.append(image_data["image"])
         elif isinstance(image_data, list):
-            images_list = image_data
+            # Process list of images or image dictionaries
+            for item in image_data:
+                if isinstance(item, dict):
+                    # Handle nested image dictionaries
+                    if "images" in item and isinstance(item["images"], list):
+                        images_list.extend(item["images"])
+                    elif "image" in item and item["image"] is not None:
+                        images_list.append(item["image"])
+                else:
+                    # Raw image data
+                    images_list.append(item)
         else:
-            images_list = [image_data]
+            # Single raw image
+            images_list.append(image_data)
 
+        # Process all collected images
         for img in images_list:
-            base64_image = encode_image(img)
-            message_content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}"
-                }
-            })
+            if img is not None:  # Skip None values
+                base64_image = encode_image(img)
+                message_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                    }
+                })
 
     def _build_messages(
         self,

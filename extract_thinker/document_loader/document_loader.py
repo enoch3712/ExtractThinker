@@ -18,18 +18,21 @@ class DocumentLoader(ABC):
     #     "pdf", "jpg", "jpeg", "png", "tiff", "bmp"
     # ]
 
-    def __init__(self, content: Any = None, cache_ttl: int = 300):
+    def __init__(self, content: Any = None, cache_ttl: int = 300, screenshot_timeout: int = 1000):
         """Initialize loader.
         
         Args:
             content: Initial content
             cache_ttl: Cache time-to-live in seconds
+            screenshot_timeout: Timeout in milliseconds to wait for page content load when capturing a screenshot.
         """
         self.content = content
         self.file_path = None
         self.cache = TTLCache(maxsize=100, ttl=cache_ttl)
         self.vision_mode = False
         self.max_image_size = None  # Changed to None by default
+        self.is_url = False  # Indicates if the source is a URL
+        self.screenshot_timeout = screenshot_timeout
 
     def set_max_image_size(self, size: int) -> None:
         """Set the maximum image size."""
@@ -38,6 +41,10 @@ class DocumentLoader(ABC):
     def set_vision_mode(self, enabled: bool = True) -> None:
         """Enable or disable vision mode processing."""
         self.vision_mode = enabled
+
+    def set_screenshot_timeout(self, timeout: int) -> None:
+        """Set the screenshot timeout in milliseconds for capturing a screenshot from a URL."""
+        self.screenshot_timeout = timeout
 
     def can_handle(self, source: Union[str, BytesIO]) -> bool:
         """
@@ -68,7 +75,6 @@ class DocumentLoader(ABC):
     def _can_handle_stream(self, stream: BytesIO) -> bool:
         """Checks if the loader can handle the given BytesIO stream."""
         try:
-            # Read the first few bytes to determine file type
             mime = magic.from_buffer(stream.getvalue(), mime=True)
             stream.seek(0)  # Reset stream position
             return check_mime_type(mime, self.SUPPORTED_FORMATS)
@@ -95,7 +101,8 @@ class DocumentLoader(ABC):
     def _convert_file_to_images(self, file_path: str, scale: float) -> Dict[int, bytes]:
         """Convert file to images, handling both URLs and local files."""
         # Check if it's a URL
-        if self.is_url(file_path):
+        if self._is_url(file_path):
+            self.is_url = True  # Set the instance variable if the source is a URL
             try:
                 screenshot = self._capture_screenshot_from_url(file_path)
                 # Convert screenshot to PIL Image for potential resizing
@@ -194,7 +201,7 @@ class DocumentLoader(ABC):
         """
         try:
             if isinstance(source, str):
-                if self.is_url(source):
+                if self._is_url(source):
                     return True  # URLs are always supported in vision mode
                 ext = get_file_extension(source).lower()
                 return ext in ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp']
@@ -238,13 +245,20 @@ class DocumentLoader(ABC):
         except Exception:
             return False
 
-    def is_url(self, source: str) -> bool:
-        """Check if the source is a URL."""
+    @staticmethod
+    def _check_playwright_dependencies():
+        """
+        Check if the playwright dependency is installed.
+        Raises:
+            ImportError: If playwright is not installed.
+        """
         try:
-            result = urlparse(source)
-            return bool(result.scheme and result.netloc)
-        except:
-            return False
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise ImportError(
+                "You are using vision with url. You need to install playwright."
+                "`pip install playwright` and run `playwright install`."
+            )
 
     def _capture_screenshot_from_url(self, url: str) -> bytes:
         """
@@ -256,6 +270,11 @@ class DocumentLoader(ABC):
         Returns:
             bytes: The screenshot image data
         """
+        # Optional: Check if playwright is installed before attempting to use it.
+        self._check_playwright_dependencies()
+        
+        from playwright.sync_api import sync_playwright  # Import after the dependency check
+        
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
@@ -266,12 +285,12 @@ class DocumentLoader(ABC):
                 
                 # Optional: Handle cookie consent popups (customize selectors as needed)
                 try:
-                    page.click('button:has-text("Accept")', timeout=3000)
-                except:
-                    pass  # Ignore if no cookie banner found
+                    page.click('button:has-text("Accept")', timeout=10000)
+                except Exception:
+                    pass  # Ignore if no cookie banner is found
                     
-                # Wait for content to load
-                page.wait_for_timeout(1000)
+                # Wait for content to load with the configurable timeout
+                page.wait_for_timeout(self.screenshot_timeout)
                 
                 # Capture full page screenshot
                 screenshot = page.screenshot(full_page=True)
@@ -313,10 +332,10 @@ class DocumentLoader(ABC):
             
         return chunks_bytes
 
-def is_url(source: str) -> bool:
-    """Check if the source is a URL."""
-    try:
-        result = urlparse(source)
-        return bool(result.scheme and result.netloc)
-    except:
-        return False  
+    def _is_url(self, source: str) -> bool:
+        """Check if the source string is a URL."""
+        try:
+            result = urlparse(source)
+            return bool(result.scheme and result.netloc)
+        except:
+            return False

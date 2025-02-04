@@ -1,6 +1,7 @@
 from io import BytesIO
 from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -177,12 +178,44 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         from docling.document_converter import DocumentConverter
         return DocumentConverter()
 
+    def _is_url(self, potential_url: str) -> bool:
+        """
+        Check if the given string is a URL.
+        
+        Returns:
+            True if the string starts with "http://" or "https://", otherwise False.
+        """
+        return potential_url.startswith("http://") or potential_url.startswith("https://")
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Determine if the loader can handle the given source.
+        This method now supports URLs, local file paths with supported extensions, and BytesIO.
+        
+        Args:
+            source: The document source, which may be a string (file path or URL) or a BytesIO stream.
+            
+        Returns:
+            True if the source is a valid input for the loader, else False.
+        """
+        if isinstance(source, BytesIO):
+            return True
+        elif isinstance(source, str):
+            # If it's a URL, return True.
+            if self._is_url(source):
+                return True
+            # Otherwise, determine the file extension and check if it's supported.
+            extension = source.split('.')[-1].lower()
+            return extension in self.SUPPORTED_FORMATS
+        return False
+
     @cachedmethod(cache=lambda self: self.cache, 
                   key=lambda self, source: hashkey(
                       source if isinstance(source, str) else source.getvalue(), 
                       self.vision_mode
                   ))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
+        from docling.document_converter import ConversionResult
         """
         Load and parse the document using Docling.
         
@@ -190,30 +223,35 @@ class DocumentLoaderDocling(CachedDocumentLoader):
             A list of dictionaries, each representing a "page" with:
               - "content": text from that page
               - "image": optional image bytes if vision_mode is True
-              - "markdown": Markdown string of that page
         """
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
 
         # Convert the source to a docling "ConversionResult"
-        conv_result = self._docling_convert(source)
-
-        test = conv_result.document.export_to_markdown()
-        print(test)
+        conv_result: ConversionResult = self._docling_convert(source)
         
-        # Build the output list of page data
+        # If the source is a URL, return a single page with all the content.
+        if isinstance(source, str) and self._is_url(source):
+            content = conv_result.document.export_to_markdown()
+            print(content)  # Log the exported markdown, if needed
+            page_output = {"content": content, "image": None}
+            # Handle image extraction if vision_mode is enabled
+            if self.vision_mode:
+                images_dict = self.convert_to_images(source)
+                page_output["images"] = images_dict.get(0)
+            return [page_output]
+
+        # Build the output list of page data for non-URL sources
         pages_output = []
         for p in conv_result.pages:
             page_dict = {
                 "content": conv_result.document.export_to_markdown(page_no=p.page_no+1),
                 "image": None
             }
-
             # Handle image extraction if vision_mode is enabled
             if self.vision_mode:
                 images_dict = self.convert_to_images(source)
                 page_dict["image"] = images_dict.get(p.page_no)
-
             pages_output.append(page_dict)
 
         # Fallback for documents without explicit pages
@@ -316,17 +354,3 @@ class DocumentLoaderDocling(CachedDocumentLoader):
                 rows.append("| " + " | ".join(row_text) + " |")
 
         return "\n".join(rows)
-
-    def can_handle(self, source: Union[str, BytesIO]) -> bool:
-        """Override to add URL support."""
-        if isinstance(source, str) and self.is_url(source):
-            return True
-        return super().can_handle(source)
-
-    def is_url(self, source: str) -> bool:
-        """Check if the source is a URL."""
-        try:
-            result = urlparse(source)
-            return bool(result.scheme and result.netloc)
-        except:
-            return False

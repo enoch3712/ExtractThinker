@@ -53,7 +53,11 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
     Supports text extraction and optional image/page rendering in vision mode.
     Produces a list of pages, each with:
       - "content": text from that page
-      - "image": optional page/image bytes if vision_mode is True
+      - "image": optional page/image bytes if vision_mode is True (for non-URL sources)
+      - For URL sources, returns a single page with:
+          - "content": extracted text
+          - "image": always None
+          - "images": rendered image bytes if vision_mode is enabled
     """
 
     SUPPORTED_FORMATS = [
@@ -132,6 +136,32 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
         """Apply any additional text processing (e.g., strip whitespace)."""
         return text if self.config.preserve_whitespace else text.strip()
 
+    def _is_url(self, potential_url: str) -> bool:
+        """Check if the source is a URL."""
+        return potential_url.startswith("http://") or potential_url.startswith("https://")
+
+    def can_handle(self, source: Union[str, BytesIO]) -> bool:
+        """
+        Checks if the loader can handle the given source.
+        
+        Args:
+            source: Either a file path (str), a BytesIO stream, or a URL
+            
+        Returns:
+            bool: True if the loader can handle the source, False otherwise
+        """
+        try:
+            if isinstance(source, str):
+                if self._is_url(source):
+                    return True
+                extension = source.split('.')[-1].lower()
+                return extension in self.SUPPORTED_FORMATS
+            elif isinstance(source, BytesIO):
+                return True
+            return False
+        except Exception:
+            return False
+
     @cachedmethod(cache=attrgetter('cache'), 
                   key=lambda self, source: hashkey(
                       source if isinstance(source, str) else source.getvalue(), 
@@ -142,13 +172,31 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
         Load and process the source with MarkItDown, returning a list of pages.
 
         Args:
-            source: A file path or a BytesIO stream
+            source: A file path, BytesIO stream, or URL
 
         Returns:
             A list of dictionaries where each dict is one "page" of text.
-            - "content": The text content (str)
-            - "image": Optional bytes if vision mode is enabled (key only present if vision_mode is True)
+            For non-URL sources:
+              - "content": The text content (str)
+              - "image": Optional bytes if vision mode is enabled (key only present if vision_mode is True)
+            For URL sources:
+              - "content": The text content (str)
+              - "image": Always None
+              - "images": Optional rendered image bytes if vision mode is enabled
         """
+        # Handle URL sources separately
+        if isinstance(source, str) and self._is_url(source):
+            try:
+                result = self.markitdown.convert(source)
+                text_content = result.text_content or ""
+                page_output = {"content": text_content, "image": None}
+                if self.vision_mode:
+                    images_dict = self.convert_to_images(source)
+                    page_output["images"] = images_dict.get(0)
+                return [page_output]
+            except Exception as e:
+                raise ValueError(f"Error processing document with MarkItDown URL handling: {str(e)}")
+
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
 
@@ -162,7 +210,7 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
                 # File path
                 result = self.markitdown.convert(source)
             else:
-                # BytesIO
+                # BytesIO stream
                 source.seek(0)
                 if self.config.mime_type_detection:
                     mime = magic.from_buffer(source.getvalue(), mime=True)
@@ -181,13 +229,9 @@ class DocumentLoaderMarkItDown(CachedDocumentLoader):
                 source.seek(0)
 
             # Full text from MarkItDown
-            text_content = result.text_content
-            if not text_content:
-                text_content = ""
-
+            text_content = result.text_content or ""
             # Split text content into pages (based on config.page_separator)
             raw_pages = text_content.split(self.config.page_separator)
-
             pages = []
             for page_text in raw_pages:
                 processed = self._process_text(page_text)

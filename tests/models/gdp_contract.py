@@ -21,11 +21,21 @@ class RegionData(Contract):
     provinces: List[ProvinceData] = Field(default_factory=list)
 
 class CountryData(Contract):
-    country: str
-    total_gdp_million: Optional[float] = Field(None, description="Total GDP (€ million)")
-    regions: List[RegionData] = Field(default_factory=list, description="Make sure to ignore Extra-regio*/Extra-region")
+    country: str = Field(
+        ...,
+        description="Country name as it appears in the PDF. IMPORTANT: Extract this value from every page and aggregate unique entries, not just the first occurrence."
+    )
+    total_gdp_million: Optional[float] = Field(
+        None,
+        description="Total GDP (€ million) for the country, using the value from any page in the document."
+    )
+    regions: List[RegionData] = Field(
+        default_factory=list,
+        description="List of regions for the country. Aggregate all regions from every page and ignore any formatting variations like 'Extra-regio*/Extra-region'."
+    )
 
 class EUData(Contract):
+    thinking: str = Field(None, description="Think step by step. You have 2 pages dont forget to add them.")
     eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
     eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
-    countries: List[CountryData] 
+    countries: List[CountryData] = Field(None, description="List of countries. Make sure you add all countries of every page, not just the first one.")
