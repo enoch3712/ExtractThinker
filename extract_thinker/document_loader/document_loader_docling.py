@@ -233,7 +233,7 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         # If the source is a URL, return a single page with all the content.
         if isinstance(source, str) and self._is_url(source):
             content = conv_result.document.export_to_markdown()
-            print(content)  # Log the exported markdown, if needed
+
             page_output = {"content": content, "image": None}
             # Handle image extraction if vision_mode is enabled
             if self.vision_mode:
