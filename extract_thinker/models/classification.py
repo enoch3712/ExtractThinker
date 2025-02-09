@@ -7,6 +7,7 @@ class Classification(BaseModel):
     name: str
     description: str
     contract: Optional[Type] = None
+    extraction_contract: Optional[Type] = None
     image: Optional[str] = None
     extractor: Optional[Any] = None
 
@@ -17,6 +18,15 @@ class Classification(BaseModel):
                 raise ValueError('contract must be a type')
             if not issubclass(v, Contract):
                 raise ValueError('contract must be a subclass of Contract')
+        return v
+
+    @field_validator('extraction_contract', mode='before')
+    def validate_extraction_contract(cls, v):
+        if v is not None:
+            if not isinstance(v, type):
+                raise ValueError('extraction_contract must be a type')
+            if not issubclass(v, Contract):
+                raise ValueError('extraction_contract must be a subclass of Contract')
         return v
 
     def set_image(self, image_path: str):
