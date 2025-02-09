@@ -249,7 +249,8 @@ class Process:
             for classification in self.split_classifications:
                 if classification.name == classificationStr:
                     extractor = classification.extractor
-                    contract = classification.contract
+                    # If an extraction_contract is provided, use it; otherwise, use the default contract
+                    contract = classification.extraction_contract or classification.contract
                     break
 
             if extractor is None:
