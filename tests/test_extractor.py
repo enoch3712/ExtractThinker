@@ -1,5 +1,10 @@
 import asyncio
+from enum import Enum
+from pydantic import Field
 import os
+import sys
+from typing import List
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from extract_thinker.extractor import Extractor
@@ -16,8 +21,9 @@ from extract_thinker.document_loader.document_loader_azure_document_intelligence
 import pytest
 import numpy as np
 from litellm import embedding
-from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling
+from extract_thinker.document_loader.document_loader_docling import DoclingConfig, DocumentLoaderDocling
 from tests.models.handbook_contract import HandbookContract
+from extract_thinker.global_models import get_lite_model, get_big_model
 
 
 load_dotenv()
@@ -32,7 +38,7 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     extractor.load_document_loader(
         DocumentLoaderPyPdf()
     )
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
 
     # Act
     result = extractor.extract(test_file_path, InvoiceContract)
@@ -51,7 +57,7 @@ def test_extract_with_azure_di_and_gpt4o_mini():
     extractor.load_document_loader(
         DocumentLoaderAzureForm(subscription_key, endpoint)
     )
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
     # Act
     result = extractor.extract(test_file_path, InvoiceContract)
 
@@ -71,7 +77,7 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     extractor.load_llm("gpt-4o-mini")
     
     # Act
-    result = extractor.extract(test_file_path, InvoiceContract)
+    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
 
     # Assert
     assert result is not None
@@ -83,7 +89,7 @@ def test_extract_with_pypdf_and_gpt4o_mini():
 def test_vision_content_pdf():
     # Arrange
     extractor = Extractor()
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
     test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
 
     # Act
@@ -108,7 +114,7 @@ def test_vision_content_pdf():
 def test_chart_with_content():
     # Arrange
     extractor = Extractor()
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
     test_file_path = os.path.join(cwd, "tests", "test_images", "eu_tax_chart.png")
 
     # Act
@@ -131,7 +137,7 @@ def test_extract_with_loader_and_vision():
     extractor = Extractor()
     loader = DocumentLoaderPyPdf()
     extractor.load_document_loader(loader)
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
 
     # Act
     result = extractor.extract(test_file_path, InvoiceContract, vision=True)
@@ -152,7 +158,7 @@ def test_extract_with_loader_and_vision():
 def test_extract_with_invalid_file_path():
     # Arrange
     extractor = Extractor()
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
     invalid_file_path = os.path.join(cwd, "tests", "nonexistent", "fake_file.png")
 
     # Act & Assert
@@ -165,7 +171,7 @@ def test_forbidden_strategy_with_token_limit():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
     tesseract_path = os.getenv("TESSERACT_PATH")
 
-    llm = LLM("gpt-4o-mini", token_limit=10)
+    llm = LLM(get_lite_model(), token_limit=10)
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
@@ -194,7 +200,7 @@ def test_pagination_handler():
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderDocling())
-    extractor.load_llm("gpt-4o")
+    extractor.load_llm(get_big_model())
 
     # Create and run both extractions in parallel
     async def run_parallel_extractions():
@@ -284,7 +290,7 @@ def test_concatenation_handler():
     tesseract_path = os.getenv("TESSERACT_PATH")
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    llm_first = LLM("gpt-4o", token_limit=500)
+    llm_first = LLM(get_big_model(), token_limit=500)
     extractor.load_llm(llm_first)
 
     result_1: ReportContract = extractor.extract(
@@ -296,7 +302,7 @@ def test_concatenation_handler():
 
     second_extractor = Extractor()
     second_extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    second_extractor.load_llm("gpt-4o")
+    second_extractor.load_llm(get_big_model())
 
     result_2: ReportContract = second_extractor.extract(
         test_file_path,
@@ -324,7 +330,7 @@ def test_llm_timeout():
     extractor.load_document_loader(DocumentLoaderPyPdf())
     
     # Create LLM with very short timeout
-    llm = LLM("gpt-4o-mini")
+    llm = LLM(get_lite_model())
     llm.set_timeout(1)  # Set timeout to 1ms (extremely short to force timeout)
     extractor.load_llm(llm)
     
@@ -374,7 +380,7 @@ def test_extract_with_default_backend():
     
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderPyPdf())
-    extractor.load_llm(LLM("gpt-4o-mini", backend=LLMEngine.DEFAULT))
+    extractor.load_llm(LLM(get_lite_model(), backend=LLMEngine.DEFAULT))
 
     # Act
     result = extractor.extract(test_file_path, InvoiceContract)
@@ -395,7 +401,7 @@ def test_extract_with_pydanticai_backend():
         
         extractor = Extractor()
         extractor.load_document_loader(DocumentLoaderPyPdf())
-        extractor.load_llm(LLM("openai:gpt-4o-mini", backend=LLMEngine.PYDANTIC_AI))
+        extractor.load_llm(LLM(get_lite_model(), backend=LLMEngine.PYDANTIC_AI))
 
         # Act
         result = extractor.extract(test_file_path, InvoiceContract)
@@ -419,7 +425,7 @@ def test_extract_from_url_docling_and_gpt4o_mini():
     # Initialize the extractor, load the Docling loader and the gpt-4o-mini LLM
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderDocling())
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
     
     # Act: Extract the document using the specified URL and the HandbookContract
     result = extractor.extract(url, HandbookContract)
@@ -427,3 +433,85 @@ def test_extract_from_url_docling_and_gpt4o_mini():
     # Assert: Verify that the extracted title matches the expected value.
     expected_title = "BCOBS 2A.1 Restriction on marketing or providing an optional product for which a fee is payable"
     assert result.title == expected_title
+
+
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+    TesseractCliOcrOptions,
+    TableStructureOptions,
+)
+
+from docling.datamodel.base_models import InputFormat
+from docling.document_converter import PdfFormatOption
+
+class Types(str, Enum):
+    EMAIL = "email"
+    DOMAIN = "domain"
+    IP = "ip"
+    URL = "url"
+    HASH = "hash"
+    FILE = "file"
+
+class Indicator(Contract):
+    IOCType: Types = Field(description="Indicator of Compromise type like email, domain, ip, url, hash, file, mutex, yara")
+    IOCValue: str = Field(description="IOC Value like 'APT29.com', 'evil@apt29.ru', '31.3.3.7', etc.")
+    IOCContext: str = Field(description="Context information to IOC")
+
+class IndicatorsContract(Contract):
+        Indicators: List[Indicator] = Field(
+        description="List of all IOCs"
+    )
+
+job = """You are an experienced Cyber Threat Intelligence and Cyber Defense Analyst.
+Get all available Indicators of Compromise (IoCs) and provide a precise description about every IoC. You MUST not skip an IoC.
+The following IoC types should be considered: """ + ", ".join([ioc_type.value for ioc_type in Types])
+
+if __name__ == "__main__":
+    test_file_path = os.path.join(cwd, "tests", "files", "ransomeware2.pdf")
+
+    ocr_options = TesseractCliOcrOptions(
+        force_full_page_ocr=True,
+        tesseract_cmd="/opt/homebrew/bin/tesseract"
+    )
+    
+    table_options = TableStructureOptions(
+        do_cell_matching=True
+    )
+        
+    pdf_options = PdfPipelineOptions(
+        do_table_structure=True,
+        do_ocr=True,
+        ocr_options=ocr_options,
+        table_structure_options=table_options
+    )
+
+    format_options = {
+        InputFormat.PDF: PdfFormatOption(
+            pipeline_options=pdf_options
+        )
+    }
+        
+    config = DoclingConfig(
+        format_options=format_options,
+        ocr_enabled=True,
+        force_full_page_ocr=True
+    )
+    loader = DocumentLoaderDocling(config)
+    
+    loader.set_vision_mode(True)
+
+    content = loader.load(test_file_path)
+
+    extractor = Extractor()
+    extractor.load_document_loader(loader)
+    extractor.load_llm("gpt-4o")
+
+    result = extractor.extract(
+        test_file_path,
+        IndicatorsContract,
+        vision=True,
+        content=job,
+        completion_strategy=CompletionStrategy.PAGINATE
+    )
+
+    print(result.model_dump_json(indent=4))
