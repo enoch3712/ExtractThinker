@@ -1,9 +1,4 @@
 import os
-import sys
-
-from extract_thinker.extractor import Extractor
-from tests.models.invoice import InvoiceContract
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pytest
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf, PyPDFConfig
 from tests.test_document_loader_base import BaseDocumentLoaderTest
@@ -121,22 +116,3 @@ class TestDocumentLoaderPyPdf(BaseDocumentLoaderTest):
         """Test handling of invalid files"""
         with pytest.raises(ValueError):
             loader.load("nonexistent.pdf")
-
-
-if __name__ == "__main__":
-    loader = DocumentLoaderPyPdf()
-    loader.set_vision_mode(True)
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    test_file_path = os.path.join(current_dir, 'files', 'invoice.pdf')
-    
-    content = loader.load(test_file_path)
-
-    extractor = Extractor()
-    extractor.load_document_loader(loader)
-    extractor.load_llm("gpt-4o-mini")
-
-    result = extractor.extract(test_file_path, InvoiceContract)
-
-    print(content)
-
