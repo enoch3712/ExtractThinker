@@ -35,7 +35,13 @@ class CountryData(Contract):
     )
 
 class EUData(Contract):
-    thinking: str = Field(None, description="Think step by step. You have 2 pages dont forget to add them.")
+    thinking: str = Field(None, description="Think step by step. You have 2 pages dont forget to add them. Cannot be NULL or empty.")
     eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
     eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
     countries: List[CountryData] = Field(None, description="List of countries. Make sure you add all countries of every page, not just the first one.")
+
+class EUDataOptional(Contract):
+    #thinking: str = Field(None, description="Think step by step. You have 2 pages dont forget to add them.")
+    eu_total_gdp_million_27: float = Field(None, description="EU27 Total GDP (€ million)")
+    eu_total_gdp_million_28: float = Field(None, description="EU28 Total GDP (€ million)")
+    countries: Optional[List[CountryData]] = Field(None, description="List of countries. Make sure you add all countries of every page, not just the first one.")

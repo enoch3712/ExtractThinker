@@ -1,7 +1,7 @@
 import os
 import pytest
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf, PyPDFConfig
-from .test_document_loader_base import BaseDocumentLoaderTest
+from tests.test_document_loader_base import BaseDocumentLoaderTest
 
 class TestDocumentLoaderPyPdf(BaseDocumentLoaderTest):
     @pytest.fixture
