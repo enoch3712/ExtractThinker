@@ -3,7 +3,7 @@
 The Concatenate strategy is designed to handle content that exceeds the LLM's context window by splitting it into manageable chunks, processing them separately, and then combining the results.
 
 <div align="center">
-  <img src="../../../assets/completion_concatenate.png" alt="Concatenate Strategy" width="50%">
+  <img src="../../assets/completion_concatenate.png" alt="Concatenate Strategy" width="50%">
 </div>
 
 ## How It Works
