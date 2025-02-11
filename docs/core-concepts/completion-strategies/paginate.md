@@ -3,7 +3,7 @@
 The PAGINATE strategy processes multi-page documents by handling each page independently and then intelligently merging the results, including sophisticated conflict resolution when pages contain overlapping information.
 
 <div align="center">
-  <img src="../../../assets/completion_paginate.png" alt="Paginate Strategy" width="35%">
+  <img src="../../assets/completion_paginate.png" alt="Paginate Strategy" width="35%">
 </div>
 
 ## How It Works
