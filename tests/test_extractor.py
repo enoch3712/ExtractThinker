@@ -1,10 +1,5 @@
 import asyncio
-from enum import Enum
-from pydantic import Field
 import os
-import sys
-from typing import List
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from extract_thinker.extractor import Extractor
@@ -16,7 +11,7 @@ from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from tests.models.page_contract import ReportContract
-from tests.models.gdp_contract import EUData
+from tests.models.gdp_contract import EUData, EUDataOptional
 from extract_thinker.document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
 import pytest
 import numpy as np
@@ -210,8 +205,8 @@ def test_pagination_handler():
         )
         return result_1, result_2
 
-    # Run the async code
-    results: tuple[EUData, EUData] = asyncio.run(run_parallel_extractions())
+    # Run the async extraction and get the results as instances of OptionalEUData
+    results = asyncio.run(run_parallel_extractions())
     result_1, result_2 = results
 
     # Compare top-level EU data
@@ -257,6 +252,25 @@ def test_pagination_handler():
     #             assert province1.gdp_million == matching_province.gdp_million
     #             assert province1.share_in_eu27_gdp == matching_province.share_in_eu27_gdp
     #             assert province1.gdp_per_capita == matching_province.gdp_per_capita
+
+def test_pagination_handler_optional():
+    test_file_path = os.path.join(os.getcwd(), "tests", "files", "Regional_GDP_per_capita_2018_2.pdf")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderDocling())
+    extractor.load_llm(get_big_model())
+
+    async def extract_async_optional(extractor, file_path, vision, completion_strategy):
+        return extractor.extract(
+            file_path,
+            EUDataOptional,
+            vision=vision,
+            completion_strategy=completion_strategy
+        )
+    
+    result = asyncio.run(extract_async_optional(extractor, test_file_path, vision=True, completion_strategy=CompletionStrategy.PAGINATE))
+
+    assert len(result.countries) == 6
 
 def get_embedding(text, model="text-embedding-ada-002"):
     text = text.replace("\n", " ")
@@ -433,85 +447,3 @@ def test_extract_from_url_docling_and_gpt4o_mini():
     # Assert: Verify that the extracted title matches the expected value.
     expected_title = "BCOBS 2A.1 Restriction on marketing or providing an optional product for which a fee is payable"
     assert result.title == expected_title
-
-
-from docling.datamodel.pipeline_options import (
-    PdfPipelineOptions,
-    TesseractCliOcrOptions,
-    TableStructureOptions,
-)
-
-from docling.datamodel.base_models import InputFormat
-from docling.document_converter import PdfFormatOption
-
-class Types(str, Enum):
-    EMAIL = "email"
-    DOMAIN = "domain"
-    IP = "ip"
-    URL = "url"
-    HASH = "hash"
-    FILE = "file"
-
-class Indicator(Contract):
-    IOCType: Types = Field(description="Indicator of Compromise type like email, domain, ip, url, hash, file, mutex, yara")
-    IOCValue: str = Field(description="IOC Value like 'APT29.com', 'evil@apt29.ru', '31.3.3.7', etc.")
-    IOCContext: str = Field(description="Context information to IOC")
-
-class IndicatorsContract(Contract):
-        Indicators: List[Indicator] = Field(
-        description="List of all IOCs"
-    )
-
-job = """You are an experienced Cyber Threat Intelligence and Cyber Defense Analyst.
-Get all available Indicators of Compromise (IoCs) and provide a precise description about every IoC. You MUST not skip an IoC.
-The following IoC types should be considered: """ + ", ".join([ioc_type.value for ioc_type in Types])
-
-if __name__ == "__main__":
-    test_file_path = os.path.join(cwd, "tests", "files", "ransomeware2.pdf")
-
-    ocr_options = TesseractCliOcrOptions(
-        force_full_page_ocr=True,
-        tesseract_cmd="/opt/homebrew/bin/tesseract"
-    )
-    
-    table_options = TableStructureOptions(
-        do_cell_matching=True
-    )
-        
-    pdf_options = PdfPipelineOptions(
-        do_table_structure=True,
-        do_ocr=True,
-        ocr_options=ocr_options,
-        table_structure_options=table_options
-    )
-
-    format_options = {
-        InputFormat.PDF: PdfFormatOption(
-            pipeline_options=pdf_options
-        )
-    }
-        
-    config = DoclingConfig(
-        format_options=format_options,
-        ocr_enabled=True,
-        force_full_page_ocr=True
-    )
-    loader = DocumentLoaderDocling(config)
-    
-    loader.set_vision_mode(True)
-
-    content = loader.load(test_file_path)
-
-    extractor = Extractor()
-    extractor.load_document_loader(loader)
-    extractor.load_llm("gpt-4o")
-
-    result = extractor.extract(
-        test_file_path,
-        IndicatorsContract,
-        vision=True,
-        content=job,
-        completion_strategy=CompletionStrategy.PAGINATE
-    )
-
-    print(result.model_dump_json(indent=4))

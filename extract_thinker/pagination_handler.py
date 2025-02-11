@@ -17,6 +17,14 @@ class PaginationHandler(CompletionHandler):
     def __init__(self, llm):
         super().__init__(llm)
         
+    def _make_hashable(self, item: Any) -> Any:
+        """Recursively convert a value to something hashable."""
+        if isinstance(item, dict):
+            return tuple(sorted((k, self._make_hashable(v)) for k, v in item.items()))
+        elif isinstance(item, list):
+            return tuple(self._make_hashable(x) for x in item)
+        return item
+
     def handle(self, 
                content: List[Dict[str, Any]],
                response_model: type[BaseModel],
@@ -81,57 +89,56 @@ class PaginationHandler(CompletionHandler):
         for _, result in pages_data:
             result_dict = result.model_dump()
             for field_name, field_value in result_dict.items():
-                if field_name not in field_values:
-                    field_values[field_name] = []
-                field_values[field_name].append(field_value)
+                field_values.setdefault(field_name, []).append(field_value)
 
         # Merge fields
         merged = {}
         for field_name, values in field_values.items():
+            # Get the annotated type from the response model
             field_type = response_model.model_fields[field_name].annotation if field_name in response_model.model_fields else None
             non_null_values = [v for v in values if v is not None]
 
             if field_type and get_origin(field_type) is list:
-                # Merge lists using a more sophisticated approach
+                # Merge list fields using a more sophisticated approach
                 merged_list = self._merge_list_field(field_name, values, field_type)
                 merged[field_name] = merged_list
             else:
                 # Scalar field handling
                 if len(non_null_values) == 0:
-                    merged[field_name] = None
+                    # If the field is expected to be a string, default to an empty string.
+                    if field_type == str or (get_origin(field_type) is Union and str in get_args(field_type)):
+                        merged[field_name] = ""
+                    else:
+                        continue
                 else:
-                    # Convert unhashable types (e.g., lists) to hashable types
-                    hashable_values = [tuple(item) if isinstance(item, list) else item for item in non_null_values]
+                    # Build a mapping from the hashable version of each candidate to the original candidate.
+                    distinct_map = {}
+                    for candidate in non_null_values:
+                        key = self._make_hashable(candidate)
+                        if key not in distinct_map:
+                            distinct_map[key] = candidate
+                    distinct_values = list(distinct_map.values())
                     
-                    try:
-                        distinct_values = list(set(hashable_values))
-                    except TypeError:
-                        # Fallback to order-preserving method if conversion fails
-                        seen = set()
-                        distinct_values = []
-                        for item in hashable_values:
-                            if item not in seen:
-                                seen.add(item)
-                                distinct_values.append(item)
-                    # **Modification Ends Here**
-
                     if len(distinct_values) == 1:
                         merged[field_name] = distinct_values[0]
                     else:
-                        # Store conflicts in special structure
+                        # Store conflicts in a special structure
                         merged[field_name] = {
                             "_conflict": True,
                             "candidates": distinct_values
                         }
-
+        
         # Check for conflicts and resolve if necessary
         if self._has_conflicts(merged, response_model):
             merged = self._resolve_conflicts(merged, response_model, pages_data, field_values)
         
         # Clean merged dictionary to ensure it's compatible with the response model
         merged = self._clean_merged_dict(merged, response_model)
-
-        # Now that conflicts are resolved and cleaned, instantiate the response model
+        
+        # Filter out any keys with a None value,
+        # now every required field (e.g., a string like "thinking") will be non-null.
+        merged = {k: v for k, v in merged.items() if v is not None}
+        
         return response_model(**merged)
 
     def _merge_list_field(self, field_name: str, values: List[Any], field_type: Any) -> List[Any]:
