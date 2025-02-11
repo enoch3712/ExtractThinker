@@ -12,6 +12,7 @@ from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import ClassificationResponse
 from tests.models.invoice import CreditNoteContract, FinancialContract, InvoiceContract
 from tests.models.driver_license import DriverLicense, IdentificationContract
+from extract_thinker.global_models import get_lite_model, get_big_model
 
 # Setup environment and common paths
 load_dotenv()
@@ -32,9 +33,9 @@ def setup_extractors():
     document_loader = DocumentLoaderTesseract(tesseract_path)
 
     extractors = [
-        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
-        ("claude-3-haiku-20240307", "claude-3-haiku-20240307"),
-        ("gpt-4o", "gpt-4o")
+        (get_lite_model(), get_lite_model()),
+        (get_big_model(), get_big_model()),
+        (get_big_model(), get_big_model())
     ]
 
     configured_extractors = []
@@ -78,9 +79,9 @@ def setup_process_with_gpt4_extractor():
     print(f"Tesseract path: {tesseract_path}")
     document_loader = DocumentLoaderTesseract(tesseract_path)
 
-    # Initialize the GPT-4 extractor
+    # Initialize the GPT-4 extractor using the big model
     gpt_4_extractor = Extractor(document_loader)
-    gpt_4_extractor.load_llm("gpt-4o")
+    gpt_4_extractor.load_llm(get_big_model())
 
     # Create the process with only the GPT-4 extractor
     process = Process()
@@ -298,16 +299,16 @@ def test_mom_classification_layers():
     # Initialize extractors with different models
     # Layer 1: Small models that might disagree
     gpt35_extractor = Extractor(document_loader)
-    gpt35_extractor.load_llm("claude-3-5-haiku-20241022")
+    gpt35_extractor.load_llm(get_big_model())
     
     claude_haiku_extractor = Extractor(document_loader)
-    claude_haiku_extractor.load_llm("gpt-4o-mini")
+    claude_haiku_extractor.load_llm(get_lite_model())
     
     # Layer 2: More capable models for resolution
     gpt4_extractor = Extractor(document_loader)
-    gpt4_extractor.load_llm("gpt-4o")
+    gpt4_extractor.load_llm(get_big_model())
     sonnet_extractor = Extractor(document_loader)
-    sonnet_extractor.load_llm("claude-3-5-sonnet-20241022")
+    sonnet_extractor.load_llm(get_big_model())
     
     # Create process with multiple layers
     process = Process()

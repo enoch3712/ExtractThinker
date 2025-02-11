@@ -11,6 +11,7 @@ from extract_thinker.text_splitter import TextSplitter
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.contract import Contract
 from extract_thinker.extractor import Extractor
+from extract_thinker.global_models import get_lite_model, get_big_model
 import pytest
 
 # Setup environment and paths
@@ -50,7 +51,7 @@ def setup_process_and_classifications():
     extractor = Extractor()
     tesseract_path = "/opt/homebrew/bin/tesseract"
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
-    extractor.load_llm("gpt-4o-mini")
+    extractor.load_llm(get_lite_model())
 
     # Add to classifications
     TEST_CLASSIFICATIONS[0].extractor = extractor
@@ -66,7 +67,7 @@ def test_eager_splitting_strategy():
     """Test eager splitting strategy with a multi-page document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(ImageSplitter("claude-3-5-sonnet-20241022"))
+    process.load_splitter(ImageSplitter(get_big_model()))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -85,7 +86,7 @@ def test_lazy_splitting_strategy():
     """Test lazy splitting strategy with a multi-page document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(ImageSplitter("claude-3-5-sonnet-20241022"))
+    process.load_splitter(ImageSplitter(get_big_model()))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -104,7 +105,7 @@ def test_eager_splitting_strategy_text():
     """Test eager splitting strategy with a multi-page text document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(TextSplitter("claude-3-5-sonnet-20241022"))
+    process.load_splitter(TextSplitter(get_big_model()))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -123,7 +124,7 @@ def test_lazy_splitting_strategy_text():
     """Test lazy splitting strategy with a multi-page text document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(TextSplitter("claude-3-5-sonnet-20241022"))
+    process.load_splitter(TextSplitter(get_big_model()))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -142,7 +143,7 @@ def test_eager_splitting_strategy_vision():
     """Test eager splitting strategy with a multi-page document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(ImageSplitter("claude-3-5-sonnet-20241022"))
+    process.load_splitter(ImageSplitter(get_big_model()))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -269,7 +270,7 @@ def test_invoice_extraction_with_extraction_contract():
         license_number: str
 
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(TextSplitter("gpt-4o"))
+    process.load_splitter(TextSplitter(get_big_model()))
 
     # Use an invoice PDF for input
     invoice_pdf_path = os.path.join(CURRENT_DIR, "files", "bulk.pdf")
