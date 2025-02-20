@@ -24,8 +24,8 @@ Your step-by-step reasoning and analysis goes here...
 """
 
 class LLM:
-    TEMPERATURE = 0  # Always zero for deterministic outputs (IDP)
     TIMEOUT = 3000  # Timeout in milliseconds
+    DEFAULT_TEMPERATURE = 0
 
     def __init__(
         self,
@@ -45,6 +45,7 @@ class LLM:
         self.router = None
         self.is_dynamic = False
         self.backend = backend
+        self.temperature = self.DEFAULT_TEMPERATURE
 
         if self.backend == LLMEngine.DEFAULT:
             self.client = instructor.from_litellm(
@@ -94,6 +95,14 @@ class LLM:
         if self.backend != LLMEngine.DEFAULT:
             raise ValueError("Router is only supported with LITELLM backend")
         self.router = router
+
+    def set_temperature(self, temperature: float) -> None:
+        """Set the temperature for LLM requests.
+        
+        Args:
+            temperature (float): Temperature value between 0 and 1
+        """
+        self.temperature = temperature
 
     def set_dynamic(self, is_dynamic: bool) -> None:
         """Set whether the LLM should handle dynamic content.
@@ -156,14 +165,14 @@ class LLM:
                 model=self.model,
                 messages=working_messages,
                 response_model=request_model,
-                temperature=self.TEMPERATURE,
+                temperature=self.temperature,
                 timeout=self.TIMEOUT,
             )
         else:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=working_messages,
-                temperature=self.TEMPERATURE,
+                temperature=self.temperature,
                 response_model=request_model,
                 max_retries=1,
                 max_tokens=self.token_limit,
