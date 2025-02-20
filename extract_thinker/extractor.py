@@ -92,12 +92,22 @@ class Extractor:
         Returns:
             Optional[DocumentLoader]: The suitable document loader if available.
         """
+        # First, if a primary document loader is set and it can handle the source, return it.
+        if self.document_loader and self.document_loader.can_handle(source):
+            return self.document_loader
+
+        # If source is a string, attempt an extension-based lookup.
         if isinstance(source, str):
             _, ext = os.path.splitext(source)
-            return self.document_loaders_by_file_type.get(ext, self.document_loader)
-        elif hasattr(source, 'read'):
-            # Implement logic to determine the loader based on the stream if necessary
-            return self.document_loader
+            loader = self.document_loaders_by_file_type.get(ext)
+            if loader and loader.can_handle(source):
+                return loader
+
+        # As a fallback, iterate over all registered loaders and return the first that supports the source.
+        for loader in self.document_loaders_by_file_type.values():
+            if loader.can_handle(source):
+                return loader
+
         return None
 
     def load_document_loader(self, document_loader: DocumentLoader) -> None:
