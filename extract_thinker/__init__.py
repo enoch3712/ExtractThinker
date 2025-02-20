@@ -29,6 +29,8 @@ from .document_loader.document_loader_google_document_ai import (
     DocumentLoaderGoogleDocumentAI,
     DocumentLoaderDocumentAI,
 )
+from .warning import filter_pydantic_v2_warnings
+filter_pydantic_v2_warnings()
 
 __all__ = [
     'Extractor',
