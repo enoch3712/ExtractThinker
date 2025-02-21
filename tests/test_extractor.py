@@ -1,13 +1,11 @@
 import asyncio
 import os
 from dotenv import load_dotenv
-from extract_thinker.document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.llm import LLM, LLMEngine
 from extract_thinker.models.completion_strategy import CompletionStrategy
-from extract_thinker.models.contract import Contract
 from tests.models.invoice import InvoiceContract
 from tests.models.ChartWithContent import ChartWithContent
 from tests.models.page_contract import ReportContract
@@ -16,9 +14,10 @@ from extract_thinker.document_loader.document_loader_azure_document_intelligence
 import pytest
 import numpy as np
 from litellm import embedding
-from extract_thinker.document_loader.document_loader_docling import DoclingConfig, DocumentLoaderDocling
+from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling
 from tests.models.handbook_contract import HandbookContract
 from extract_thinker.global_models import get_lite_model, get_big_model
+from pydantic import BaseModel, Field
 
 
 load_dotenv()
@@ -447,3 +446,38 @@ def test_extract_from_url_docling_and_gpt4o_mini():
     # Assert: Verify that the extracted title matches the expected value.
     expected_title = "BCOBS 2A.1 Restriction on marketing or providing an optional product for which a fee is payable"
     assert result.title == expected_title
+
+def test_extract_from_multiple_sources():
+    """
+    Test extracting from multiple sources (PDF and URL) in a single call.
+    Combines invoice data with handbook data using DocumentLoaderDocling.
+    """
+    # Arrange
+    pdf_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+    url = "https://www.handbook.fca.org.uk/handbook/BCOBS/2A/?view=chapter"
+
+    extractor = Extractor()
+    docling_loader = DocumentLoaderDocling()
+    extractor.load_document_loader(docling_loader)
+    extractor.load_llm(get_big_model())
+
+    class CombinedData(BaseModel):
+        invoice_number: str
+        invoice_date: str
+        total_amount: float
+        handbook_title: str = Field(alias="title of the url, and not the invoice")
+
+    # Act
+    result: CombinedData = extractor.extract(
+        [pdf_path, url],
+        CombinedData,
+    )
+
+    # Assert
+    # Check invoice data
+    assert result.invoice_number == "00012"
+    assert result.invoice_date == "1/30/23"
+    assert result.total_amount == 1125
+
+    # Check handbook data
+    assert "FCA Handbook" in result.handbook_title, f"Expected title to contain 'FCA Handbook', but got: {result.handbook_title}"
