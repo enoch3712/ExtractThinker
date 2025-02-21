@@ -288,9 +288,30 @@ class Extractor:
         source: Union[str, IO, list],
         response_model: type[BaseModel],
         vision: bool = False,
+        content: Optional[str] = None,
         completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
-        return await asyncio.to_thread(self.extract, source, response_model, vision, "", completion_strategy)
+        """
+        Asynchronously extract information from the provided source.
+
+        Args:
+            source: The input source (file path, stream, or list)
+            response_model: The Pydantic model to parse the response into
+            vision: Whether to use vision capabilities
+            content: Additional content to include in the extraction
+            completion_strategy: Strategy for handling completions
+
+        Returns:
+            Parsed response matching response_model
+        """
+        return await asyncio.to_thread(
+            self.extract,
+            source,
+            response_model,
+            vision,
+            content,
+            completion_strategy
+        )
     
     def extract_with_strategy(
         self, 

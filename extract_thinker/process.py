@@ -276,10 +276,11 @@ class Process:
             extractor.set_skip_loading(True)
             try:
                 result = await extractor.extract_async(
-                    group_pages, 
-                    contract, 
-                    vision,
-                    completion_strategy
+                    source=group_pages,
+                    response_model=contract,
+                    vision=vision,
+                    content=None,
+                    completion_strategy=completion_strategy
                 )
             finally:
                 # Reset flag after extraction
