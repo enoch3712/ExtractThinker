@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
 from instructor.batch import BatchJob
 import uuid
 from pydantic import BaseModel
+from extract_thinker.document_loader.document_loader_data import DocumentLoaderData
 from extract_thinker.llm_engine import LLMEngine
 from extract_thinker.concatenation_handler import ConcatenationHandler
 from extract_thinker.document_loader.document_loader import DocumentLoader
@@ -53,6 +54,7 @@ class Extractor:
         self.is_classify_image: bool = False
         self._skip_loading: bool = False
         self.chunk_height: int = 1500
+        self.allow_vision: bool = False
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
@@ -85,7 +87,7 @@ class Extractor:
             
         raise ValueError("No suitable document loader found for the input.")
 
-    def get_document_loader(self, source: Union[str, IO]) -> Optional[DocumentLoader]:
+    def get_document_loader(self, source: Union[str, IO, List[Union[str, IO]]]) -> Optional[DocumentLoader]:
         """
         Retrieve the appropriate document loader for the given source.
 
@@ -110,6 +112,14 @@ class Extractor:
         for loader in self.document_loaders_by_file_type.values():
             if loader.can_handle(source):
                 return loader
+        
+        # if is a list, usually coming from split, return documentLoaderData
+        if isinstance(source, List) or isinstance(source, dict):
+            return DocumentLoaderData()
+        
+        # Last check, if allow vision just return the document loader llm image
+        if self.allow_vision:
+            return DocumentLoaderLLMImage()
 
         return None
 
@@ -148,6 +158,36 @@ class Extractor:
         """Internal method to control content loading behavior"""
         self._skip_loading = skip
 
+    def remove_images_from_content(self, content: Union[Dict[str, Any], List[Dict[str, Any]], str]) -> Union[Dict[str, Any], List[Dict[str, Any]], str]:
+        """
+        Remove image-related keys from the content while preserving the original structure.
+        
+        Args:
+            content: Input content that can be a dictionary, list of dictionaries, or string
+            
+        Returns:
+            Content with image-related keys removed, maintaining the original type
+        """
+        if isinstance(content, dict):
+            # Create a deep copy to avoid modifying the original
+            content_copy = {
+                k: v for k, v in content.items()
+                if k not in ('images', 'image')
+            }
+            return content_copy
+            
+        elif isinstance(content, list):
+            # Handle list of dictionaries
+            return [
+                self.remove_images_from_content(item)
+                if isinstance(item, (dict, list))
+                else item
+                for item in content
+            ]
+            
+        # Return strings or other types unchanged
+        return content
+
     def extract(
         self,
         source: Union[str, IO, List[Union[str, IO]]],
@@ -176,12 +216,16 @@ class Extractor:
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
         self.completion_strategy = completion_strategy
+        self.allow_vision = vision
 
         if vision:
             try:
                 self._handle_vision_mode(source)
             except ValueError as e:
                 raise InvalidVisionDocumentLoaderError(str(e))
+        else:
+            if isinstance(source, List):
+                source = self.remove_images_from_content(source)
 
         if completion_strategy is not CompletionStrategy.FORBIDDEN:
             return self.extract_with_strategy(source, response_model, vision, completion_strategy)
@@ -1149,23 +1193,18 @@ class Extractor:
         content: Union[Dict[str, Any], List[Any]],
         message_content: List[Dict[str, Any]],
     ) -> None:
-        """
-        Add images to the message content.
-        Handles both legacy format and new page-based format from document loaders.
-
-        Args:
-            content: The content containing images.
-            message_content: The message content to append images to.
-        """
         if isinstance(content, list):
-            # Handle new page-based format
             for page in content:
-                if isinstance(page, dict) and 'image' in page:
-                    self._append_images(page['image'], message_content)
+                if isinstance(page, dict):
+                    if 'image' in page:
+                        self._append_images(page['image'], message_content)
+                    if 'images' in page:
+                        self._append_images(page['images'], message_content)
         elif isinstance(content, dict):
-            # Handle legacy format
-            image_data = content.get('image') or content.get('images')
-            self._append_images(image_data[0], message_content)
+            if 'image' in content:
+                self._append_images(content['image'], message_content)
+            if 'images' in content:
+                self._append_images(content['images'], message_content)
 
     def _append_images(
         self,

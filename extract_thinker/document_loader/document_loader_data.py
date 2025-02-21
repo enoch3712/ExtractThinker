@@ -51,6 +51,8 @@ class DocumentLoaderData(CachedDocumentLoader):
             return True
         if isinstance(source, list) and all(isinstance(item, dict) for item in source):
             return True
+        if isinstance(source, dict):
+            return True
         return False
 
     @cachedmethod(cache=attrgetter('cache'), 
@@ -80,6 +82,8 @@ class DocumentLoaderData(CachedDocumentLoader):
                 return self._load_from_string(source)
             elif hasattr(source, "read"):
                 return self._load_from_stream(source)
+            elif isinstance(source, dict):
+                return source
 
         except Exception as e:
             raise ValueError(f"Error processing content: {str(e)}")

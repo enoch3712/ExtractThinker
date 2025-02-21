@@ -1,12 +1,14 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
+import pytest
 from extract_thinker import DocumentLoaderPyPdf
 from extract_thinker.document_loader.document_loader_docling import DocumentLoaderDocling, DoclingConfig
 from extract_thinker import Extractor
 from extract_thinker import Contract
 from extract_thinker import Classification
 from extract_thinker import DocumentLoaderMarkItDown
+from extract_thinker.llm import LLM
 from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker import SplittingStrategy
 from extract_thinker import Process
@@ -161,3 +163,31 @@ def test_extract_with_ollama_full_pipeline():
     # Check each extracted item
     for item in result:
         assert isinstance(item, (VehicleRegistration, DriverLicenseContract))
+
+def test_dynamic_json_parsing():
+    """Test dynamic JSON parsing with local Ollama model."""
+    # Initialize components
+    llm = LLM(model="ollama/deepseek-r1:1.5b")
+    llm.set_dynamic(True)  # Enable dynamic JSON parsing
+    
+    document_loader = DocumentLoaderPyPdf()
+    extractor = Extractor(document_loader=document_loader, llm=llm)
+    
+    # Test content that should produce JSON response
+    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+    
+    # Extract with dynamic parsing
+    try:
+        result = extractor.extract(test_file_path, InvoiceContract)
+        
+        # Verify the result is an InvoiceContract instance
+        assert isinstance(result, InvoiceContract)
+        
+        # Verify invoice fields
+        assert result.invoice_number is not None
+        assert result.invoice_date is not None
+        assert result.total_amount is not None
+        assert isinstance(result.lines, list)
+        
+    except Exception as e:
+        pytest.fail(f"Dynamic JSON parsing test failed: {str(e)}")

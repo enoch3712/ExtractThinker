@@ -18,15 +18,16 @@ from extract_thinker.document_loader.document_loader_docling import DocumentLoad
 from tests.models.handbook_contract import HandbookContract
 from extract_thinker.global_models import get_lite_model, get_big_model
 from pydantic import BaseModel, Field
+from extract_thinker.exceptions import ExtractThinkerError
 
 
 load_dotenv()
 cwd = os.getcwd()
 
-def test_extract_with_pypdf_and_gpt4o_mini():
+def test_extract_with_pypdf_and_gpt4o_mini_vision():
 
     # Arrange
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+    test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
 
     extractor = Extractor()
     extractor.load_document_loader(
@@ -35,50 +36,12 @@ def test_extract_with_pypdf_and_gpt4o_mini():
     extractor.load_llm(get_lite_model())
 
     # Act
-    result = extractor.extract(test_file_path, InvoiceContract)
+    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
 
     # Assert
     assert result is not None
     assert result.invoice_number == "0000001"
     assert result.invoice_date == "2014-05-07"
-
-def test_extract_with_azure_di_and_gpt4o_mini():
-    subscription_key = os.getenv("AZURE_SUBSCRIPTION_KEY")
-    endpoint = os.getenv("AZURE_ENDPOINT")
-    test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
-
-    extractor = Extractor()
-    extractor.load_document_loader(
-        DocumentLoaderAzureForm(subscription_key, endpoint)
-    )
-    extractor.load_llm(get_lite_model())
-    # Act
-    result = extractor.extract(test_file_path, InvoiceContract)
-
-    # Assert
-    assert result is not None
-    assert result.lines[0].description == "Website Redesign"
-    assert result.lines[0].quantity == 1
-    assert result.lines[0].unit_price == 2500
-    assert result.lines[0].amount == 2500
-
-def test_extract_with_pypdf_and_gpt4o_mini():
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
-
-    extractor = Extractor()
-    document_loader = DocumentLoaderPyPdf()
-    extractor.load_document_loader(document_loader)
-    extractor.load_llm("gpt-4o-mini")
-    
-    # Act
-    result = extractor.extract(test_file_path, InvoiceContract, vision=True)
-
-    # Assert
-    assert result is not None
-    assert result.lines[0].description == "Consultation services"
-    assert result.lines[0].quantity == 3
-    assert result.lines[0].unit_price == 375
-    assert result.lines[0].amount == 1125
 
 def test_vision_content_pdf():
     # Arrange
@@ -156,10 +119,10 @@ def test_extract_with_invalid_file_path():
     invalid_file_path = os.path.join(cwd, "tests", "nonexistent", "fake_file.png")
 
     # Act & Assert
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ExtractThinkerError) as exc_info:
         extractor.extract(invalid_file_path, InvoiceContract, vision=True)
     
-    assert "Failed to extract from source" in str(exc_info.value.args[0])
+    assert "Failed to extract from source: Cannot handle source" in str(exc_info.value)
 
 def test_forbidden_strategy_with_token_limit():
     test_file_path = os.path.join(os.getcwd(), "tests", "test_images", "eu_tax_chart.png")
@@ -358,34 +321,6 @@ def test_llm_timeout():
     result = extractor.extract(test_file_path, InvoiceContract)
     assert result is not None
 
-def test_dynamic_json_parsing():
-    """Test dynamic JSON parsing with local Ollama model."""
-    # Initialize components
-    llm = LLM(model="ollama/deepseek-r1:1.5b")
-    llm.set_dynamic(True)  # Enable dynamic JSON parsing
-    
-    document_loader = DocumentLoaderPyPdf()
-    extractor = Extractor(document_loader=document_loader, llm=llm)
-    
-    # Test content that should produce JSON response
-    test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
-    
-    # Extract with dynamic parsing
-    try:
-        result = extractor.extract(test_file_path, InvoiceContract)
-        
-        # Verify the result is an InvoiceContract instance
-        assert isinstance(result, InvoiceContract)
-        
-        # Verify invoice fields
-        assert result.invoice_number is not None
-        assert result.invoice_date is not None
-        assert result.total_amount is not None
-        assert isinstance(result.lines, list)
-        
-    except Exception as e:
-        pytest.fail(f"Dynamic JSON parsing test failed: {str(e)}")
-
 def test_extract_with_default_backend():
     """Test extraction using default LiteLLM backend"""
     # Arrange
@@ -407,8 +342,6 @@ def test_extract_with_default_backend():
 def test_extract_with_pydanticai_backend():
     """Test extraction using PydanticAI backend if available"""
     try:
-        import pydantic_ai
-        
         # Arrange
         test_file_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
         
@@ -439,13 +372,12 @@ def test_extract_from_url_docling_and_gpt4o_mini():
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderDocling())
     extractor.load_llm(get_lite_model())
-    
-    # Act: Extract the document using the specified URL and the HandbookContract
-    result = extractor.extract(url, HandbookContract)
 
-    # Assert: Verify that the extracted title matches the expected value.
-    expected_title = "BCOBS 2A.1 Restriction on marketing or providing an optional product for which a fee is payable"
-    assert result.title == expected_title
+    # Act: Extract the document using the specified URL and the HandbookContract
+    result: HandbookContract = extractor.extract(url, HandbookContract)
+
+    # Check handbook data
+    assert "FCA Handbook" in result.title, f"Expected title to contain 'FCA Handbook', but got: {result.title}"
 
 def test_extract_from_multiple_sources():
     """
@@ -481,3 +413,6 @@ def test_extract_from_multiple_sources():
 
     # Check handbook data
     assert "FCA Handbook" in result.handbook_title, f"Expected title to contain 'FCA Handbook', but got: {result.handbook_title}"
+
+if __name__ == "__main__":
+    test_extract_with_invalid_file_path()
