@@ -25,6 +25,7 @@ from .document_loader.document_loader_txt import DocumentLoaderTxt
 from .document_loader.document_loader_doc2txt import DocumentLoaderDoc2txt
 from .document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 from .document_loader.document_loader_llm_image import DocumentLoaderLLMImage
+from .document_loader.document_loader_data import DocumentLoaderData
 from .document_loader.document_loader_google_document_ai import (
     DocumentLoaderGoogleDocumentAI,
     DocumentLoaderDocumentAI,
@@ -50,6 +51,7 @@ __all__ = [
     'DocumentLoaderGoogleDocumentAI',
     'DocumentLoaderDocumentAI',
 	'DocumentLoaderMarkItDown',
+	'DocumentLoaderData',
     'Classification',
     'CompletionStrategy',
     'DocumentLoaderDocling',
