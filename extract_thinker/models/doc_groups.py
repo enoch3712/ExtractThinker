@@ -1,6 +1,4 @@
 from extract_thinker.models.doc_group import DocGroup
-
-
 from typing import List
 
 

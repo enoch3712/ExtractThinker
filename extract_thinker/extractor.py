@@ -3,7 +3,6 @@ import base64
 from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
 from instructor.batch import BatchJob
 import uuid
-import litellm
 from pydantic import BaseModel
 from extract_thinker.llm_engine import LLMEngine
 from extract_thinker.concatenation_handler import ConcatenationHandler
@@ -17,7 +16,6 @@ from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.batch_job import BatchJob
-
 from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
     add_classification_structure,
@@ -29,6 +27,11 @@ import yaml
 from copy import deepcopy
 from extract_thinker.pagination_handler import PaginationHandler
 from instructor.exceptions import IncompleteOutputException
+from extract_thinker.exceptions import (
+    ExtractThinkerError,
+    InvalidVisionDocumentLoaderError
+)
+from extract_thinker.utils import is_vision_error, classify_vision_error
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -161,7 +164,10 @@ class Extractor:
         self.completion_strategy = completion_strategy
 
         if vision:
-            self._handle_vision_mode(source)
+            try:
+                self._handle_vision_mode(source)
+            except ValueError as e:
+                raise InvalidVisionDocumentLoaderError(str(e))
 
         if completion_strategy is not CompletionStrategy.FORBIDDEN:
             return self.extract_with_strategy(source, response_model, vision, completion_strategy)
@@ -184,7 +190,11 @@ class Extractor:
         except Exception as e:
             if isinstance(e.args[0], IncompleteOutputException):
                 raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
-            raise ValueError(f"Failed to extract from source: {str(e)}")
+            
+            if vision & is_vision_error(e):
+                raise classify_vision_error(e, self.llm.model if self.llm else None)
+            
+            raise ExtractThinkerError(f"Failed to extract from source: {str(e)}")
 
     def _map_to_universal_format(
         self,
@@ -334,11 +344,6 @@ class Extractor:
         Returns:
             List of content items (text and images) for the message
         """
-        if not litellm.supports_vision(model=self.llm.model):
-            raise ValueError(
-                f"Model {self.llm.model} is not supported for vision, since it's not a vision model."
-            )
-        
         message_content = []
         for classification in classifications:
             if not classification.image:
@@ -442,9 +447,6 @@ class Extractor:
         Classify doc_image_b64 as either matching or not matching
         the classification's reference image. Return name/confidence.
         """
-        if not litellm.supports_vision(model=self.llm.model):
-            raise ValueError(f"Model {self.llm.model} does not support vision images.")
-
         # Convert classification.reference image to base64 if needed:
         if isinstance(ref_image, str) and os.path.isfile(ref_image):
             ref_image_b64 = encode_image(ref_image)
@@ -512,9 +514,6 @@ class Extractor:
         Minimal fallback if user didn't provide a reference image
         but we still want a numeric confidence if doc_image matches the classification.
         """
-        if not litellm.supports_vision(model=self.llm.model):
-            raise ValueError(f"Model {self.llm.model} does not support vision images.")
-
         messages = [
             {
                 "role": "system",
@@ -945,11 +944,6 @@ class Extractor:
         for interceptor in self.llm_interceptors:
             interceptor.intercept(self.llm)
 
-        if vision and not litellm.supports_vision(model=self.llm.model):
-            raise ValueError(
-                f"Model {self.llm.model} is not supported for vision."
-            )
-
         # Build messages
         messages = self._build_messages(self._build_message_content(content, vision), vision)
 
@@ -1238,13 +1232,7 @@ class Extractor:
             self.document_loader.set_vision_mode(True)
             return
 
-        # No document loader available, check if we can use LLM's vision capabilities
-        if not litellm.supports_vision(self.llm.model):
-            raise ValueError(
-                f"Model {self.llm.model} does not support vision. "
-                "Please provide a document loader or a model that supports vision."
-            )
-    
+        # No document loader available, create a new DocumentLoaderLLMImage
         self.document_loader = DocumentLoaderLLMImage(llm=self.llm)
         self.document_loader.set_vision_mode(True)
 

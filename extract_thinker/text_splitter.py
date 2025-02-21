@@ -1,18 +1,16 @@
-import json
-import instructor
 from typing import List, Any
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.eager_doc_group import DocGroupsEager, EagerDocGroup
 from extract_thinker.splitter import Splitter
-from litellm import completion
+from extract_thinker.llm import LLM
 
 class TextSplitter(Splitter):
 
     def __init__(self, model: str):
         self.model = model
-        self.client = instructor.from_litellm(completion, mode=instructor.Mode.MD_JSON)
+        self.llm = LLM(model)
 
     def belongs_to_same_document(self,
                              obj1: Any,
@@ -55,8 +53,7 @@ class TextSplitter(Splitter):
     }}"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.request(
                 messages=[
                     {
                         "role": "user",
@@ -127,8 +124,7 @@ Return your analysis in the following JSON format:
     }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.request(
                 messages=[
                     {
                         "role": "user",

@@ -1,6 +1,4 @@
 import base64
-import litellm
-import instructor
 from io import BytesIO
 from typing import List, Any
 from extract_thinker.models.classification import Classification
@@ -8,14 +6,13 @@ from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.eager_doc_group import DocGroupsEager, EagerDocGroup
 from extract_thinker.splitter import Splitter
+from extract_thinker.llm import LLM
 
 class ImageSplitter(Splitter):
 
     def __init__(self, model: str):
-        if not litellm.supports_vision(model=model):
-            raise ValueError(f"Model {model} is not supported for ImageSplitter, since its not a vision model.")
         self.model = model
-        self.client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.MD_JSON)
+        self.llm = LLM(model)
 
     def encode_image(self, image):
         """
@@ -97,8 +94,7 @@ class ImageSplitter(Splitter):
         })
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.request(
                 messages=[
                     {
                         "role": "user",
@@ -195,8 +191,7 @@ Return your analysis in the following JSON format:
             })
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm.request(
                 messages=[
                     {
                         "role": "user",
