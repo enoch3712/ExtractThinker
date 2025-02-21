@@ -65,6 +65,7 @@ def setup_process_and_classifications():
 
 def test_eager_splitting_strategy():
     """Test eager splitting strategy with a multi-page document"""
+    
     # Arrange
     process, classifications = setup_process_and_classifications()
     process.load_splitter(ImageSplitter(get_big_model()))

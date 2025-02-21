@@ -4,14 +4,11 @@ from extract_thinker.image_splitter import ImageSplitter
 from extract_thinker.models.classification_response import ClassificationResponse
 from extract_thinker.models.classification_strategy import ClassificationStrategy
 from extract_thinker.models.completion_strategy import CompletionStrategy
-from extract_thinker.models.doc_groups2 import DocGroups2
 from extract_thinker.models.splitting_strategy import SplittingStrategy
 from extract_thinker.extractor import Extractor
 from extract_thinker.models.classification import Classification
 from extract_thinker.document_loader.document_loader import DocumentLoader
 from extract_thinker.models.classification_tree import ClassificationTree
-from extract_thinker.models.classification_node import ClassificationNode
-from extract_thinker.models.doc_group import DocGroup
 from extract_thinker.splitter import Splitter
 from extract_thinker.models.doc_groups import (
     DocGroups,
