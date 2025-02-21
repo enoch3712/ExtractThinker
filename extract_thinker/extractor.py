@@ -150,14 +150,28 @@ class Extractor:
 
     def extract(
         self,
-        source: Union[str, IO, list],
-        response_model: type[BaseModel],
+        source: Union[str, IO, List[Union[str, IO]]],
+        response_model: Type[BaseModel],
         vision: bool = False,
         content: Optional[str] = None,
         completion_strategy: Optional[CompletionStrategy] = CompletionStrategy.FORBIDDEN
     ) -> Any:
         """
-        Extract information from the provided source.
+        Extract information from one or more sources.
+
+        If source is a list, it loads each one, converts each to a universal format, and
+        merges them as if they were a single document. This merged content is then passed
+        to the extraction logic to produce a final result.
+
+        Args:
+            source: A single file path/stream or a list of them.
+            response_model: A Pydantic model class for validating the extracted data.
+            vision: Whether to use vision mode (affecting how content is processed).
+            content: Optional extra content to prepend to the merged content.
+            completion_strategy: Strategy for handling completions.
+
+        Returns:
+            The parsed result from the LLM as validated by response_model.
         """
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
@@ -173,18 +187,53 @@ class Extractor:
             return self.extract_with_strategy(source, response_model, vision, completion_strategy)
 
         try:
-            if self._skip_loading:
-                # Skip loading if flag is set (content from splitting)
-                unified_content = self._map_to_universal_format(source, vision)
+            if isinstance(source, list):
+                all_contents = []
+                for src in source:
+                    loader = self.get_document_loader(src)
+                    if loader is None:
+                        raise ValueError(f"No suitable document loader found for source: {src}")
+                    # Load the content (e.g. text, images, metadata)
+                    loaded = loader.load(src)
+                    # Map to a universal format that your extraction logic understands.
+                    universal = self._map_to_universal_format(loaded, vision)
+                    all_contents.append(universal)
+                
+                # Merge the text contents with a clear separator.
+                merged_text = "\n\n--- Document Separator ---\n\n".join(
+                    item.get("content", "") for item in all_contents
+                )
+                # Merge all image lists into one.
+                merged_images = []
+                for item in all_contents:
+                    merged_images.extend(item.get("images", []))
+                
+                merged_content = {
+                    "content": merged_text,
+                    "images": merged_images,
+                    "metadata": {"num_documents": len(all_contents)}
+                }
+                
+                # Optionally, prepend any extra content provided by the caller.
+                if content:
+                    merged_content["content"] = content + "\n\n" + merged_content["content"]
+                
+                return self._extract(merged_content, response_model, vision)
             else:
-                # Normal loading path
-                loader = self.get_document_loader(source)
-                if not loader:
-                    raise ValueError("No suitable document loader found for the input.")
-                loaded_content = loader.load(source)
-                unified_content = self._map_to_universal_format(loaded_content, vision)
+                # Single source; use existing behavior.
+                if self._skip_loading:
+                    # Skip loading if flag is set (content from splitting)
+                    unified_content = self._map_to_universal_format(source, vision)
+                else:
+                    # Normal loading path
+                    loader = self.get_document_loader(source)
+                    if not loader:
+                        raise ValueError("No suitable document loader found for the input.")
+                    loaded_content = loader.load(source)
+                    unified_content = self._map_to_universal_format(loaded_content, vision)
 
-            return self._extract(unified_content, response_model, vision)
+                return self._extract(unified_content, response_model, vision)
+
         except IncompleteOutputException as e:
             raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
         except Exception as e:
