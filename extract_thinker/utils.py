@@ -3,6 +3,7 @@ import json
 import re
 import yaml
 from PIL import Image
+import litellm
 from pydantic import BaseModel
 import typing
 import os
@@ -10,6 +11,7 @@ from io import BytesIO
 import sys
 from typing import Optional, Any, Union, get_origin, get_args, List, Dict
 from pydantic import BaseModel, create_model
+from extract_thinker.exceptions import VisionError
 
 def encode_image(image_source: Union[str, BytesIO, bytes, Image.Image]) -> str:
     """
@@ -536,3 +538,26 @@ def extract_thinking_json(thinking_text: str, response_model: type[BaseModel]) -
         raise ValueError(f"Invalid JSON format: {str(e)}\nJSON string was: {json_str}")
     except Exception as e:
         raise ValueError(f"Failed to parse thinking output: {str(e)}\nInput text was: {thinking_text[:200]}...")
+
+def is_vision_error(error: Exception) -> bool:
+    if isinstance(error.args[0], litellm.BadRequestError):
+        return True
+    return False
+
+def classify_vision_error(e: Exception, vision: bool) -> None:
+    """
+    Examines the exception and, if the vision flag is set and the exception is of type
+    litellm.BadRequestError, re-raises it as a VisionError. Otherwise, it re-raises the original exception.
+    
+    Args:
+        e: The caught exception.
+        vision: A flag indicating that this was a vision-related operation.
+    
+    Raises:
+        VisionError: if vision is True and e is an instance of litellm.BadRequestError.
+        Otherwise, re-raises e.
+    """
+    if vision and isinstance(e.args[0], litellm.BadRequestError):
+        raise VisionError(f"Make sure that the model you're using supports vision features: {e.args[0].message}") from e
+    else:
+        raise e
