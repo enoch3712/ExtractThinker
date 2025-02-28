@@ -1,59 +1,76 @@
-# Evals
+# Evaluation Framework
+
+The evaluation framework helps measure the performance and reliability of your extraction models across different document types.
 
 ## Overview
 
-The evaluation framework helps you:
+ExtractThinker's evaluation system provides comprehensive metrics to:
 
-- Measure extraction accuracy at both field and document levels
-- Track schema validation success rates
-- Monitor execution times
-- Generate comprehensive reports with detailed metrics
-- Compare performance across different models or datasets
-- Detect potential hallucinations in extracted data
-- Track token usage and costs
+* Measure extraction accuracy at both field and document levels
+* Track schema validation success rates 
+* Monitor execution times
+* Detect potential hallucinations in extracted data
+* Track token usage and associated costs
+* Compare performance across different models or datasets
+
+:::info
+Evaluations are essential for understanding model performance, identifying areas for improvement, and making informed decisions about model selection for production use.
+:::
+
+## Required Components
+
+To use the evaluation framework, you'll need:
+
+* An initialized `Extractor` instance
+* A `Contract` class that defines your extraction schema
+* A dataset containing documents and their expected outputs
 
 ## Basic Usage
 
-Here's how to set up a basic evaluation:
+Here's how to set up and run a basic evaluation:
 
 ```python
 from extract_thinker import Extractor, Contract
 from extract_thinker.eval import Evaluator, FileSystemDataset
 from typing import List
 
-# Define your contract
+# 1. Define your contract class
 class InvoiceContract(Contract):
     invoice_number: str
     date: str
     total_amount: float
     line_items: List[dict]
 
-# Initialize your extractor
+# 2. Initialize your extractor
 extractor = Extractor()
 extractor.load_llm("gpt-4o")
 
-# Create a dataset
+# 3. Create a dataset
 dataset = FileSystemDataset(
     documents_dir="./test_invoices/",
     labels_path="./test_invoices/labels.json",
     name="Invoice Test Set"
 )
 
-# Set up evaluator
+# 4. Set up evaluator
 evaluator = Evaluator(
     extractor=extractor,
     response_model=InvoiceContract
 )
 
-# Run evaluation
+# 5. Run evaluation
 report = evaluator.evaluate(dataset)
 
-# Print summary and save detailed report
+# 6. Print summary and save detailed report
 report.print_summary()
 evaluator.save_report(report, "evaluation_results.json")
 ```
 
-## Using the Command Line Interface
+:::tip
+For consistent evaluations, use a temperature of 0.0 in your model configuration to ensure deterministic outputs.
+:::
+
+## Command Line Interface
 
 ExtractThinker includes a CLI for running evaluations from configuration files:
 
@@ -84,73 +101,36 @@ Example configuration file:
 
 ## Available Metrics
 
-The evaluation framework provides several metrics to assess model performance:
+ExtractThinker captures several key metrics during evaluation:
 
-| Metric | Description |
-|--------|-------------|
-| Document Accuracy | Percentage of documents with all fields correctly extracted |
-| Schema Validation Rate | Percentage of documents that produce valid schema outputs |
-| Field Precision | Proportion of extracted field values that are correct |
-| Field Recall | Proportion of expected field values that are correctly extracted |
-| Field F1 Score | Harmonic mean of precision and recall |
-| Execution Time | Average time taken to extract information from a document |
+| Metric Type | Description | Use Case |
+|-------------|-------------|----------|
+| Field-level | Precision, recall, F1 scores for each field | Identify problematic fields |
+| Document-level | Overall accuracy across all documents | General model performance |
+| Schema validation | Success rate of schema validation | Data structure correctness |
+| Execution time | Average and per-document processing time | Performance optimization |
+| Hallucination | Detection of fabricated information | Trust and reliability |
+| Cost | Token usage and associated costs | Budget optimization |
 
-## Creating Evaluation Datasets
-
-ExtractThinker supports filesystem-based evaluation datasets:
-
-```python
-from extract_thinker.eval import FileSystemDataset
-
-# Create a dataset from files on disk
-dataset = FileSystemDataset(
-    documents_dir="./documents/",
-    labels_path="./labels.json",
-    name="Custom Dataset",
-    file_pattern="*.pdf"  # Optional glob pattern
-)
-```
-
-The labels file should be a JSON file mapping document filenames to expected values:
-
-```json
-{
-  "invoice1.pdf": {
-    "invoice_number": "INV-2024-001",
-    "date": "2024-05-15",
-    "total_amount": 1250.50,
-    "line_items": [
-      {"description": "Service A", "amount": 1000.00},
-      {"description": "Service B", "amount": 250.50}
-    ]
-  },
-  "invoice2.pdf": {
-    ...
-  }
-}
-```
-
-## Interpreting Results
-
-The evaluation report provides both overall metrics and field-level performance:
+### Sample Output
 
 ```
-=== Invoice Extraction Test ===
-Dataset: Invoice Dataset
+=== Invoice Extraction Evaluation ===
+Dataset: Invoice Test Set
 Model: gpt-4o
-Timestamp: 2024-06-01T12:34:56.789012
+Timestamp: 2023-08-15T14:30:45
 
 === Overall Metrics ===
 Documents tested: 50
-Document accuracy: 85.00%
-Schema validation rate: 98.00%
-Average precision: 92.50%
-Average recall: 90.00%
-Average F1 score: 91.23%
-Average execution time: 2.45s
+Document accuracy: 92.00%
+Schema validation rate: 96.00%
+Average precision: 95.40%
+Average recall: 94.80%
+Average F1 score: 95.10%
+Average execution time: 2.34s
 
 === Field-Level Metrics ===
-invoice_number:
+invoice_number (comparison: exact):
   Precision: 98.00%
   Recall: 98.00%
   F1 Score: 98.00%
@@ -163,77 +143,112 @@ date:
 ...
 ```
 
-## Advanced Usage
+## Evaluation Features
 
-### Vision Support
+ExtractThinker offers several specialized evaluation capabilities:
 
-For documents that require visual processing:
+### Field Comparison Types
+
+Different fields may require different comparison methods:
 
 ```python
+from extract_thinker.eval import ComparisonType
+
 evaluator = Evaluator(
     extractor=extractor,
     response_model=InvoiceContract,
-    vision=True  # Enable vision mode
+    field_comparisons={
+        "invoice_number": ComparisonType.EXACT,  # Exact match required
+        "description": ComparisonType.SEMANTIC,  # Semantic similarity
+        "total_amount": ComparisonType.NUMERIC   # Allows percentage tolerance
+    }
 )
 ```
+
+[Learn more about field comparison types →](field-comparison.md)
+
+### Teacher-Student Evaluation
+
+Benchmark your model against a more capable "teacher" model:
+
+```python
+from extract_thinker.eval import TeacherStudentEvaluator
+
+evaluator = TeacherStudentEvaluator(
+    student_extractor=student_extractor,
+    teacher_extractor=teacher_extractor,
+    response_model=InvoiceContract
+)
+```
+
+[Learn more about teacher-student evaluation →](teacher-student.md)
 
 ### Hallucination Detection
 
-To identify potentially hallucinated content:
+Identify potentially hallucinated content:
 
 ```python
 evaluator = Evaluator(
     extractor=extractor,
     response_model=InvoiceContract,
-    detect_hallucinations=True  # Enable hallucination detection
+    detect_hallucinations=True
 )
 ```
 
-For more details, see [Hallucination Detection](hallucination-detection.md).
+[Learn more about hallucination detection →](hallucination-detection.md)
 
 ### Cost Tracking
 
-To monitor token usage and costs:
+Monitor token usage and costs:
 
 ```python
 evaluator = Evaluator(
     extractor=extractor,
     response_model=InvoiceContract,
-    track_costs=True  # Enable cost tracking
+    track_costs=True
 )
 ```
 
-For more details, see [Cost Tracking](cost-tracking.md).
-
-### Additional Content
-
-You can provide additional context or instructions for extraction:
-
-```python
-evaluator = Evaluator(
-    extractor=extractor,
-    response_model=InvoiceContract,
-    content="Focus on the header section of the invoice for the invoice number and date."
-)
-```
-
-### Skip Failed Documents
-
-To continue evaluation even when schema validation fails:
-
-```python
-report = evaluator.evaluate(
-    dataset=dataset,
-    skip_failures=True
-)
-```
+[Learn more about cost tracking →](cost-tracking.md)
 
 ## Best Practices
 
-- Create diverse datasets that cover a range of document variations
-- Use consistent file formats and naming conventions in your datasets
-- Run evaluations on different model configurations to find optimal settings
-- Monitor field-level metrics to identify specific areas for improvement
-- Create separate test sets for different document types
-- Enable hallucination detection for critical applications
-- Track costs to optimize performance/price ratio
+:::note
+Following these practices will help ensure more reliable and actionable evaluation results.
+:::
+
+* **Dataset diversity**: Include a wide range of document variations in your test set
+* **Consistent formatting**: Use consistent file formats and naming conventions
+* **Benchmark different models**: Run evaluations on different model configurations
+* **Field-level analysis**: Monitor field-level metrics to identify specific areas for improvement
+* **Specialized test sets**: Create separate test sets for different document types
+* **Hallucination checks**: Enable hallucination detection for critical applications
+* **Cost optimization**: Track costs to optimize the performance/price ratio
+* **Version control**: Keep evaluation datasets under version control to track improvements over time
+
+## Advanced Configuration
+
+For more complex evaluation needs:
+
+```python
+# Advanced evaluator setup with multiple features
+evaluator = Evaluator(
+    extractor=extractor,
+    response_model=InvoiceContract,
+    vision=True,  # Enable vision mode for image-based documents
+    content="Focus on the header section for invoice number and date.",
+    field_comparisons={
+        "invoice_number": ComparisonType.EXACT,
+        "description": ComparisonType.SEMANTIC
+    },
+    detect_hallucinations=True,
+    track_costs=True
+)
+
+# Run evaluation with special options
+report = evaluator.evaluate(
+    dataset=dataset,
+    evaluation_name="Comprehensive Invoice Evaluation",
+    skip_failures=True  # Continue even when schema validation fails
+)
+```

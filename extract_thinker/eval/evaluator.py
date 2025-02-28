@@ -1,13 +1,6 @@
 import time
-from typing import Type, Dict, Any, List, Optional, Union, Callable
-import json
+from typing import Type, Dict, Any, Optional, Union, Callable
 from datetime import datetime
-
-from pydantic import BaseModel
-import deepeval
-from deepeval.metrics import JsonCorrectnessMetric, ExactMatchMetric, F1Metric
-from deepeval.test_case import LLMTestCase
-
 from extract_thinker import Extractor, Contract
 from extract_thinker.eval.dataset import EvaluationDataset
 from extract_thinker.eval.metrics import (
@@ -22,9 +15,10 @@ from extract_thinker.eval.field_comparison import (
     FieldComparisonConfig,
     ComparisonType
 )
-from extract_thinker.eval.hallucination import HallucinationDetector, DocumentHallucinationResults
+from extract_thinker.eval.hallucination import HallucinationDetector
 from extract_thinker.eval.cost_metrics import CostMetrics
 from litellm import completion_cost, token_counter
+import uuid
 
 
 class Evaluator:
@@ -506,7 +500,8 @@ class TeacherStudentEvaluator(Evaluator):
         document_metrics: DocumentMetrics,
         schema_metrics: SchemaValidationMetrics,
         time_metrics: ExecutionTimeMetrics,
-        skip_failures: bool
+        skip_failures: bool,
+        doc_id: str = str(uuid.uuid4())
     ) -> Dict[str, Any]:
         """Helper method to extract data using a specific extractor and update metrics."""
         # Extract data from document
