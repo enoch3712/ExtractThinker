@@ -79,6 +79,12 @@ nav:
           - Overview: core-concepts/completion-strategies/index.md
           - Concatenate: core-concepts/completion-strategies/concatenate.md
           - Paginate: core-concepts/completion-strategies/paginate.md
+      - Evals:
+          - Overview: core-concepts/evals/index.md
+          - Field Comparison Types: core-concepts/evals/field-comparison.md
+          - Teacher-Student Evaluation: core-concepts/evals/teacher-student.md
+          - Hallucination Detection: core-concepts/evals/hallucination-detection.md
+          - Cost Tracking: core-concepts/evals/cost-tracking.md
   - "Examples":
       - Resume Processing: examples/resume-processing.md
       - Azure Stack: examples/azure-stack.md

@@ -97,6 +97,8 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate ExtractThinker extraction performance")
     parser.add_argument("--config", required=True, help="Path to evaluation configuration file")
     parser.add_argument("--output", default="eval_results.json", help="Path to save evaluation results")
+    parser.add_argument("--detect-hallucinations", action="store_true", help="Enable hallucination detection")
+    parser.add_argument("--track-costs", action="store_true", help="Enable token usage and cost tracking")
     
     args = parser.parse_args()
     
@@ -118,12 +120,18 @@ def main():
         file_pattern=config.get("file_pattern", "*.*")
     )
     
+    # Check if hallucination detection and cost tracking are in config
+    detect_hallucinations = config.get("detect_hallucinations", False) or args.detect_hallucinations
+    track_costs = config.get("track_costs", False) or args.track_costs
+    
     # Create and run the evaluator
     evaluator = Evaluator(
         extractor=extractor,
         response_model=contract_class,
         vision=config.get("vision", False),
-        content=config.get("content")
+        content=config.get("content"),
+        detect_hallucinations=detect_hallucinations,
+        track_costs=track_costs
     )
     
     # Run evaluation

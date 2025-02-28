@@ -1,13 +1,16 @@
-# ExtractThinker Evaluation Framework
+# Evals
 
 ## Overview
 
 The evaluation framework helps you:
+
 - Measure extraction accuracy at both field and document levels
 - Track schema validation success rates
 - Monitor execution times
 - Generate comprehensive reports with detailed metrics
 - Compare performance across different models or datasets
+- Detect potential hallucinations in extracted data
+- Track token usage and costs
 
 ## Basic Usage
 
@@ -174,6 +177,34 @@ evaluator = Evaluator(
 )
 ```
 
+### Hallucination Detection
+
+To identify potentially hallucinated content:
+
+```python
+evaluator = Evaluator(
+    extractor=extractor,
+    response_model=InvoiceContract,
+    detect_hallucinations=True  # Enable hallucination detection
+)
+```
+
+For more details, see [Hallucination Detection](hallucination-detection.md).
+
+### Cost Tracking
+
+To monitor token usage and costs:
+
+```python
+evaluator = Evaluator(
+    extractor=extractor,
+    response_model=InvoiceContract,
+    track_costs=True  # Enable cost tracking
+)
+```
+
+For more details, see [Cost Tracking](cost-tracking.md).
+
 ### Additional Content
 
 You can provide additional context or instructions for extraction:
@@ -204,3 +235,5 @@ report = evaluator.evaluate(
 - Run evaluations on different model configurations to find optimal settings
 - Monitor field-level metrics to identify specific areas for improvement
 - Create separate test sets for different document types
+- Enable hallucination detection for critical applications
+- Track costs to optimize performance/price ratio
