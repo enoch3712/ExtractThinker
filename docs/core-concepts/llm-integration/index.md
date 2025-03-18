@@ -59,3 +59,47 @@ llm = LLM("openai:gpt-4o", backend=LLMEngine.PYDANTIC_AI)
     - Requires the `pydantic-ai` package to be installed
     
     [Read more about Pydantic AI features](https://ai.pydantic.dev/#why-use-pydanticai)
+
+## Features
+
+### Thinking Models
+
+ExtractThinker's LLM integration includes support for "thinking models" that expose their reasoning process:
+
+```python
+from extract_thinker import LLM
+
+# Initialize LLM
+llm = LLM("gpt-4o")
+
+# Enable thinking mode
+llm.set_thinking(True)  # Automatically sets temperature to 1.0
+```
+
+Learn more about [Thinking Models](./thinking-models.md) and how they improve extraction results.
+
+### Router Support
+
+ExtractThinker supports LiteLLM's router functionality for model fallbacks:
+
+```python
+from extract_thinker import LLM
+from litellm import Router
+
+# Initialize router with fallbacks
+router = Router(
+    model_list=[
+        {"model_name": "gpt-4o", "litellm_params": {"model": "gpt-4o"}},
+        {"model_name": "claude-3-opus-20240229", "litellm_params": {"model": "claude-3-opus-20240229"}},
+    ],
+    fallbacks=[
+        {"gpt-4o": "claude-3-opus-20240229"}
+    ]
+)
+
+# Initialize LLM with router
+llm = LLM("gpt-4o")
+llm.load_router(router)
+```
+
+This enables seamless fallbacks between different providers if a request fails.

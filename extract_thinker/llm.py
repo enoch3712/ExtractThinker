@@ -26,6 +26,12 @@ Your step-by-step reasoning and analysis goes here...
 class LLM:
     TIMEOUT = 3000  # Timeout in milliseconds
     DEFAULT_TEMPERATURE = 0
+    THINKING_BUDGET_TOKENS = 8000
+    DEFAULT_PAGE_TOKENS = 1500  # Each page has this many tokens (text + image)
+    DEFAULT_THINKING_RATIO = 1/3  # Thinking budget as a fraction of content tokens
+    MAX_TOKEN_LIMIT = 120000  # Maximum token limit (for Claude 3.7 Sonnet)
+    MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
+    MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
 
     def __init__(
         self,
@@ -46,6 +52,9 @@ class LLM:
         self.is_dynamic = False
         self.backend = backend
         self.temperature = self.DEFAULT_TEMPERATURE
+        self.is_thinking = False  # Initialize is_thinking flag
+        self.page_count = None  # Initialize page count
+        self.thinking_budget = self.THINKING_BUDGET_TOKENS  # Default thinking budget
 
         if self.backend == LLMEngine.DEFAULT:
             self.client = instructor.from_litellm(
@@ -104,6 +113,15 @@ class LLM:
         """
         self.temperature = temperature
 
+    def set_thinking(self, is_thinking: bool) -> None:
+        """Set whether the LLM should handle thinking.
+        
+        Args:
+            is_thinking (bool): Whether to enable thinking
+        """
+        self.is_thinking = is_thinking
+        self.temperature = 1
+
     def set_dynamic(self, is_dynamic: bool) -> None:
         """Set whether the LLM should handle dynamic content.
         
@@ -114,6 +132,34 @@ class LLM:
             is_dynamic (bool): Whether to enable dynamic content handling
         """
         self.is_dynamic = is_dynamic
+
+    def set_page_count(self, page_count: int) -> None:
+        """Set the page count to calculate token limits for thinking.
+        
+        Each page is assumed to have DEFAULT_PAGE_TOKENS tokens (text + image).
+        Thinking budget is calculated as DEFAULT_THINKING_RATIO of the content tokens.
+        
+        Args:
+            page_count (int): Number of pages in the document
+        """
+        if page_count <= 0:
+            raise ValueError("Page count must be a positive integer")
+            
+        self.page_count = page_count
+        
+        # Calculate content tokens
+        content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, self.MAX_TOKEN_LIMIT)
+        
+        # Calculate thinking budget (1/3 of content tokens)
+        thinking_tokens = int(page_count * self.DEFAULT_PAGE_TOKENS * self.DEFAULT_THINKING_RATIO)
+        
+        # Apply min/max constraints
+        thinking_tokens = max(thinking_tokens, self.MIN_THINKING_BUDGET)
+        thinking_tokens = min(thinking_tokens, self.MAX_THINKING_BUDGET)
+        
+        # Update token limit and thinking budget
+        self.token_limit = content_tokens
+        self.thinking_budget = thinking_tokens
 
     def request(
         self,
@@ -160,24 +206,11 @@ class LLM:
                 "content": prompt
             })
 
+        # Use router or direct call based on thinking state
         if self.router:
-            response = self.router.completion(
-                model=self.model,
-                messages=working_messages,
-                response_model=request_model,
-                temperature=self.temperature,
-                timeout=self.TIMEOUT,
-            )
+            response = self._request_with_router(working_messages, request_model)
         else:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=working_messages,
-                temperature=self.temperature,
-                response_model=request_model,
-                max_retries=1,
-                max_tokens=self.token_limit,
-                timeout=self.TIMEOUT,
-            )
+            response = self._request_direct(working_messages, request_model)
 
         # If response_model is provided, return the response directly
         if self.is_dynamic == False:
@@ -190,19 +223,141 @@ class LLM:
             
         return content
 
+    def _request_with_router(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
+        """Handle request using router with or without thinking parameter"""
+        if self.is_thinking:
+            # Add thinking parameter for supported models
+            thinking_param = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget
+            }
+            try:
+                return self.router.completion(
+                    model=self.model,
+                    messages=messages,
+                    response_model=response_model,
+                    temperature=self.temperature,
+                    timeout=self.TIMEOUT,
+                    thinking=thinking_param,
+                )
+            except Exception as e:
+                # If thinking parameter causes an error, try without it
+                if "property 'thinking' is unsupported" in str(e):
+                    print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+                    return self.router.completion(
+                        model=self.model,
+                        messages=messages,
+                        response_model=response_model,
+                        temperature=self.temperature,
+                        timeout=self.TIMEOUT,
+                    )
+                else:
+                    raise e
+        else:
+            # Normal request without thinking parameter
+            return self.router.completion(
+                model=self.model,
+                messages=messages,
+                response_model=response_model,
+                temperature=self.temperature,
+                timeout=self.TIMEOUT,
+            )
+            
+    def _request_direct(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
+        """Handle direct request with or without thinking parameter"""
+        base_params = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "response_model": response_model,
+            "max_retries": 1,
+            "max_tokens": self.token_limit,
+            "timeout": self.TIMEOUT,
+        }
+        
+        if self.is_thinking:
+            # Try with thinking parameter
+            thinking_param = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget
+            }
+            try:
+                return self.client.chat.completions.create(
+                    **base_params,
+                    thinking=thinking_param,
+                )
+            except Exception as e:
+                # If thinking parameter causes an error, try without it
+                if "property 'thinking' is unsupported" in str(e):
+                    print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+                    return self.client.chat.completions.create(**base_params)
+                else:
+                    raise e
+        else:
+            # Normal request without thinking parameter
+            return self.client.chat.completions.create(**base_params)
+
     def raw_completion(self, messages: List[Dict[str, str]]) -> str:
         """Make raw completion request without response model."""
         if self.router:
-            raw_response = self.router.completion(
-                model=self.model,
-                messages=messages
-            )
+            if self.is_thinking:
+                # Add thinking parameter for supported models
+                thinking_param = {
+                    "type": "enabled",
+                    "budget_tokens": self.thinking_budget
+                }
+                try:
+                    raw_response = self.router.completion(
+                        model=self.model,
+                        messages=messages,
+                        thinking=thinking_param,
+                    )
+                except Exception as e:
+                    # If thinking parameter causes an error, try without it
+                    if "property 'thinking' is unsupported" in str(e):
+                        print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+                        raw_response = self.router.completion(
+                            model=self.model,
+                            messages=messages,
+                        )
+                    else:
+                        raise e
+            else:
+                raw_response = self.router.completion(
+                    model=self.model,
+                    messages=messages,
+                )
         else:
-            raw_response = litellm.completion(
-                model=self.model,
-                messages=messages,
-                max_tokens=self.token_limit
-            )
+            if self.is_thinking:
+                # Add thinking parameter for supported models
+                thinking_param = {
+                    "type": "enabled",
+                    "budget_tokens": self.thinking_budget
+                }
+                try:
+                    raw_response = litellm.completion(
+                        model=self.model,
+                        messages=messages,
+                        max_tokens=self.token_limit,
+                        thinking=thinking_param,
+                    )
+                except Exception as e:
+                    # If thinking parameter causes an error, try without it
+                    if "property 'thinking' is unsupported" in str(e):
+                        print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+                        raw_response = litellm.completion(
+                            model=self.model,
+                            messages=messages,
+                            max_tokens=self.token_limit,
+                        )
+                    else:
+                        raise e
+            else:
+                raw_response = litellm.completion(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=self.token_limit,
+                )
         return raw_response.choices[0].message.content
 
     def set_timeout(self, timeout_ms: int) -> None:

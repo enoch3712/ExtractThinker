@@ -1,5 +1,8 @@
 # Dynamic Parsing
 
+!!! note "Recommendation"
+    For most extraction tasks, we recommend using [Thinking Models](./thinking-models.md), which provide more comprehensive reasoning capabilities and broader provider support.
+
 <div align="center">
   <img src="../../../assets/dynamic_parsing.png" alt="Dynamic Parsing" width="90%">
 </div>
