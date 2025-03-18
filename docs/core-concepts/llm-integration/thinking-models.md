@@ -57,7 +57,7 @@ from extract_thinker import LLM, Extractor
 from extract_thinker.document_loader import DocumentLoaderPyPdf
 
 # Initialize components
-llm = LLM("gpt-4o")
+llm = LLM("claude-3-7-sonnet-20250219")
 document_loader = DocumentLoaderPyPdf()
 extractor = Extractor(document_loader=document_loader, llm=llm)
 
