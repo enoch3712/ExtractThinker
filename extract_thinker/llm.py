@@ -26,6 +26,12 @@ Your step-by-step reasoning and analysis goes here...
 class LLM:
     TIMEOUT = 3000  # Timeout in milliseconds
     DEFAULT_TEMPERATURE = 0
+    THINKING_BUDGET_TOKENS = 8000
+    DEFAULT_PAGE_TOKENS = 1500  # Each page has this many tokens (text + image)
+    DEFAULT_THINKING_RATIO = 1/3  # Thinking budget as a fraction of content tokens
+    MAX_TOKEN_LIMIT = 120000  # Maximum token limit (for Claude 3.7 Sonnet)
+    MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
+    MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
 
     def __init__(
         self,
@@ -46,6 +52,9 @@ class LLM:
         self.is_dynamic = False
         self.backend = backend
         self.temperature = self.DEFAULT_TEMPERATURE
+        self.is_thinking = False  # Initialize is_thinking flag
+        self.page_count = None  # Initialize page count
+        self.thinking_budget = self.THINKING_BUDGET_TOKENS  # Default thinking budget
 
         if self.backend == LLMEngine.DEFAULT:
             self.client = instructor.from_litellm(
@@ -104,6 +113,15 @@ class LLM:
         """
         self.temperature = temperature
 
+    def set_thinking(self, is_thinking: bool) -> None:
+        """Set whether the LLM should handle thinking.
+        
+        Args:
+            is_thinking (bool): Whether to enable thinking
+        """
+        self.is_thinking = is_thinking
+        self.temperature = 1
+
     def set_dynamic(self, is_dynamic: bool) -> None:
         """Set whether the LLM should handle dynamic content.
         
@@ -114,6 +132,34 @@ class LLM:
             is_dynamic (bool): Whether to enable dynamic content handling
         """
         self.is_dynamic = is_dynamic
+
+    def set_page_count(self, page_count: int) -> None:
+        """Set the page count to calculate token limits for thinking.
+        
+        Each page is assumed to have DEFAULT_PAGE_TOKENS tokens (text + image).
+        Thinking budget is calculated as DEFAULT_THINKING_RATIO of the content tokens.
+        
+        Args:
+            page_count (int): Number of pages in the document
+        """
+        if page_count <= 0:
+            raise ValueError("Page count must be a positive integer")
+            
+        self.page_count = page_count
+        
+        # Calculate content tokens
+        content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, self.MAX_TOKEN_LIMIT)
+        
+        # Calculate thinking budget (1/3 of content tokens)
+        thinking_tokens = int(page_count * self.DEFAULT_PAGE_TOKENS * self.DEFAULT_THINKING_RATIO)
+        
+        # Apply min/max constraints
+        thinking_tokens = max(thinking_tokens, self.MIN_THINKING_BUDGET)
+        thinking_tokens = min(thinking_tokens, self.MAX_THINKING_BUDGET)
+        
+        # Update token limit and thinking budget
+        self.token_limit = content_tokens
+        self.thinking_budget = thinking_tokens
 
     def request(
         self,
@@ -160,6 +206,14 @@ class LLM:
                 "content": prompt
             })
 
+        # Add thinking parameter if enabled (only for LiteLLM backend)
+        thinking_param = None
+        if self.backend == LLMEngine.DEFAULT and self.is_thinking:
+            thinking_param = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget
+            }
+
         if self.router:
             response = self.router.completion(
                 model=self.model,
@@ -167,6 +221,7 @@ class LLM:
                 response_model=request_model,
                 temperature=self.temperature,
                 timeout=self.TIMEOUT,
+                thinking=thinking_param,
             )
         else:
             response = self.client.chat.completions.create(
@@ -177,6 +232,7 @@ class LLM:
                 max_retries=1,
                 max_tokens=self.token_limit,
                 timeout=self.TIMEOUT,
+                thinking=thinking_param,
             )
 
         # If response_model is provided, return the response directly
@@ -192,16 +248,26 @@ class LLM:
 
     def raw_completion(self, messages: List[Dict[str, str]]) -> str:
         """Make raw completion request without response model."""
+        # Add thinking parameter if enabled
+        thinking_param = None
+        if self.is_thinking:
+            thinking_param = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget
+            }
+            
         if self.router:
             raw_response = self.router.completion(
                 model=self.model,
-                messages=messages
+                messages=messages,
+                thinking=thinking_param,
             )
         else:
             raw_response = litellm.completion(
                 model=self.model,
                 messages=messages,
-                max_tokens=self.token_limit
+                max_tokens=self.token_limit,
+                thinking=thinking_param,
             )
         return raw_response.choices[0].message.content
 
