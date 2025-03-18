@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin
+from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_type_hints, get_args, Annotated
 from instructor.batch import BatchJob
 import uuid
 from pydantic import BaseModel
@@ -30,7 +30,7 @@ from extract_thinker.pagination_handler import PaginationHandler
 from instructor.exceptions import IncompleteOutputException
 from extract_thinker.exceptions import (
     ExtractThinkerError,
-    InvalidVisionDocumentLoaderError
+    InvalidVisionDocumentLoaderError,
 )
 from extract_thinker.utils import is_vision_error, classify_vision_error
 
@@ -243,6 +243,25 @@ class Extractor:
                     universal = self._map_to_universal_format(loaded, vision)
                     all_contents.append(universal)
                 
+                # Count total pages across all documents
+                total_pages = 0
+                for item in all_contents:
+                    # If metadata contains page count, use it
+                    if isinstance(item, dict) and 'metadata' in item:
+                        metadata = item.get('metadata', {})
+                        if isinstance(metadata, dict) and 'num_pages' in metadata:
+                            total_pages += metadata['num_pages']
+                        else:
+                            # Otherwise count as 1 page
+                            total_pages += 1
+                    else:
+                        # Count as 1 page if no metadata
+                        total_pages += 1
+                
+                # Set page count if we have an LLM
+                if self.llm:
+                    self.llm.set_page_count(max(1, total_pages))
+                
                 # Merge the text contents with a clear separator.
                 merged_text = "\n\n--- Document Separator ---\n\n".join(
                     item.get("content", "") for item in all_contents
@@ -262,7 +281,7 @@ class Extractor:
                 if content:
                     merged_content["content"] = content + "\n\n" + merged_content["content"]
                 
-                return self._extract(merged_content, response_model, vision)
+                result = self._extract(merged_content, response_model, vision)
             else:
                 # Single source; use existing behavior.
                 if self._skip_loading:
@@ -275,8 +294,23 @@ class Extractor:
                         raise ValueError("No suitable document loader found for the input.")
                     loaded_content = loader.load(source)
                     unified_content = self._map_to_universal_format(loaded_content, vision)
+                
+                # Set page count if we have an LLM
+                if self.llm:
+                    # Count pages from unified content
+                    page_count = 1  # Default to 1 page
+                    
+                    # Try to get page count from metadata
+                    if isinstance(unified_content, dict) and 'metadata' in unified_content:
+                        metadata = unified_content.get('metadata', {})
+                        if isinstance(metadata, dict) and 'num_pages' in metadata:
+                            page_count = metadata['num_pages']
+                    
+                    self.llm.set_page_count(page_count)
+                
+                result = self._extract(unified_content, response_model, vision)
 
-                return self._extract(unified_content, response_model, vision)
+            return result
 
         except IncompleteOutputException as e:
             raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
@@ -956,6 +990,16 @@ class Extractor:
         else:
             sources = source
 
+        # Set page count for batch processing if we have an LLM
+        if self.llm:
+            # Estimate pages based on the number of sources
+            if isinstance(source, list):
+                estimated_pages = len(source)
+            else:
+                estimated_pages = 1
+                
+            self.llm.set_page_count(estimated_pages)
+        
         def get_messages():
             for idx, src in enumerate(sources):
                 messages = [
@@ -1059,7 +1103,7 @@ class Extractor:
             interceptor.intercept(self.llm)
 
         # Build messages
-        messages = self._build_messages(self._build_message_content(content, vision), vision)
+        messages = self._build_messages(self._build_message_content(content, vision))
 
         if self.extra_content is not None:
             self._add_extra_content(messages)
@@ -1267,14 +1311,12 @@ class Extractor:
     def _build_messages(
         self,
         message_content: Union[List[Dict[str, Any]], List[str]],
-        vision: bool,
     ) -> List[Dict[str, Any]]:
         """
         Build the messages to send to the LLM.
 
         Args:
             message_content: The content of the message.
-            vision: Whether vision is enabled.
 
         Returns:
             A list of messages.
@@ -1284,7 +1326,7 @@ class Extractor:
             "content": "You are a server API that receives document information and returns specific fields in JSON format.",
         }
 
-        if vision:
+        if self.allow_vision:
             messages = [
                 system_message,
                 {
@@ -1363,3 +1405,34 @@ class Extractor:
             
         # For regular content, join all page contents
         return "\n\n".join(page.get("content", "") for page in pages)
+
+    def enable_thinking_mode(self, enable: bool = True) -> 'Extractor':
+        """Enable thinking mode for the LLM if supported.
+        
+        Args:
+            enable (bool): Whether to enable thinking mode
+            
+        Returns:
+            Extractor: self for method chaining
+        """
+        if self.llm is None:
+            raise ValueError("LLM must be set before enabling thinking mode")
+            
+        self.enable_thinking = enable
+        self.llm.set_thinking(enable)
+        return self
+    
+    def set_page_count(self, page_count: int) -> 'Extractor':
+        """Set the page count for token calculation when thinking is enabled.
+        
+        Args:
+            page_count (int): Number of pages in the document
+            
+        Returns:
+            Extractor: self for method chaining
+        """
+        if self.llm is None:
+            raise ValueError("LLM must be set before setting page count")
+            
+        self.llm.set_page_count(page_count)
+        return self

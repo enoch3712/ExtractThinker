@@ -56,7 +56,7 @@ nav:
           - Kofax: '#'
       - LLM Integration:
           - Overview: core-concepts/llm-integration/index.md
-          - Dynamic Parsing: core-concepts/llm-integration/dynamic-parsing.md
+          - Thinking Models: core-concepts/llm-integration/thinking-models.md
       - Classification: 
           - Overview: core-concepts/classification/index.md
           - Basic Classification: core-concepts/classification/basic.md
