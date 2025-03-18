@@ -55,7 +55,6 @@ class Extractor:
         self._skip_loading: bool = False
         self.chunk_height: int = 1500
         self.allow_vision: bool = False
-        self.bbox_config = BoundingBoxConfig.default()
 
     def add_interceptor(
         self, interceptor: Union[LoaderInterceptor, LlmInterceptor]
