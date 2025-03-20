@@ -1,4 +1,4 @@
-# Evaluation Framework
+# Evaluation Framework <span class="beta-badge">🧪 In Beta</span>
 
 The evaluation framework helps measure the performance and reliability of your extraction models across different document types.
 
@@ -7,15 +7,11 @@ The evaluation framework helps measure the performance and reliability of your e
 ExtractThinker's evaluation system provides comprehensive metrics to:
 
 * Measure extraction accuracy at both field and document levels
-* Track schema validation success rates 
+* Track schema validation success rates
 * Monitor execution times
 * Detect potential hallucinations in extracted data
 * Track token usage and associated costs
 * Compare performance across different models or datasets
-
-:::info
-Evaluations are essential for understanding model performance, identifying areas for improvement, and making informed decisions about model selection for production use.
-:::
 
 ## Required Components
 

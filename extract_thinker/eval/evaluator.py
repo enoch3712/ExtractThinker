@@ -18,6 +18,8 @@ from extract_thinker.eval.field_comparison import (
 from extract_thinker.eval.hallucination import HallucinationDetector
 from extract_thinker.eval.cost_metrics import CostMetrics
 from litellm import completion_cost, token_counter
+from extract_thinker.eval.hallucination import HallucinationDetector
+from extract_thinker.eval.HallucinationDetectionStrategy import HallucinationDetectionStrategy
 import uuid
 
 
@@ -37,7 +39,8 @@ class Evaluator:
         content: Optional[str] = None,
         field_comparisons: Optional[Dict[str, Union[ComparisonType, FieldComparisonConfig]]] = None,
         detect_hallucinations: bool = False,
-        track_costs: bool = False
+        track_costs: bool = False,
+        document_text_provider: Optional[Callable[[str], str]] = None
     ):
         """
         Initialize the evaluator.
@@ -50,6 +53,7 @@ class Evaluator:
             field_comparisons: Optional dict mapping field names to comparison types or configs
             detect_hallucinations: Whether to detect potential hallucinations
             track_costs: Whether to track token usage and costs
+            document_text_provider: Optional function that takes a document path and returns its text content
         """
         self.extractor = extractor
         self.response_model = response_model
@@ -85,13 +89,32 @@ class Evaluator:
         self.detect_hallucinations = detect_hallucinations
         self.hallucination_detector = None
         if detect_hallucinations:
-            self.hallucination_detector = HallucinationDetector(
-                llm=extractor.llm if hasattr(extractor, "llm") else None
-            )
+            # Get LLM from extractor if available
+            llm = getattr(extractor, "llm", None)
+            
+            # Create detector with appropriate strategy
+            if llm:
+                strategy = HallucinationDetectionStrategy.LLM
+                print(f"Using LLM strategy for hallucination detection with {llm.model if hasattr(llm, 'model') else 'unknown model'}")
+            else:
+                strategy = HallucinationDetectionStrategy.HEURISTIC
+                print("Using heuristic strategy for hallucination detection (no LLM available)")
+                
+            try:
+                self.hallucination_detector = HallucinationDetector(
+                    llm=llm,
+                    strategy=strategy
+                )
+                print("Hallucination detector initialized successfully")
+            except Exception as e:
+                print(f"Warning: Failed to initialize hallucination detector: {str(e)}")
         
         # Initialize cost tracking if enabled
         self.track_costs = track_costs
         self.cost_metrics = CostMetrics()
+        
+        # Store document text provider to allow custom loading of document content
+        self.document_text_provider = document_text_provider
         
     def set_field_comparison(
         self, 
@@ -179,6 +202,7 @@ class Evaluator:
             dataset=self.dataset_name or "Custom Dataset",
             model=model_name,
             timestamp=datetime.now().isoformat(),
+            documents_evaluated=len(self.results),
             metrics=metrics,
             field_metrics=self.field_metrics.get_metrics_by_field(),
             results=self.results,
@@ -205,19 +229,24 @@ class Evaluator:
         """
         print(f"Processing document: {doc_id}")
         
-        # Get document text for hallucination detection if needed
+        # Get document text for hallucination detection if needed using provided document_text_provider
         document_text = None
         if self.detect_hallucinations:
-            try:
-                with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    document_text = f.read()
-            except:
-                # If we can't read text directly, try to extract it
+            if self.document_text_provider:
                 try:
-                    from extract_thinker.utils import extract_text_from_document
-                    document_text = extract_text_from_document(doc_path)
-                except:
-                    print(f"Warning: Could not extract text from {doc_id} for hallucination detection")
+                    document_text = self.document_text_provider(doc_path)
+                except Exception as e:
+                    print(f"Warning: Could not extract text from {doc_id} using document_text_provider: {str(e)}")
+            elif hasattr(self.extractor, 'document_loader') and self.extractor.document_loader:
+                try:
+                    # Try to use the extractor's document loader as fallback
+                    pages = self.extractor.document_loader.load(doc_path)
+                    document_text = "\n".join(page.get("content", "") for page in pages)
+                except Exception as e:
+                    print(f"Warning: Could not extract text using extractor's document_loader: {str(e)}")
+                    
+            if document_text is None:
+                print(f"Warning: No document text available for hallucination detection for {doc_id}")
         
         # Time the extraction
         start_time = time.time()
@@ -248,7 +277,11 @@ class Evaluator:
             
             # Convert to dict for comparison
             if hasattr(extracted, "dict"):
-                predicted = extracted.dict()
+                try:
+                    predicted = extracted.dict()
+                except AttributeError:
+                    # For Pydantic v2
+                    predicted = extracted.model_dump()
             else:
                 predicted = dict(extracted)
             
@@ -323,9 +356,18 @@ class Evaluator:
         # Detect hallucinations if enabled
         hallucination_results = None
         if self.detect_hallucinations and self.hallucination_detector and document_text:
-            hallucination_results = self.hallucination_detector.detect_hallucinations(
-                predicted, document_text
-            )
+            try:
+                hallucination_results = self.hallucination_detector.detect_hallucinations(
+                    predicted, document_text
+                )
+                print(f"Hallucination detection completed for {doc_id}")
+            except Exception as e:
+                print(f"Warning: Hallucination detection failed for {doc_id}: {str(e)}")
+        elif self.detect_hallucinations:
+            if not self.hallucination_detector:
+                print(f"Warning: Hallucination detection enabled but detector not initialized for {doc_id}")
+            if document_text is None:
+                print(f"Warning: Hallucination detection enabled but no document text available for {doc_id}")
         
         # Return result for this document
         result = {
@@ -348,7 +390,20 @@ class Evaluator:
         
         # Add hallucination results if available
         if hallucination_results:
-            result["hallucination_results"] = hallucination_results.dict()
+            try:
+                # Try both dict methods to support both Pydantic v1 and v2
+                try:
+                    result["hallucination_results"] = hallucination_results.dict()
+                except AttributeError:
+                    # For Pydantic v2
+                    result["hallucination_results"] = hallucination_results.model_dump()
+            except Exception as e:
+                print(f"Warning: Could not add hallucination results to output for {doc_id}: {str(e)}")
+                # Fallback to a simple representation
+                result["hallucination_results"] = {
+                    "overall_score": hallucination_results.overall_score,
+                    "field_scores": hallucination_results.field_scores
+                }
         
         # Add token usage and cost if tracked
         if self.track_costs:
@@ -420,7 +475,34 @@ class TeacherStudentEvaluator(Evaluator):
         
         # Store teacher results
         self.teacher_results = []
+    
+    def _values_match(self, expected: Any, predicted: Any) -> bool:
+        """
+        Helper method to check if values match using the field comparison manager.
+        This uses a simple equality comparison as a fallback when the field name is not known.
         
+        Args:
+            expected: Expected value
+            predicted: Predicted value
+            
+        Returns:
+            bool: True if values match, False otherwise
+        """
+        # Use simple equality as a fallback comparison method
+        if isinstance(expected, (str, int, float, bool)) and isinstance(predicted, (str, int, float, bool)):
+            return expected == predicted
+        elif isinstance(expected, dict) and isinstance(predicted, dict):
+            # For dictionaries, check if all keys match
+            return all(self._values_match(expected.get(k), predicted.get(k)) for k in set(expected.keys()) | set(predicted.keys()))
+        elif isinstance(expected, list) and isinstance(predicted, list):
+            # For lists, check if lengths match and all items match
+            if len(expected) != len(predicted):
+                return False
+            return all(self._values_match(e, p) for e, p in zip(expected, predicted))
+        else:
+            # For other types, use string representation equality
+            return str(expected) == str(predicted)
+    
     def evaluate(
         self,
         dataset: EvaluationDataset,
@@ -504,18 +586,64 @@ class TeacherStudentEvaluator(Evaluator):
         doc_id: str = str(uuid.uuid4())
     ) -> Dict[str, Any]:
         """Helper method to extract data using a specific extractor and update metrics."""
+        # Get document text for hallucination detection if needed using provided document_text_provider
+        document_text = None
+        if self.detect_hallucinations and self.document_text_provider:
+            try:
+                document_text = self.document_text_provider(doc_path)
+            except Exception as e:
+                print(f"Warning: Could not extract text from {doc_id} using document_text_provider: {str(e)}")
+        
         # Extract data from document
         start_time = time.time()
+        
+        # Initialize token tracking variables if needed
+        input_tokens = 0
+        output_tokens = 0
+        cost = 0.0
+        
         try:
+            # Track input size if cost tracking is enabled
+            if self.track_costs and hasattr(extractor, "llm") and hasattr(extractor.llm, "model"):
+                # Estimate input tokens
+                try:
+                    if document_text:
+                        input_tokens = token_counter(model=extractor.llm.model, text=document_text)
+                except:
+                    pass
+            
+            # Extract data from document
             result = extractor.extract(
                 source=doc_path,
                 response_model=self.response_model,
                 vision=vision,
                 content=content
             )
+            
             schema_valid = True
             predicted = result.dict()
+            
+            # Track token usage and cost
+            if self.track_costs and hasattr(extractor, "llm") and hasattr(result, "_response"):
+                try:
+                    # Get token usage from response
+                    usage = result._response.usage
+                    input_tokens = usage.prompt_tokens
+                    output_tokens = usage.completion_tokens
+                    
+                    # Calculate cost
+                    cost = completion_cost(
+                        completion_response=result._response,
+                        model=extractor.llm.model
+                    )
+                    
+                    # Update cost metrics
+                    self.cost_metrics.update(doc_id, input_tokens, output_tokens, cost)
+                except Exception as e:
+                    print(f"Warning: Could not track cost for {doc_id}: {str(e)}")
+                
         except Exception as e:
+            print(f"Extraction failed for {doc_id}: {str(e)}")
             schema_valid = False
             predicted = {"error": str(e)}
                 
@@ -555,8 +683,15 @@ class TeacherStudentEvaluator(Evaluator):
         doc_correct = all(fields_correct.values())
         document_metrics.update(doc_correct)
         
+        # Detect hallucinations if enabled
+        hallucination_results = None
+        if self.detect_hallucinations and self.hallucination_detector and document_text:
+            hallucination_results = self.hallucination_detector.detect_hallucinations(
+                predicted, document_text
+            )
+        
         # Return result for this document
-        return {
+        result = {
             "doc_id": doc_id,
             "expected": expected,
             "predicted": predicted,
@@ -564,6 +699,17 @@ class TeacherStudentEvaluator(Evaluator):
             "schema_valid": schema_valid,
             "execution_time_s": execution_time
         }
+        
+        # Add hallucination results if available
+        if hallucination_results:
+            result["hallucination_results"] = hallucination_results.dict()
+        
+        # Add token usage and cost if tracked
+        if self.track_costs:
+            result["tokens"] = {"input": input_tokens, "output": output_tokens, "total": input_tokens + output_tokens}
+            result["cost"] = cost
+            
+        return result
     
     def _generate_comparative_report(self) -> EvaluationReport:
         """
@@ -584,9 +730,9 @@ class TeacherStudentEvaluator(Evaluator):
         
         # Create comparative metrics
         field_improvements = {}
-        for field_name in self.field_metrics.field_data.keys():
-            student_f1 = self.field_metrics.get_f1_for_field(field_name)
-            teacher_f1 = self.teacher_field_metrics.get_f1_for_field(field_name)
+        for field_name in self.field_metrics.field_names:
+            student_f1 = self.field_metrics.get_f1(field_name)
+            teacher_f1 = self.teacher_field_metrics.get_f1(field_name)
             
             # Calculate improvement percentage
             if student_f1 > 0:
@@ -615,32 +761,19 @@ class TeacherStudentEvaluator(Evaluator):
             dataset=self.dataset_name or "Custom Dataset",
             model=f"Student: {student_model}, Teacher: {teacher_model}",
             timestamp=datetime.now().isoformat(),
+            documents_evaluated=len(self.results),
             metrics={
-                "documents_tested": len(self.results),
-                
-                # Student metrics
                 "student_document_accuracy": student_doc_accuracy,
-                "student_schema_validation_rate": self.schema_metrics.get_success_rate(),
-                "student_average_precision": self.field_metrics.get_precision(),
-                "student_average_recall": self.field_metrics.get_recall(),
-                "student_average_f1": self.field_metrics.get_f1(),
-                "student_average_execution_time_s": self.time_metrics.get_average_time(),
-                
-                # Teacher metrics
                 "teacher_document_accuracy": teacher_doc_accuracy,
-                "teacher_schema_validation_rate": self.teacher_schema_metrics.get_success_rate(),
-                "teacher_average_precision": self.teacher_field_metrics.get_precision(),
-                "teacher_average_recall": self.teacher_field_metrics.get_recall(),
-                "teacher_average_f1": self.teacher_field_metrics.get_f1(),
-                "teacher_average_execution_time_s": self.teacher_time_metrics.get_average_time(),
-                
-                # Comparative metrics
                 "document_accuracy_improvement": doc_accuracy_improvement,
-                "execution_time_ratio": self.teacher_time_metrics.get_average_time() / self.time_metrics.get_average_time() if self.time_metrics.get_average_time() > 0 else float('inf')
+                "student_schema_validation_rate": self.schema_metrics.get_success_rate(),
+                "teacher_schema_validation_rate": self.teacher_schema_metrics.get_success_rate(),
+                "student_average_execution_time": self.time_metrics.get_average_time(),
+                "teacher_average_execution_time": self.teacher_time_metrics.get_average_time()
             },
+            field_improvements=field_improvements,
             field_metrics=self.field_metrics.get_metrics_by_field(),
             teacher_field_metrics=self.teacher_field_metrics.get_metrics_by_field(),
-            field_improvements=field_improvements,
             results=self.results,
             teacher_results=self.teacher_results
         )

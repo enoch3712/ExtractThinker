@@ -1,0 +1,15 @@
+{
+    "invoice.pdf": {
+        "invoice_number": "00012",
+        "invoice_date": "1/30/23",
+        "total_amount": 1125.0,
+        "lines": [
+            {
+                "description": "Consultation services",
+                "quantity": 3,
+                "unit_price": 375,
+                "amount": 1125
+            }
+        ]
+    }
+} 

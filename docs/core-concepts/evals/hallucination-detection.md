@@ -1,4 +1,4 @@
-# Hallucination Detection
+# Hallucination Detection <span class="beta-badge">🧪 In Beta</span>
 
 ## Overview
 

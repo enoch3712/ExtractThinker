@@ -1,3 +1,5 @@
+from extract_thinker.eval.DocumentHallucinationResults import DocumentHallucinationResults
+from extract_thinker.eval.HallucinationResult import HallucinationResult
 from extract_thinker.eval.evaluator import Evaluator, TeacherStudentEvaluator
 from extract_thinker.eval.dataset import EvaluationDataset, FileSystemDataset
 from extract_thinker.eval.metrics import (
@@ -7,9 +9,7 @@ from extract_thinker.eval.metrics import (
     ExecutionTimeMetrics
 )
 from extract_thinker.eval.hallucination import (
-    HallucinationDetector,
-    HallucinationResult,
-    DocumentHallucinationResults
+    HallucinationDetector
 )
 from extract_thinker.eval.cost_metrics import CostMetrics
 from extract_thinker.eval.report import EvaluationReport

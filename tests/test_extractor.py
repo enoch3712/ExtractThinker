@@ -413,6 +413,3 @@ def test_extract_from_multiple_sources():
 
     # Check handbook data
     assert "FCA Handbook" in result.handbook_title, f"Expected title to contain 'FCA Handbook', but got: {result.handbook_title}"
-
-if __name__ == "__main__":
-    test_extract_with_invalid_file_path()

@@ -1,5 +1,4 @@
-# Cost Tracking
-
+# Cost Tracking <span class="beta-badge">🧪 In Beta</span>
 ## Overview
 
 ExtractThinker provides built-in cost tracking for evaluations, helping you monitor token usage and associated costs when using various LLM models.

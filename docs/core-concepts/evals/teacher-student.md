@@ -1,8 +1,16 @@
-# Teacher-Student Evaluation
+# Teacher-Student Evaluation <span class="beta-badge">🧪 In Beta</span>
+
+<div align="center">
+  <img src="../../../assets/student_teacher.png" alt="Teacher Student" width="90%">
+</div>
+
+
+> This approach is inspired by the teacher-student progressive learning technique described in the paper [YODA: Teacher-Student Progressive Learning for Language Models](https://arxiv.org/abs/2401.15670). While commonly used for model distillation, ExtractThinker adapts this concept for evaluation purposes, where more capable "teacher" models assess and benchmark smaller "student" models in extraction pipelines.
 
 The teacher-student approach allows you to benchmark your extractor against a more capable "teacher" model to identify performance gaps and potential areas for improvement.
 
 This approach is particularly useful for:
+
 - Understanding the performance ceiling with better models
 - Identifying fields that benefit most from model upgrades
 - Quantifying the cost-performance tradeoff between different models

@@ -12,6 +12,7 @@ class EvaluationReport(BaseModel):
     dataset: str = Field(..., description="Name of the dataset used")
     model: str = Field(..., description="Name of the model(s) used for extraction")
     timestamp: str = Field(..., description="Timestamp of the evaluation")
+    documents_evaluated: int = Field(..., description="Number of documents evaluated")
     
     metrics: Dict[str, Any] = Field(
         ...,

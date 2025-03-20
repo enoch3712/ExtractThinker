@@ -1,4 +1,4 @@
-# Field Comparison Types
+# Field Comparison Types <span class="beta-badge">🧪 In Beta</span>
 
 When evaluating extraction results, different fields may require different comparison methods. For example:
 
@@ -137,25 +137,3 @@ total_amount (comparison: numeric):
 - Use `NUMERIC` for financial data, allowing for small rounding differences
 - Use `FUZZY` for fields that may contain typos or minor variations
 - Configure thresholds based on your application's tolerance for errors
-
-## Advanced Usage
-
-### Field Comparison Types
-
-You can configure different comparison methods for different fields:
-
-```python
-from extract_thinker.eval import ComparisonType
-
-evaluator = Evaluator(
-    extractor=extractor,
-    response_model=InvoiceContract,
-    field_comparisons={
-        "invoice_number": ComparisonType.EXACT,  # Exact match required
-        "description": ComparisonType.SEMANTIC,  # Semantic similarity
-        "total_amount": ComparisonType.NUMERIC   # Allows percentage tolerance
-    }
-)
-```
-
-For more details, see [Field Comparison Types](field-comparison.md).

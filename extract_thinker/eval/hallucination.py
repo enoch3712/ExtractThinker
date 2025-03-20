@@ -1,35 +1,52 @@
 from typing import Dict, Any, Optional, List, Union
 import re
 from pydantic import BaseModel
+from extract_thinker.eval.DocumentHallucinationResults import DocumentHallucinationResults
+from extract_thinker.eval.HallucinationDetectionStrategy import HallucinationDetectionStrategy
+from extract_thinker.eval.HallucinationResult import HallucinationResult
+from extract_thinker.llm import LLM
 
-class HallucinationResult(BaseModel):
-    """Results from hallucination detection."""
-    field_name: str
-    hallucination_score: float  # 0.0 (definitely real) to 1.0 (definitely hallucinated)
-    reasoning: Optional[str] = None
-    
-class DocumentHallucinationResults(BaseModel):
-    """Hallucination detection results for an entire document."""
-    doc_id: str
-    overall_score: float
-    field_scores: Dict[str, float]
-    detailed_results: List[HallucinationResult]
-    
+class HallucinationCheckResponse(BaseModel):
+    """Response model for LLM hallucination check."""
+    is_contradicted: bool  # Whether the field contradicts the document context
+    score: float  # 0.0 (definitely in document) to 1.0 (definitely hallucinated)
+    reasoning: str  # Explanation for the assessment
+
 class HallucinationDetector:
     """
     Detects potential hallucinations in extracted data by comparing to source document.
+    
+    Following the Confident AI approach, hallucination is calculated as:
+    Hallucination = Number of Contradicted Fields / Total Number of Fields
     """
     
-    def __init__(self, llm=None, threshold: float = 0.7):
+    def __init__(
+        self, 
+        llm: Optional[LLM] = None, 
+        threshold: float = 0.7,
+        strategy: HallucinationDetectionStrategy = None
+    ):
         """
         Initialize the hallucination detector.
         
         Args:
-            llm: Optional LLM to use for hallucination detection (recommended)
+            llm: Optional LLM instance to use for hallucination detection (required for LLM strategy)
             threshold: Score threshold above which a field is considered hallucinated
+            strategy: The strategy to use for hallucination detection. If None, will use
+                      LLM if an LLM is provided, otherwise will use HEURISTIC.
         """
         self.llm = llm
         self.threshold = threshold
+        
+        # Set default strategy based on LLM availability if not specified
+        if strategy is None:
+            self.strategy = HallucinationDetectionStrategy.LLM if llm else HallucinationDetectionStrategy.HEURISTIC
+        else:
+            self.strategy = strategy
+            
+        # Validate that we have an LLM if using LLM strategy
+        if self.strategy == HallucinationDetectionStrategy.LLM and not self.llm:
+            raise ValueError("LLM strategy requires an LLM instance to be provided")
         
     def detect_hallucinations(
         self, 
@@ -49,18 +66,28 @@ class HallucinationDetector:
         detailed_results = []
         field_scores = {}
         
+        contradicted_count = 0
+        total_fields = 0
+        
         # Process each field in the extracted data
         for field_name, field_value in extracted_data.items():
             if self._should_skip_field(field_name, field_value):
                 continue
                 
+            total_fields += 1
+            
             # Use different detection strategies based on field value type
             result = self._detect_field_hallucination(field_name, field_value, document_text)
             detailed_results.append(result)
             field_scores[field_name] = result.hallucination_score
+            
+            # Count as contradicted if score exceeds threshold
+            if result.hallucination_score >= self.threshold:
+                contradicted_count += 1
         
-        # Calculate overall hallucination score
-        overall_score = sum(field_scores.values()) / len(field_scores) if field_scores else 0.0
+        # Calculate overall hallucination score as per Confident AI approach
+        # Hallucination = Number of Contradicted Fields / Total Number of Fields
+        overall_score = contradicted_count / total_fields if total_fields > 0 else 0.0
         
         return DocumentHallucinationResults(
             doc_id=extracted_data.get("doc_id", "unknown"),
@@ -87,23 +114,25 @@ class HallucinationDetector:
         field_value: Any, 
         document_text: str
     ) -> HallucinationResult:
-        """Detect hallucination for a specific field."""
-        # For simple text fields, do basic text matching
-        if isinstance(field_value, (str, int, float, bool)):
-            if self.llm:
-                # Use LLM-based detection
-                return self._llm_hallucination_check(field_name, field_value, document_text)
-            else:
-                # Use heuristic detection
-                return self._heuristic_hallucination_check(field_name, field_value, document_text)
+        """
+        Detect hallucination for a specific field.
         
-        # For complex fields (lists, dicts), handle accordingly
+        Based on the field value type and selected strategy, determines if the field
+        contradicts or is unsupported by the document context.
+        """
+        if isinstance(field_value, (str, int, float, bool)):
+            if self.strategy == HallucinationDetectionStrategy.LLM:
+                return self._llm_hallucination_check(field_name, field_value, document_text)
+            elif self.strategy == HallucinationDetectionStrategy.HEURISTIC:
+                return self._heuristic_hallucination_check(field_name, field_value, document_text)
+            else:
+                raise ValueError(f"Unknown hallucination detection strategy: {self.strategy}")
+        
         elif isinstance(field_value, list):
             return self._list_hallucination_check(field_name, field_value, document_text)
         elif isinstance(field_value, dict):
             return self._dict_hallucination_check(field_name, field_value, document_text)
         
-        # Default case for unhandled types
         return HallucinationResult(
             field_name=field_name,
             hallucination_score=0.5,
@@ -116,7 +145,12 @@ class HallucinationDetector:
         field_value: Any, 
         document_text: str
     ) -> HallucinationResult:
-        """Use heuristic methods to check for hallucinations."""
+        """
+        Use heuristic methods to check for hallucinations.
+        
+        Following the Confident AI approach, we determine if the field contradicts
+        or is unsupported by the document context.
+        """
         field_str = str(field_value).strip().lower()
         doc_text_lower = document_text.lower()
         
@@ -145,11 +179,11 @@ class HallucinationDetector:
                 reasoning="Partial match found in document"
             )
             
-        # No match
+        # No match - considered contradicted/hallucinated
         return HallucinationResult(
             field_name=field_name,
             hallucination_score=0.9,
-            reasoning="No significant match found in document"
+            reasoning="No significant match found in document - considered hallucinated"
         )
     
     def _llm_hallucination_check(
@@ -158,9 +192,16 @@ class HallucinationDetector:
         field_value: Any, 
         document_text: str
     ) -> HallucinationResult:
-        """Use LLM to check for hallucinations."""
+        """
+        Use LLM to check for hallucinations following the Confident AI approach.
+        
+        We ask the LLM to determine if the extracted field contradicts the document context.
+        """
+        if not self.llm:
+            raise ValueError("LLM strategy selected but no LLM instance provided")
+            
         prompt = f"""
-        I need to determine if an extracted field might be hallucinated (not actually present in the source document).
+        I need to determine if an extracted field might be hallucinated (not present in or contradicted by the source document).
         
         Field name: {field_name}
         Extracted value: {field_value}
@@ -170,33 +211,30 @@ class HallucinationDetector:
         {document_text[:2000]}
         ---
         
-        Is this extracted value present in the document or can it be reasonably inferred?
+        Task: Determine if this extracted value contradicts the document or isn't supported by it.
+        
+        Follow these guidelines:
+        1. If the value is directly stated or can be reasonably inferred from the document: NOT HALLUCINATED
+        2. If the value contradicts information in the document: HALLUCINATED
+        3. If the value is completely unrelated or unsupported by the document: HALLUCINATED
         
         Respond with:
-        1. A hallucination score from 0.0 (definitely in document) to 1.0 (definitely hallucinated)
-        2. Brief reasoning for your assessment
-        
-        Format: 
-        Score: [0.0-1.0]
-        Reasoning: [your explanation]
+        1. Whether the field is contradicted or not (true/false)
+        2. A hallucination score from 0.0 (definitely in document) to 1.0 (definitely hallucinated)
+        3. Brief reasoning for your assessment
         """
         
         try:
-            response = self.llm.raw_completion(
-                messages=[{"role": "user", "content": prompt}]
+            # Use the LLM's request method with our response model
+            response = self.llm.request(
+                messages=[{"role": "user", "content": prompt}],
+                response_model=HallucinationCheckResponse
             )
-            
-            # Extract score and reasoning
-            score_match = re.search(r'Score:\s*(0\.\d+|1\.0)', response)
-            reasoning_match = re.search(r'Reasoning:\s*(.*?)(?:\n|$)', response, re.DOTALL)
-            
-            score = float(score_match.group(1)) if score_match else 0.5
-            reasoning = reasoning_match.group(1).strip() if reasoning_match else None
             
             return HallucinationResult(
                 field_name=field_name,
-                hallucination_score=score,
-                reasoning=reasoning
+                hallucination_score=response.score,
+                reasoning=response.reasoning
             )
         except Exception as e:
             # Fallback to heuristic if LLM fails
@@ -233,7 +271,7 @@ class HallucinationDetector:
             )
         
         # For complex lists (lists of objects), use LLM or simplified check
-        if self.llm:
+        if self.strategy == HallucinationDetectionStrategy.LLM:
             return self._llm_hallucination_check(field_name, field_value, document_text)
         else:
             return HallucinationResult(
