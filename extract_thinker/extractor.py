@@ -33,6 +33,8 @@ from extract_thinker.exceptions import (
     InvalidVisionDocumentLoaderError,
 )
 from extract_thinker.utils import is_vision_error, classify_vision_error
+from json import JSONDecodeError
+from pydantic import ValidationError
 
 class Extractor:
     BATCH_SUPPORTED_MODELS = [
@@ -313,10 +315,16 @@ class Extractor:
             return result
 
         except IncompleteOutputException as e:
-            raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+            raise ExtractThinkerError("Incomplete output received and FORBIDDEN strategy is set") from e
         except Exception as e:
             if isinstance(e.args[0], IncompleteOutputException):
-                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+                raise ExtractThinkerError("Incomplete output received and FORBIDDEN strategy is set") from e
+            
+            # Handle JSON validation errors or decoding errors as incomplete output
+            if isinstance(e, (ValidationError, JSONDecodeError)) or \
+               "ValidationError" in str(e) or "JSONDecodeError" in str(e) or \
+               "json_invalid" in str(e):
+                raise ExtractThinkerError("Incomplete output received and FORBIDDEN strategy is set") from e
             
             if vision & is_vision_error(e):
                 raise classify_vision_error(e, self.llm.model if self.llm else None)
@@ -1122,7 +1130,7 @@ class Extractor:
                 raise ValueError(f"Unsupported completion strategy: {self.completion_strategy}")
         except IncompleteOutputException as e:
             if self.completion_strategy == CompletionStrategy.FORBIDDEN:
-                raise ValueError("Incomplete output received and FORBIDDEN strategy is set") from e
+                raise ExtractThinkerError("Incomplete output received and FORBIDDEN strategy is set") from e
             raise e
 
     def _build_message_content(
