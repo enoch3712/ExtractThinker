@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
@@ -134,8 +136,8 @@ def test_forbidden_strategy_with_token_limit():
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     extractor.load_llm(llm)
 
-    # Should raise ValueError due to FORBIDDEN strategy
-    with pytest.raises(ValueError, match="Incomplete output received and FORBIDDEN strategy is set"):
+    # Should raise ExtractThinkerError due to FORBIDDEN strategy
+    with pytest.raises(ExtractThinkerError, match="Incomplete output received and FORBIDDEN strategy is set"):
         extractor.extract(
             test_file_path,
             ReportContract,
