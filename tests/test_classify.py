@@ -1,6 +1,4 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import asyncio
 from dotenv import load_dotenv
 from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
@@ -340,7 +338,3 @@ def test_mom_classification_layers():
     assert final_result.classification.name == "Credit Note"
     assert final_result.classification.description == "A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice"
     assert final_result.classification.contract == CreditNoteContract
-
-
-if __name__ == "__main__":
-    test_with_tree()
