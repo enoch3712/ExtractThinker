@@ -62,9 +62,10 @@ report.print_summary()
 evaluator.save_report(report, "evaluation_results.json")
 ```
 
-:::tip
-For consistent evaluations, use a temperature of 0.0 in your model configuration to ensure deterministic outputs.
-:::
+> **Tip:** For consistent evaluations, use a temperature of 0.0 in your model configuration to ensure deterministic outputs.
+
+!!! tip "💡 Model Temperature"
+    For consistent evaluations, use a temperature of 0.0 in your model configuration to ensure deterministic outputs.
 
 ## Command Line Interface
 
@@ -209,9 +210,6 @@ evaluator = Evaluator(
 
 ## Best Practices
 
-:::note
-Following these practices will help ensure more reliable and actionable evaluation results.
-:::
 
 * **Dataset diversity**: Include a wide range of document variations in your test set
 * **Consistent formatting**: Use consistent file formats and naming conventions
