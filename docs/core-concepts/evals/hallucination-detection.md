@@ -4,6 +4,9 @@
 
 When extracting information from documents, language models sometimes "hallucinate" content by generating information that isn't actually present in the source document. ExtractThinker's hallucination detection helps identify these cases.
 
+!!! tip "💡 When To Use"
+    Enable hallucination detection when working with summarizations.
+
 ## Basic Usage
 
 To enable hallucination detection in your evaluations:
