@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
 from extract_thinker.document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from extract_thinker.document_loader.document_loader_spreadsheet import DocumentLoaderSpreadSheet
 from extract_thinker.llm import LLM, LLMEngine
 from extract_thinker.models.completion_strategy import CompletionStrategy
 from tests.models.invoice import InvoiceContract
@@ -21,10 +22,21 @@ from tests.models.handbook_contract import HandbookContract
 from extract_thinker.global_models import get_lite_model, get_big_model
 from pydantic import BaseModel, Field
 from extract_thinker.exceptions import ExtractThinkerError
+from typing import List, Optional
 
 
 load_dotenv()
 cwd = os.getcwd()
+
+# Define a new Pydantic model for budget data
+class BudgetData(BaseModel):
+    """Model for budget data extraction from spreadsheet"""
+    total_income: float
+    total_expense: float
+    cash_flow: float
+    monthly_income_items: Optional[List[str]] = None
+    monthly_expense_items: Optional[List[str]] = None
+
 
 def test_extract_with_pypdf_and_gpt4o_mini_vision():
 
@@ -380,6 +392,42 @@ def test_extract_from_url_docling_and_gpt4o_mini():
 
     # Check handbook data
     assert "FCA Handbook" in result.title, f"Expected title to contain 'FCA Handbook', but got: {result.title}"
+
+def test_spreadsheet_data_extraction():
+    """
+    Test that the Excel spreadsheet data (not just sheet names) is properly passed to LLM.
+    This test verifies the fix for the bug where only sheet names were passed to LLM.
+    """
+    # Arrange
+    budget_file_path = os.path.join(cwd, "tests", "files", "family_budget.xlsx")
+    
+    # Skip if file doesn't exist
+    if not os.path.exists(budget_file_path):
+        pytest.skip(f"Test file {budget_file_path} not found")
+    
+    # Create extractor with spreadsheet loader
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderSpreadSheet())
+    extractor.load_llm(get_lite_model())
+    
+    # Act
+    result = extractor.extract(budget_file_path, BudgetData)
+    
+    # Assert
+    assert result is not None
+    assert isinstance(result, BudgetData)
+    
+    # Check budget values from the spreadsheet
+    assert result.total_income == 5700, "Total income should be extracted from spreadsheet data"
+    assert result.total_expense == 3603, "Total expense should be extracted from spreadsheet data"
+    assert result.cash_flow == 2097, "Cash flow should be extracted from spreadsheet data"
+    
+    # If expense items were extracted, verify some common categories
+    if result.monthly_expense_items:
+        expense_categories_text = " ".join(result.monthly_expense_items).lower()
+        expected_categories = ["housing", "groceries", "utilities", "transportation"]
+        found_categories = [cat for cat in expected_categories if cat.lower() in expense_categories_text]
+        assert len(found_categories) > 0, "Should find at least one expense category"
 
 def test_extract_from_multiple_sources():
     """

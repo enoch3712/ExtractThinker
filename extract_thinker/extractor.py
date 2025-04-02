@@ -372,7 +372,17 @@ class Extractor:
                 if isinstance(page, dict):
                     # Extract text content
                     if 'content' in page:
+                        # Add page content
                         text_content.append(page['content'])
+                    
+                    # Handle spreadsheet data specially
+                    if page.get('is_spreadsheet', False):
+                        # If this is a spreadsheet, we need to make sure we're 
+                        # including the actual sheet content, not just the name
+                        sheet_name = page.get('name', '') or page.get('sheet_name', '')
+                        if sheet_name and not any(sheet_name in line for line in text_content):
+                            text_content.append(f"Sheet: {sheet_name}")
+                    
                     # Extract images if vision mode is enabled
                     if vision:
                         # If there's a list of images
