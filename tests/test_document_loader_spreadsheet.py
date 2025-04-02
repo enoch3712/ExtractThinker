@@ -14,6 +14,14 @@ class TestSpreadsheetData(BaseModel):
     sample_value: str
 
 
+class TestBudgetData(BaseModel):
+    """Test model for budget spreadsheet data extraction"""
+    sheet_names: list[str]
+    contains_current_month: bool
+    contains_chart_data: bool
+    expense_data_present: bool
+
+
 class TestDocumentLoaderSpreadSheet:
     @pytest.fixture
     def loader(self):
@@ -25,6 +33,12 @@ class TestDocumentLoaderSpreadSheet:
         """Path to test Excel file"""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         return os.path.join(current_dir, 'files', 'test_spreadsheet.xlsx')
+        
+    @pytest.fixture
+    def budget_file_path(self):
+        """Path to Family Budget Excel file"""
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(current_dir, 'files', 'Family Budget1.xlsx')
 
     @pytest.fixture
     def mock_llm(self, monkeypatch):
@@ -79,6 +93,26 @@ class TestDocumentLoaderSpreadSheet:
                             total_rows=total_rows,
                             sample_value=sample_value
                         )
+                    
+                    # Check if this is budget data
+                    if "Current Month" in content or "CHART DATA" in content:
+                        sheet_names = []
+                        contains_current_month = "Current Month" in content
+                        contains_chart_data = "CHART DATA" in content
+                        expense_data_present = "Expenses" in content or "Budget" in content
+                        
+                        # Extract sheet names
+                        if contains_current_month:
+                            sheet_names.append("Current Month")
+                        if contains_chart_data:
+                            sheet_names.append("CHART DATA")
+                            
+                        return TestBudgetData(
+                            sheet_names=sheet_names,
+                            contains_current_month=contains_current_month,
+                            contains_chart_data=contains_chart_data,
+                            expense_data_present=expense_data_present
+                        )
                 
                 # Default response
                 return TestSpreadsheetData(
@@ -108,23 +142,26 @@ class TestDocumentLoaderSpreadSheet:
     def test_load_spreadsheet(self, loader, test_file_path):
         """Test loading content from a spreadsheet file"""
         # Load the spreadsheet
-        pages = loader.load(test_file_path)
+        sheets = loader.load(test_file_path)
         
         # Assertions
-        assert isinstance(pages, list)
-        assert len(pages) > 0
+        assert isinstance(sheets, list)
+        assert len(sheets) > 0
         
-        # Check page structure
-        page = pages[0]
-        assert "content" in page
-        assert "data" in page
-        assert "is_spreadsheet" in page
-        assert "sheet_name" in page
+        # Check sheet structure
+        sheet = sheets[0]
+        assert "content" in sheet
+        assert "data" in sheet
+        assert "is_spreadsheet" in sheet
+        assert "name" in sheet
+        assert "image" in sheet
         
-        # Verify flags
-        assert page["is_spreadsheet"] == True
-        assert isinstance(page["data"], list)
-        assert page["content"].startswith("Sheet:")
+        # Verify flags and format
+        assert sheet["is_spreadsheet"] == True
+        assert isinstance(sheet["data"], list)
+        assert sheet["image"] is None
+        assert isinstance(sheet["content"], str)
+        assert len(sheet["content"]) > 0
 
     def test_vision_mode_not_supported(self, loader):
         """Test that vision mode is not supported for spreadsheets"""
@@ -162,20 +199,45 @@ class TestDocumentLoaderSpreadSheet:
         bio = BytesIO(file_content)
         
         # Load from BytesIO
-        pages = loader.load(bio)
+        sheets = loader.load(bio)
         
         # Verify structure
-        assert isinstance(pages, list)
-        assert len(pages) > 0
-        assert pages[0]["is_spreadsheet"] == True
+        assert isinstance(sheets, list)
+        assert len(sheets) > 0
+        assert sheets[0]["is_spreadsheet"] == True
         
+    def test_family_budget_spreadsheet(self, loader, budget_file_path, mock_llm):
+        """Test loading Family Budget spreadsheet with known sheets"""
+        # Skip if the file doesn't exist
+        if not os.path.exists(budget_file_path):
+            pytest.skip(f"Test file {budget_file_path} not found")
+            
+        # Load the spreadsheet
+        sheets = loader.load(budget_file_path)
+        
+        # Basic assertions
+        assert isinstance(sheets, list)
+        assert len(sheets) >= 2
+        
+        # Check sheet names
+        sheet_names = [sheet["name"] for sheet in sheets]
+        assert "Current Month" in sheet_names
+        assert "CHART DATA" in sheet_names
+        
+        # Test content format - each sheet should have formatted content
+        for sheet in sheets:
+            assert isinstance(sheet["content"], str)
+            assert len(sheet["content"]) > 0
+            assert sheet["is_spreadsheet"] == True
+            
         # Test with extractor
         extractor = Extractor(document_loader=loader, llm=mock_llm)
-        result = extractor.extract(bio, TestSpreadsheetData)
+        result = extractor.extract(budget_file_path, TestBudgetData)
         
-        # Verify results
-        assert isinstance(result, TestSpreadsheetData)
-        assert len(result.sheet_names) > 0
+        # Verify extraction results
+        assert isinstance(result, TestBudgetData)
+        assert result.contains_current_month == True
+        assert result.contains_chart_data == True
         
     def test_convert_to_image(self, loader, test_file_path):
         """Test converting spreadsheet to images"""

@@ -63,7 +63,7 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
             source: Either a file path or BytesIO stream
             
         Returns:
-            List[Dict[str, Any]]: List of pages, each containing content and sheet data
+            List[Dict[str, Any]]: List of sheets, each containing content and sheet data
         """
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
@@ -71,29 +71,41 @@ class DocumentLoaderSpreadSheet(CachedDocumentLoader):
         openpyxl = self._get_openpyxl()
 
         try:
-            # Load workbook based on source type
+            # Load workbook based on source type with data_only=True to get calculated values
             if isinstance(source, str):
-                workbook = openpyxl.load_workbook(source)
+                workbook = openpyxl.load_workbook(source, data_only=True)
             else:
                 # BytesIO stream
-                workbook = openpyxl.load_workbook(filename=BytesIO(source.read()))
+                workbook = openpyxl.load_workbook(filename=BytesIO(source.read()), data_only=True)
 
-            # Convert to our standard page-based format
-            pages = []
+            # Convert to our standard format
+            sheets = []
             for sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
-                sheet_data = [self._process_row(row) for row in sheet.iter_rows(values_only=True)]
                 
-                # Create a page for each sheet
-                page_dict = {
-                    "content": f"Sheet: {sheet_name}",  # Sheet name as content
-                    "data": sheet_data,  # Sheet data
-                    "is_spreadsheet": True,  # Flag to indicate special handling
-                    "sheet_name": sheet_name  # Sheet name for reference
+                # Extract plain text content with values instead of formulas
+                sheet_content = []
+                for row in sheet.iter_rows(values_only=True):
+                    # Filter out None values and convert all to strings
+                    formatted_row = [str(cell) if cell is not None else "" for cell in row]
+                    if any(cell for cell in formatted_row):  # Skip empty rows
+                        sheet_content.append(" | ".join(formatted_row))
+                
+                # Create a sheet entry
+                sheet_dict = {
+                    "content": "\n".join(sheet_content),
+                    "image": None,
+                    "name": sheet_name,
+                    "is_spreadsheet": True  # Flag to indicate special handling
                 }
-                pages.append(page_dict)
+                
+                # # For backward compatibility, also keep the original data
+                # row_data = [self._process_row(row) for row in sheet.iter_rows(values_only=True)]
+                # sheet_dict["data"] = row_data
+                
+                sheets.append(sheet_dict)
 
-            return pages
+            return sheets
 
         except Exception as e:
             raise ValueError(f"Error loading spreadsheet: {str(e)}")
