@@ -1,6 +1,8 @@
 import asyncio
 import os
 import sys
+
+from extract_thinker.document_loader.document_loader_aws_textract import DocumentLoaderAWSTextract
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dotenv import load_dotenv
 from extract_thinker.extractor import Extractor
@@ -463,3 +465,21 @@ def test_extract_from_multiple_sources():
 
     # Check handbook data
     assert "FCA Handbook" in result.handbook_title, f"Expected title to contain 'FCA Handbook', but got: {result.handbook_title}"
+
+
+if __name__ == "__main__":
+
+    pdf_path = os.path.join(cwd, "tests", "files", "invoice.pdf")
+
+    extractor = Extractor()
+    extractor.load_document_loader(DocumentLoaderDocling())
+    extractor.load_llm(get_big_model())
+
+    result = extractor.extract(
+        pdf_path, 
+        InvoiceContract, 
+        vision=True,
+        completion_strategy=CompletionStrategy.PAGINATE
+    )
+    print(result)
+

@@ -6,7 +6,7 @@ from .document_loader.cached_document_loader import CachedDocumentLoader
 from .document_loader.document_loader_tesseract import DocumentLoaderTesseract
 from .document_loader.document_loader_spreadsheet import DocumentLoaderSpreadSheet
 from .document_loader.document_loader_azure_document_intelligence import DocumentLoaderAzureForm
-from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf
+from .document_loader.document_loader_pypdf import DocumentLoaderPyPdf, PyPDFConfig
 from .document_loader.document_loader_pdfplumber import DocumentLoaderPdfPlumber
 from .document_loader.document_loader_beautiful_soup import DocumentLoaderBeautifulSoup
 from .document_loader.document_loader_markitdown import DocumentLoaderMarkItDown
@@ -31,6 +31,7 @@ from .document_loader.document_loader_google_document_ai import (
     DocumentLoaderDocumentAI,
 )
 from .warning import filter_pydantic_v2_warnings
+from .document_loader.document_loader_mistral_ocr import DocumentLoaderMistralOCR, MistralOCRConfig
 filter_pydantic_v2_warnings()
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     'DocumentLoaderSpreadSheet',
     'DocumentLoaderAzureForm',
     'DocumentLoaderPyPdf',
+    'PyPDFConfig',
     'DocumentLoaderPdfPlumber',
     'DocumentLoaderBeautifulSoup',
     'DocumentLoaderLLMImage',
@@ -64,4 +66,6 @@ __all__ = [
     'Contract',
     'SplittingStrategy',
 	'BatchJob',
+    'DocumentLoaderMistralOCR',
+    'MistralOCRConfig',
 ]
