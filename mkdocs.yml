@@ -44,6 +44,7 @@ nav:
           - Text: core-concepts/document-loaders/txt.md
           - Docling: core-concepts/document-loaders/docling.md
           - Data: core-concepts/document-loaders/data.md
+          - Mistral OCR: core-concepts/document-loaders/mistral-ocr.md
           - Adobe PDF Services: '#'
           - ABBYY FineReader: '#'
           - PaddleOCR: '#'

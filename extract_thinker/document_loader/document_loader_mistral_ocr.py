@@ -239,13 +239,18 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
                     "page_index": page.get("index", 0)
                 }
                 
-                # Include images if available
-                if "images" in page and page["images"]:
-                    page_dict["images"] = page["images"]
+                # # Include images if available
+                # if "images" in page and page["images"]:
+                #     page_dict["images"] = page["images"]
                 
-                # Include dimensions if available
-                if "dimensions" in page:
-                    page_dict["dimensions"] = page["dimensions"]
+                # # Include dimensions if available
+                # if "dimensions" in page:
+                #     page_dict["dimensions"] = page["dimensions"]
+
+                if self.vision_mode:
+                    images_dict = self.convert_to_images(source)
+                    if page.get("index") in images_dict:
+                        page_dict["image"] = images_dict[page.get("index")]
                 
                 pages_data.append(page_dict)
             
