@@ -2,6 +2,7 @@ import io
 import os
 import json
 import base64
+import tempfile
 import requests
 from typing import Any, Union, Dict, List, Optional
 from io import BytesIO
@@ -72,6 +73,80 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
         except:
             return False
 
+    def _get_file_content_type(self, source: str) -> str:
+        """Get the content type based on file extension."""
+        ext = get_file_extension(source).lower()
+        content_type_map = {
+            'pdf': 'application/pdf',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'tiff': 'image/tiff',
+            'bmp': 'image/bmp'
+        }
+        return content_type_map.get(ext, 'application/octet-stream')
+
+    def _is_image_file(self, source: Union[str, BytesIO]) -> bool:
+        """Check if the source is an image file."""
+        if isinstance(source, str):
+            ext = get_file_extension(source).lower()
+            return ext in ['jpg', 'jpeg', 'png', 'tiff', 'bmp']
+        return False
+
+    def _convert_image_to_pdf(self, source: Union[str, BytesIO]) -> BytesIO:
+        """Convert an image file to PDF format, which is supported by Mistral OCR API.
+        
+        Args:
+            source: Either a file path or BytesIO object
+            
+        Returns:
+            BytesIO: PDF content
+        """
+        try:
+            from PIL import Image
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+            
+            # Open the image
+            if isinstance(source, str):
+                img = Image.open(source)
+            else:
+                source.seek(0)
+                img = Image.open(source)
+            
+            # Create a BytesIO buffer for the PDF
+            pdf_buffer = BytesIO()
+            
+            # Calculate dimensions to fit on a letter page
+            img_width, img_height = img.size
+            width, height = letter
+            
+            # Maintain aspect ratio
+            ratio = min(width / img_width, height / img_height) * 0.9  # 90% of the page
+            new_width = img_width * ratio
+            new_height = img_height * ratio
+            
+            # Create a temporary file for the image
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_img_file:
+                img.save(temp_img_file.name, format='PNG')
+                
+                # Create PDF
+                c = canvas.Canvas(pdf_buffer, pagesize=letter)
+                # Center the image
+                x_centered = (width - new_width) / 2
+                y_centered = (height - new_height) / 2
+                c.drawImage(temp_img_file.name, x_centered, y_centered, width=new_width, height=new_height)
+                c.save()
+                
+                # Remove temporary file
+                os.unlink(temp_img_file.name)
+            
+            pdf_buffer.seek(0)
+            return pdf_buffer
+            
+        except ImportError:
+            raise ImportError("PIL and reportlab are required for image to PDF conversion. Install with: pip install pillow reportlab")
+
     def _prepare_payload(self, source: Union[str, BytesIO]) -> Dict:
         """Prepare payload for Mistral OCR API request."""
         payload = {
@@ -79,7 +154,7 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
             "include_image_base64": self.config.include_image_base64
         }
 
-        # Handle pages if specified
+        # Handle pages if specified (only for PDFs)
         if self.config.pages:
             payload["pages"] = self.config.pages
 
@@ -100,13 +175,23 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
                     "document_url": source
                 }
             else:
-                # File path - need to upload to Mistral
-                file_id = self._upload_file_to_mistral(source)
-                signed_url = self._get_signed_url(file_id)
-                payload["document"] = {
-                    "type": "document_url",
-                    "document_url": signed_url
-                }
+                # If it's an image file, convert to PDF first
+                if self._is_image_file(source):
+                    pdf_buffer = self._convert_image_to_pdf(source)
+                    file_id = self._upload_file_to_mistral(pdf_buffer)
+                    signed_url = self._get_signed_url(file_id)
+                    payload["document"] = {
+                        "type": "document_url",
+                        "document_url": signed_url
+                    }
+                else:
+                    # File path - need to upload to Mistral
+                    file_id = self._upload_file_to_mistral(source)
+                    signed_url = self._get_signed_url(file_id)
+                    payload["document"] = {
+                        "type": "document_url",
+                        "document_url": signed_url
+                    }
         else:
             # BytesIO object - need to upload to Mistral
             file_id = self._upload_file_to_mistral(source)
@@ -137,17 +222,20 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
         try:
             if isinstance(source, str):
                 # File path
+                content_type = self._get_file_content_type(source)
                 with open(source, 'rb') as file:
                     files = {
-                        'file': (os.path.basename(source), file, 'application/octet-stream'),
+                        'file': (os.path.basename(source), file, content_type),
                         'purpose': (None, 'ocr')
                     }
                     response = requests.post(upload_url, headers=headers, files=files)
             else:
                 # BytesIO object
                 source.seek(0)
+                # Since we're converting images to PDF, set content type to PDF
+                content_type = 'application/pdf'
                 files = {
-                    'file': ('document.bin', source, 'application/octet-stream'),
+                    'file': ('document.pdf', source, content_type),
                     'purpose': (None, 'ocr')
                 }
                 response = requests.post(upload_url, headers=headers, files=files)
@@ -157,12 +245,15 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
             return result.get("id")
             
         except requests.exceptions.RequestException as e:
-            if hasattr(e.response, 'text'):
+            if hasattr(e, 'response') and e.response is not None:
                 error_text = e.response.text
                 try:
                     error_json = json.loads(error_text)
                     if 'error' in error_json:
-                        raise ValueError(f"Mistral API upload error: {error_json['error']}")
+                        error_message = error_json.get('error', {})
+                        if isinstance(error_message, dict) and 'message' in error_message:
+                            error_message = error_message.get('message')
+                        raise ValueError(f"Mistral API upload error: {error_message}")
                 except json.JSONDecodeError:
                     pass
             raise ValueError(f"Error uploading file to Mistral: {str(e)}")
@@ -189,12 +280,15 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
             return result.get("url")
             
         except requests.exceptions.RequestException as e:
-            if hasattr(e.response, 'text'):
+            if hasattr(e, 'response') and e.response is not None:
                 error_text = e.response.text
                 try:
                     error_json = json.loads(error_text)
                     if 'error' in error_json:
-                        raise ValueError(f"Mistral API signed URL error: {error_json['error']}")
+                        error_message = error_json.get('error', {})
+                        if isinstance(error_message, dict) and 'message' in error_message:
+                            error_message = error_message.get('message')
+                        raise ValueError(f"Mistral API signed URL error: {error_message}")
                 except json.JSONDecodeError:
                     pass
             raise ValueError(f"Error getting signed URL from Mistral: {str(e)}")
@@ -210,6 +304,11 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
         """
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
+
+        # Convert image file to PDF if needed
+        original_source = source
+        if isinstance(source, str) and not self._is_url(source) and self._is_image_file(source):
+            source = self._convert_image_to_pdf(source)
 
         # Prepare headers and payload
         headers = {
@@ -247,22 +346,32 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
                 # if "dimensions" in page:
                 #     page_dict["dimensions"] = page["dimensions"]
 
-                if self.vision_mode:
-                    images_dict = self.convert_to_images(source)
-                    if page.get("index") in images_dict:
-                        page_dict["image"] = images_dict[page.get("index")]
+                # Only try to convert images if not a URL - URLs cause issues with Playwright
+                if self.vision_mode and not (isinstance(original_source, str) and self._is_url(original_source)):
+                    try:
+                        images_dict = self.convert_to_images(original_source)
+                        if page.get("index") in images_dict:
+                            page_dict["image"] = images_dict[page.get("index")]
+                    except Exception as img_err:
+                        # Log the error but continue without the image
+                        print(f"Warning: Could not convert image: {str(img_err)}")
                 
                 pages_data.append(page_dict)
             
             return pages_data
             
         except requests.exceptions.RequestException as e:
-            if hasattr(e.response, 'text'):
+            if hasattr(e, 'response') and e.response is not None:
                 error_text = e.response.text
                 try:
                     error_json = json.loads(error_text)
                     if 'error' in error_json:
-                        raise ValueError(f"Mistral OCR API error: {error_json['error']}")
+                        error_message = error_json.get('error', {})
+                        if isinstance(error_message, dict) and 'message' in error_message:
+                            error_message = error_message.get('message')
+                        raise ValueError(f"Mistral OCR API error: {error_message}")
+                    else:
+                        raise ValueError(f"Mistral OCR API error: {error_text}")
                 except json.JSONDecodeError:
                     pass
             raise ValueError(f"Error calling Mistral OCR API: {str(e)}")
