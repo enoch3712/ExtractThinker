@@ -73,6 +73,23 @@ All the formatted content here...
 Focus on creating high-quality, well-structured Markdown first, then provide the JSON breakdown.
 """
 
+    DEFAULT_MARKDOWN_PROMPT = """
+Convert the image into well-formatted Markdown content.
+
+Instructions:
+1. Create proper Markdown with headings, lists, formatting etc.
+2. Include ALL content from the image in your Markdown output.
+3. Format headings with # syntax (# for main headings, ## for sub-headings, etc.)
+4. Format lists with proper bullet points (*, -) or numbers (1., 2., etc.)
+5. Apply proper emphasis using **bold**, *italic*, or `code` where appropriate
+6. Create proper links using [text](url) format if applicable
+7. Format code blocks with triple backticks ``` if applicable
+8. Format tables using proper Markdown table syntax if applicable
+9. Make sure you keep things like checkboxes, lists, etc. as is.
+
+Your response should ONLY include the formatted Markdown content without any additional JSON structure or explanations.
+"""
+
     MARKDOWN_VERIFICATION_PROMPT = """
 Look at the image provided and reformat the text content into well-structured Markdown. 
 The text content is already accurate, but may lack proper Markdown formatting. Your task is to:
@@ -123,7 +140,7 @@ Preserve all the original information while improving its readability through pr
         if require_llm and self.llm is None:
             raise ValueError("LLM is required for this operation but not set.")
 
-    def to_markdown_structured(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[str]:
+    def to_markdown_structured(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[PageContent]:
         """
         Processes document(s) using the LLM to extract structured content per page.
         This method requires vision capabilities and expects the document to contain images.
@@ -186,19 +203,21 @@ Preserve all the original information while improving its readability through pr
     def _build_messages(
         self,
         message_content: Union[List[Dict[str, Any]], List[str]],
+        structured: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Build the messages to send to the LLM.
 
         Args:
             message_content: The content of the message.
+            structured: Whether to request structured content with JSON (True) or just Markdown (False).
 
         Returns:
             A list of messages.
         """
         system_message = {
             "role": "system",
-            "content": self.DEFAULT_PAGE_PROMPT
+            "content": self.DEFAULT_PAGE_PROMPT if structured else self.DEFAULT_MARKDOWN_PROMPT
         }
 
         if self.allow_vision:
@@ -257,7 +276,7 @@ Preserve all the original information while improving its readability through pr
 
         return message_content
 
-    def _process_page_with_llm(self, page_data: Any) -> str:
+    def _process_page_with_llm(self, page_data: Any) -> PageContent:
         """
         Uses the LLM to process a single page's data and return the raw response.
         Always processes images if they are present in page_data.
@@ -316,18 +335,15 @@ Preserve all the original information while improving its readability through pr
                 k: v for k, v in content.items()
                 if k != 'images' and k != 'image' and not hasattr(v, 'read')
             }
-            if filtered_content.get("is_spreadsheet", False):
+            is_spreadsheet = content.get("is_spreadsheet")
+            if is_spreadsheet is False:
                 # Handle potential spreadsheet data if loader adds this flag
                 content_str = json_to_formatted_string(filtered_content.get("data", {}))
             else:
-                # Fallback to YAML for general dicts (text content mainly)
-                # Extract only the 'content' key if present, otherwise dump filtered dict
-                content_str = filtered_content.get('content', None)
-                if content_str is None:
-                     # Avoid dumping unrelated metadata if only 'content' was expected
-                     # If 'content' isn't present, maybe return None or empty string?
-                     # Let's dump the filtered dict for now, but might need refinement.
-                     content_str = yaml.dump(filtered_content, default_flow_style=True) if filtered_content else None
+                content_str = json_to_formatted_string(filtered_content)
+                
+                # remove 'is_spreadsheet: true' content from the string
+                content_str = content_str.replace('is_spreadsheet: true', '')
             return content_str
         elif isinstance(content, str):
             return content
@@ -451,57 +467,143 @@ Preserve all the original information while improving its readability through pr
 
     # --- Copied Methods from Extractor --- END ---
 
-    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> str:
+    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> List[str]:
          """
          Converts the source document(s) to Markdown.
-         If an LLM is configured AND vision is True, it extracts structured content using vision,
-         then formats it. Otherwise, it performs a basic text + image conversion.
-
+         This method requires an LLM to be configured.
+         If vision is True, it uses vision capabilities for processing images.
+         
          Args:
              source: A single file path/stream or a list of them.
-             vision: If True, enables image processing (required for LLM structured path).
+             vision: If True, enables image processing.
 
          Returns:
-             A string containing the Markdown representation of the document(s).
+             A list of strings, each containing the Markdown representation of a page.
+             
+         Raises:
+             ValueError: If LLM is not configured.
          """
-         if self.llm and vision:
-             # Use LLM-based structured (vision) extraction only if LLM present and vision requested
-             try:
-                 structured_results = self.to_markdown_structured(source) # No vision flag needed here
-                 # Format the structured results into Markdown
-                 markdown_parts = []
-                 for result in structured_results:
-                     if isinstance(result, str):
-                         # Extract just the Markdown part from the raw string (before the JSON section)
-                         json_start = result.find("```json")
-                         if json_start > 0:
-                             markdown_parts.append(result[:json_start].strip())
-                         else:
-                             markdown_parts.append(result)
-                 final_markdown = "\n\n---\n\n".join(markdown_parts)
-                 return final_markdown
-             except ValueError as e:
-                 # Handle case where to_markdown_structured failed (e.g., no images found)
-                 print(f"Falling back to basic conversion due to error in structured processing: {e}")
-                 # Fall through to basic conversion, passing the original vision flag
-                 return self._basic_to_markdown(source, vision=vision)
-             except Exception as e:
-                 # Handle other unexpected errors during structured processing
-                 print(f"Unexpected error during structured processing, falling back to basic: {e}")
-                 return self._basic_to_markdown(source, vision=vision)
+         # Always validate that LLM is present - it's required
+         if not self.llm:
+             raise ValueError("LLM is required for markdown conversion but not configured.")
+         
+         try:
+             # Check if we have a document loader
+             if self.document_loader:
+                 # We have both LLM and DocumentLoader
+                 
+                 # Configure document loader for vision if needed
+                 if vision and hasattr(self.document_loader, 'set_vision_mode'):
+                     try:
+                         self.document_loader.set_vision_mode(True)
+                     except Exception as e:
+                         print(f"Warning: Failed to set vision mode on document loader: {e}")
+                 
+                 # Load the document
+                 pages_data = self.document_loader.load(source)
+                 if not isinstance(pages_data, list):
+                     pages_data = [pages_data] if pages_data else []
+                 
+                 # If vision is True, check if we have any images
+                 if vision:
+                     has_images = any(isinstance(page, dict) and (page.get('image') or page.get('images')) for page in pages_data)
+                     if not has_images:
+                         print("Warning: Vision processing enabled but no images found. Will process as text-only.")
+                 
+                 # Process pages in parallel
+                 markdown_parts = [None] * len(pages_data)  # Pre-allocate list
+                 
+                 with ThreadPoolExecutor() as executor:
+                     future_to_index = {executor.submit(self._process_markdown_page, page_data): i
+                                       for i, page_data in enumerate(pages_data)}
+                     
+                     for future in as_completed(future_to_index):
+                         index = future_to_index[future]
+                         try:
+                             markdown_parts[index] = future.result()
+                         except Exception as exc:
+                             print(f'Page {index + 1} processing failed: {exc}')
+                             markdown_parts[index] = f"<!-- Error processing page {index + 1}: {exc} -->"
+                 
+                 # Return the list of markdown parts instead of joining them
+                 return [part for part in markdown_parts if part]
+             else:
+                 # We have LLM but no DocumentLoader
+                 # In this case, we need to handle the source directly
+                 
+                 if isinstance(source, list):
+                     raise ValueError("Processing multiple sources without a DocumentLoader is not supported.")
+                 
+                 # For text files, we can read them directly
+                 content = None
+                 if isinstance(source, str):
+                     # Assume it's a file path
+                     try:
+                         with open(source, 'r') as f:
+                             content = f.read()
+                     except Exception as e:
+                         raise ValueError(f"Failed to read source file: {e}")
+                 elif hasattr(source, 'read'):
+                     # Assume it's a file-like object
+                     content = source.read()
+                     
+                 if not content:
+                     raise ValueError("No content could be extracted from the source without a DocumentLoader.")
+                 
+                 # Create a simple message for the LLM
+                 messages = [
+                     {"role": "system", "content": self.DEFAULT_MARKDOWN_PROMPT},
+                     {"role": "user", "content": content}
+                 ]
+                 
+                 # Get markdown from LLM and return as a single-element list
+                 try:
+                     markdown_content = self.llm.request(messages=messages)
+                     return [markdown_content]
+                 except Exception as e:
+                     print(f"LLM request failed: {e}")
+                     raise
+                 
+         except Exception as e:
+             print(f"Error in markdown conversion: {e}")
+             if self.document_loader:
+                 print("Falling back to basic conversion.")
+                 # Call basic conversion but convert its result to a list too
+                 basic_result = self._basic_to_markdown(source, vision=vision)
+                 return [basic_result]
+             else:
+                 raise
 
-         else:
-             # Fallback to basic conversion if no LLM or vision is False
-             if not self.llm and vision:
-                  print("Warning: Vision=True but LLM not configured. Falling back to basic Markdown conversion.")
-             elif self.llm and not vision:
-                  print("Info: Vision=False. Using basic Markdown conversion.")
-             else: # No LLM, vision=False
-                  print("Info: No LLM configured. Using basic Markdown conversion.")
+    def _process_markdown_page(self, page_data: Any) -> str:
+        """
+        Uses the LLM to process a single page's data and return only the markdown content.
+        Always processes images if they are present in page_data.
 
-             # Pass the original vision flag to the basic converter
-             return self._basic_to_markdown(source, vision=vision)
+        Args:
+            page_data: The data for a single page (expected dict with 'content', 'images').
 
+        Returns:
+            A string containing only the Markdown content without JSON.
+        """
+        self.allow_vision = True
+
+        if not self.llm:
+            raise ValueError("LLM is required for markdown extraction but not configured.")
+
+        if not isinstance(page_data, dict):
+            print(f"Warning: Unexpected page data type: {type(page_data)}. Skipping LLM processing for this page.")
+            return f"<!-- Error: Unexpected page data type: {type(page_data)} -->"
+
+        # Use structured=False to get only Markdown content without JSON
+        messages = self._build_messages(self._build_message_content(page_data, vision=True), structured=False)
+
+        try:
+            # Call request without response_model to get the raw markdown content
+            markdown_content = self.llm.request(messages=messages)
+            return markdown_content.choices[0].message.content
+        except Exception as e:
+            print(f"LLM request failed for page: {e}")
+            raise
 
     def _basic_to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> str:
          """
@@ -547,7 +649,6 @@ Preserve all the original information while improving its readability through pr
 
             return "\n\n".join(part for part in markdown_parts if part)
 
-
     def _convert_page_basic(self, page_data: Any, vision: bool) -> str:
         """
         (Previously _convert_page_to_markdown)
@@ -583,16 +684,15 @@ Preserve all the original information while improving its readability through pr
         separator = "\n" if text_content and image_md else ""
         return text_content + separator + image_md
 
-
-    async def to_markdown_structured_async(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[str]:
+    async def to_markdown_structured_async(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[PageContent]:
          """ 
-         Asynchronously extracts structured content using vision and returns raw strings with 
+         Asynchronously extracts structured content using vision and returns raw strings with
          markdown and JSON sections.
          """
          # No vision flag needed for the sync method call
          return await asyncio.to_thread(self.to_markdown_structured, source)
 
-    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> str:
+    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> List[str]:
         """ Asynchronously converts to Markdown. """
         # The decision logic is handled by the synchronous to_markdown method
         # We just need to pass the arguments along.
