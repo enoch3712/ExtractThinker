@@ -78,5 +78,3 @@ Different models are optimized for different visual tasks:
 - Vision processing requires GPT-4o or higher models
 - Processing time may be longer for vision-enabled extraction
 - Image quality significantly impacts extraction accuracy
-
-For more examples and advanced usage, check out the [examples directory](examples/) in the repository. 
