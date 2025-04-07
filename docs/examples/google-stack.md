@@ -97,7 +97,7 @@ for doc_content in result:
     print(doc_content.json(indent=2))
 ```
 
-More information about document splitting can be found in the [document splitting](../../core-concepts/splitters) section.
+More information about document splitting can be found in the [document splitting](../core-concepts/splitters/index.md) section.
 
 **Document OCR**: Basic text extraction and layout analysis
 
