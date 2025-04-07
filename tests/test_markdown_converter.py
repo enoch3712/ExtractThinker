@@ -246,6 +246,25 @@ def test_mistral_structured_conversion_pdf():
     assert found_id, "Could not find '0012' in any content item"
 
 @pytest.mark.slow # Mark as slow due to external API call
+def test_mistral_conversion_pdf_bulk():
+    """Test structured conversion with Mistral OCR on a PDF."""
+    mistral_config = get_mistral_config()
+    if not mistral_config:
+        pytest.skip("Skipping Mistral OCR test: MISTRAL_API_KEY not set.")
+
+    loader = DocumentLoaderMistralOCR(config=mistral_config)
+
+    llm = LLM(get_lite_model())
+    converter = MarkdownConverter(document_loader=loader, llm=llm)
+
+    results = converter.to_markdown(PDF_PATH_BULK, vision=True)
+
+    assert isinstance(results, list)
+    assert all(isinstance(item, str) for item in results)
+    assert len(results) == 3
+    assert "123 456 789" in results[2]
+
+@pytest.mark.slow # Mark as slow due to external API call
 def test_mistral_structured_conversion_pdf_bulk():
     """Test structured conversion with Mistral OCR on a PDF."""
     mistral_config = get_mistral_config()
@@ -276,3 +295,6 @@ def test_llm_required_error():
     # to_markdown should now also fail without LLM
     with pytest.raises(ValueError, match="LLM is required for markdown conversion but not configured."):
         converter.to_markdown(PDF_PATH, vision=False)
+
+if __name__ == "__main__":
+    test_mistral_conversion_pdf_bulk()

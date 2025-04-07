@@ -1,8 +1,5 @@
 import os
 import pytest
-import tempfile
-import io
-import time
 from io import BytesIO
 from extract_thinker.document_loader.document_loader_mistral_ocr import DocumentLoaderMistralOCR, MistralOCRConfig
 from unittest.mock import patch, Mock
@@ -249,10 +246,62 @@ class TestDocumentLoaderMistralOCR:
         try:
             assert loader.can_handle_paginate("document.pdf") is True
             assert loader.can_handle_paginate("document.jpg") is False
-            assert loader.can_handle_paginate("document.png") is False
+            assert loader.can_handle_paginate("https://example.com/document.pdf") is False
         finally:
             os.path.isfile = original_isfile
 
-if __name__ == "__main__":
-    test = TestDocumentLoaderMistralOCR()
-    test.test_url_processing()
+#     @pytest.mark.slow
+#     def test_recursive_image_processing(self):
+#         """Test recursive processing of images within a PDF document."""
+#         # Skip if no API key is set
+#         api_key = os.getenv("MISTRAL_API_KEY")
+#         if not api_key:
+#             pytest.skip("MISTRAL_API_KEY environment variable not set")
+            
+#         # Create config and loader
+#         config = MistralOCRConfig(
+#             api_key=api_key,
+#             model="mistral-ocr-latest",
+#             include_image_base64=True  # Enable image base64 in response
+#         )
+#         loader = DocumentLoaderMistralOCR(config)
+        
+#         # Test file path for bulk.pdf which contains embedded images
+#         test_file_path = os.path.join(os.getcwd(), 'tests', 'files', 'bulk.pdf')
+        
+#         # Verify the file exists
+#         if not os.path.exists(test_file_path):
+#             pytest.skip(f"Test file not found: {test_file_path}")
+            
+#         # Check file size - Mistral has a 50MB limit
+#         file_size_mb = os.path.getsize(test_file_path) / (1024 * 1024)
+#         if file_size_mb > 50:
+#             pytest.skip(f"Test file too large ({file_size_mb:.2f}MB) - Mistral has a 50MB limit")
+        
+#         # Load the document
+#         result = loader.load(test_file_path)
+        
+#         # Verify response structure
+#         assert isinstance(result, list)
+#         assert len(result) > 0
+        
+#         # Get the last page
+#         last_page = result[-1]
+        
+#         # Check if the page has images
+#         assert "images" in last_page, "Last page should have images"
+#         assert isinstance(last_page["images"], list), "images should be a list"
+#         assert len(last_page["images"]) > 0, "Should have at least one image"
+        
+#         # Check if the driver's license number is in the processed content
+#         license_found = False
+#         for img in last_page["images"]:
+#             if "content" in img and "123 456 789" in img["content"]:
+#                 license_found = True
+#                 break
+        
+#         assert license_found, "Driver's license number '123 456 789' not found in processed images"
+
+# if __name__ == "__main__":
+#     test = TestDocumentLoaderMistralOCR()
+#     test.test_recursive_image_processing()

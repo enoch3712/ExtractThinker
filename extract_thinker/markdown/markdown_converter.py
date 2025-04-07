@@ -245,6 +245,8 @@ Preserve all the original information while improving its readability through pr
     ) -> Union[List[Dict[str, Any]], List[str]]:
         """
         Build the message content based on the content and vision flag.
+        If vision=True and placeholders are detected, modifies the content
+        sent to the LLM to include instructions for handling them.
 
         Args:
             content: The content to process.
@@ -258,21 +260,71 @@ Preserve all the original information while improving its readability through pr
         if content is None:
             return message_content
 
+        processed_text = None
         if vision:
-            # First add images to the message content
+            # Add images first (if any)
             self._add_images_to_message_content(content, message_content)
-            
-            # Then add text content
-            content_data = self._process_content_data(content)
-            if content_data:
-                message_content.append({
-                    "type": "text",
-                    "text": "##Content\n\n" + content_data
-                })
+            # Process text content separately
+            processed_text = self._process_content_data(content)
         else:
-            content_str = self._convert_content_to_string(content)
-            if content_str:
-                message_content.append("##Content\n\n" + content_str)
+            # Process non-vision content to string
+            processed_text = self._convert_content_to_string(content)
+
+        # Prepare the final text to be sent to the LLM
+        final_text_for_llm = processed_text if processed_text else ""
+
+        # --- Modification for Placeholders when Vision is Active ---
+        if vision and processed_text:
+            placeholder_pattern = r"\[(?:Image content not extracted|Image processing failed|Image content extraction failed).*?\]"
+            # Find all occurrences of placeholders
+            placeholders_found = re.findall(placeholder_pattern, processed_text)
+
+            if placeholders_found:
+                print(f"Detected {len(placeholders_found)} image extraction placeholder(s). Adding specific instructions to content.")
+                # Construct an instruction to append *after* the main text
+                instruction = (
+                    "\n\n---\n"
+                    "**Formatting Instruction:** The text above contains placeholders (like '[Image content not extracted...]') "
+                    "indicating where visual information from an image could not be retrieved. "
+                    "When formatting the available text into Markdown, please explicitly acknowledge these missing parts "
+                    "within the structure (e.g., by keeping the placeholder text or adding a note like '*[Image content unavailable]*')."
+                    "\n---\n"
+                )
+                # Append the instruction to the text that will be sent
+                final_text_for_llm += instruction
+        # --- End Modification ---
+
+
+        # Construct the final message content block
+        # Use the potentially modified final_text_for_llm
+        final_text_content_block = "## Content\n\n" + (final_text_for_llm if final_text_for_llm else "[No text content available]")
+
+        if vision:
+             # Append as a text block if vision was used (images added earlier)
+             # Make sure message_content is not empty if only images were present initially
+             if not message_content and not final_text_for_llm:
+                 # Only images were present, but maybe they failed? Or no images?
+                 final_text_content_block = "## Content\n\n[No processable text or image content found for this page]"
+
+             message_content.append({
+                 "type": "text",
+                 "text": final_text_content_block
+             })
+        else:
+             # For non-vision, the message content is just the string list
+             message_content = [final_text_content_block]
+
+
+        # Final check for empty vision content (e.g., only images failed)
+        # This logic seems less critical now as we handle it above, but keep for safety
+        if vision and not any(item.get("text", "").strip() for item in message_content if isinstance(item, dict)) \
+           and not any(item.get("type") == "image_url" for item in message_content if isinstance(item, dict)):
+             # If truly empty after all processing
+             message_content = [{
+                 "type": "text",
+                 "text": "## Content\n\n[Empty page or only content that failed processing]"
+             }]
+
 
         return message_content
 
