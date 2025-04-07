@@ -561,3 +561,74 @@ def classify_vision_error(e: Exception, vision: bool) -> None:
         raise VisionError(f"Make sure that the model you're using supports vision features: {e.args[0].message}") from e
     else:
         raise e
+
+def convert_jpg_to_png(source: Union[str, BytesIO, bytes, Image.Image], output_path: Optional[str] = None) -> Union[str, BytesIO]:
+    """
+    Convert JPG to PNG format.
+    
+    Args:
+        source (Union[str, BytesIO, bytes, Image.Image]): The JPG image source.
+        output_path (Optional[str]): Path to save the PNG image. If None and source is a file path,
+                                     replaces the .jpg extension with .png.
+                                     
+    Returns:
+        Union[str, BytesIO]: Path to the saved PNG file or BytesIO containing the PNG data
+    """
+    try:
+        # Handle different source types
+        if isinstance(source, str):
+            # It's a file path
+            img = Image.open(source)
+            
+            # If no output path provided, replace extension
+            if output_path is None:
+                filename, ext = os.path.splitext(source)
+                output_path = f"{filename}.png"
+            
+            # Save as PNG
+            img.save(output_path, "PNG")
+            return output_path
+            
+        elif isinstance(source, BytesIO):
+            # It's a BytesIO object
+            current_position = source.tell()
+            source.seek(0)
+            img = Image.open(source)
+            source.seek(current_position)
+            
+            # Create a new BytesIO for the PNG
+            png_buffer = BytesIO()
+            img.save(png_buffer, format="PNG")
+            png_buffer.seek(0)
+            return png_buffer
+            
+        elif isinstance(source, bytes):
+            # It's raw bytes
+            img = Image.open(BytesIO(source))
+            
+            if output_path:
+                # Save to file
+                img.save(output_path, "PNG")
+                return output_path
+            else:
+                # Return as BytesIO
+                png_buffer = BytesIO()
+                img.save(png_buffer, format="PNG")
+                png_buffer.seek(0)
+                return png_buffer
+                
+        elif isinstance(source, Image.Image):
+            # It's already a PIL Image
+            if output_path:
+                source.save(output_path, "PNG")
+                return output_path
+            else:
+                png_buffer = BytesIO()
+                source.save(png_buffer, format="PNG")
+                png_buffer.seek(0)
+                return png_buffer
+        else:
+            raise ValueError("Source must be a file path (str), BytesIO, bytes, or PIL Image")
+            
+    except Exception as e:
+        raise Exception(f"Failed to convert JPG to PNG: {str(e)}")
