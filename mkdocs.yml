@@ -58,6 +58,8 @@ nav:
       - LLM Integration:
           - Overview: core-concepts/llm-integration/index.md
           - Thinking Models: core-concepts/llm-integration/thinking-models.md
+      - Markdown Conversion:
+          - Overview: core-concepts/markdown-conversion/index.md
       - Classification: 
           - Overview: core-concepts/classification/index.md
           - Basic Classification: core-concepts/classification/basic.md
