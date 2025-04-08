@@ -1,20 +1,17 @@
-import json
 import pytest
 import os
 import sys
 from dotenv import load_dotenv
-from io import BytesIO
 
 # Ensure the package root is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from extract_thinker.markdown.markdown_converter import MarkdownConverter, PageContent, ContentItem
+from extract_thinker.markdown.markdown_converter import MarkdownConverter, PageContent
 from extract_thinker.document_loader.document_loader_pypdf import DocumentLoaderPyPdf
 from extract_thinker.document_loader.document_loader_spreadsheet import DocumentLoaderSpreadSheet
 from extract_thinker.document_loader.document_loader_mistral_ocr import DocumentLoaderMistralOCR, MistralOCRConfig
 from extract_thinker.llm import LLM
-from extract_thinker.exceptions import ExtractThinkerError # Assuming common exceptions if needed
-from extract_thinker.global_models import get_lite_model, get_big_model
+from extract_thinker.global_models import get_lite_model
 
 load_dotenv()
 cwd = os.getcwd()
@@ -296,5 +293,41 @@ def test_llm_required_error():
     with pytest.raises(ValueError, match="LLM is required for markdown conversion but not configured."):
         converter.to_markdown(PDF_PATH, vision=False)
 
-if __name__ == "__main__":
-    test_mistral_conversion_pdf_bulk()
+def test_page_selection():
+    """Test markdown conversion with specific page selection using bulk PDF."""
+    loader = DocumentLoaderPyPdf()
+    llm = LLM(get_lite_model())
+    converter = MarkdownConverter(document_loader=loader, llm=llm)
+    
+    # Test with pages 1 and 3 from bulk PDF
+    markdown_output = converter.to_markdown(PDF_PATH_BULK, vision=True, pages=[1, 3])
+    
+    # Verify output structure
+    assert isinstance(markdown_output, list)
+    assert len(markdown_output) == 2  # Should only have 2 pages
+    
+    # Verify content from first page
+    assert "Motorist" in markdown_output[0]
+    
+    # Verify content from third page
+    assert "123 456 789" in markdown_output[1]
+
+    # Test structured conversion with same pages
+    structured_results = converter.to_markdown_structured(PDF_PATH_BULK, pages=[1, 3])
+    
+    # Verify structured output
+    assert isinstance(structured_results, list)
+    assert len(structured_results) == 2
+    assert all(isinstance(item, PageContent) for item in structured_results)
+    
+    # Verify content in structured results
+    first_page = structured_results[0]
+    third_page = structured_results[1]
+    
+    # Verify content from first page
+    first_page_content = " ".join(item.content for item in first_page.items)
+    assert "Motorist" in first_page_content
+    
+    # Verify content from third page
+    third_page_content = " ".join(item.content for item in third_page.items)
+    assert "123 456 789" in third_page_content

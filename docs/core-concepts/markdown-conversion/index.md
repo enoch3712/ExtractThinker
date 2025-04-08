@@ -8,6 +8,7 @@ The `MarkdownConverter` class provides functionality to convert documents (inclu
 - **Document Loader:** It relies on a `DocumentLoader` (`extract_thinker.document_loader.DocumentLoader`) to load the source document(s) and potentially extract text and images. The behavior might vary depending on the specific loader used.
 - **Vision Support:** The `to_markdown` and `to_markdown_structured` methods have a `vision` parameter or operate in vision mode by default. When enabled, the converter attempts to process images within the document using the LLM's vision capabilities (if the LLM supports it).
 - **Structured Output:** The `to_markdown_structured` method specifically instructs the LLM to provide not only the Markdown content but also a JSON structure breaking down the content with certainty scores. This method inherently requires vision capabilities in the LLM.
+- **Page Selection:** Both `to_markdown` and `to_markdown_structured` methods support selective page processing through the `pages` parameter, allowing you to convert specific pages from multi-page documents.
 
 ## Initialization
 
@@ -51,12 +52,18 @@ markdown_pages_text = markdown_converter.to_markdown(source_path, vision=False)
 markdown_pages_vision = markdown_converter.to_markdown(source_path, vision=True) 
 # Returns List[str]
 
+# Convert specific pages (1-indexed)
+markdown_specific_pages = markdown_converter.to_markdown(source_path, vision=True, pages=[1, 3, 5])
+# Returns List[str] with only the specified pages
+
 for i, page_md in enumerate(markdown_pages_vision):
     print(f"--- Page {i+1} ---")
     print(page_md)
 
 # Async version
 markdown_pages_vision_async = await markdown_converter.to_markdown_async(source_path, vision=True)
+# Async version with page selection
+markdown_specific_pages_async = await markdown_converter.to_markdown_async(source_path, vision=True, pages=[1, 3, 5])
 ```
 
 ### Structured Markdown Conversion (LLM Vision Required)
@@ -74,6 +81,13 @@ try:
     structured_output: List[PageContent] = markdown_converter.to_markdown_structured(image_path)
     # Returns List[PageContent]
 
+    # Process specific pages (1-indexed)
+    structured_output_specific: List[PageContent] = markdown_converter.to_markdown_structured(
+        image_path, 
+        pages=[1, 3, 5]
+    )
+    # Returns List[PageContent] with only the specified pages
+
     for i, page_content in enumerate(structured_output):
         print(f"--- Page {i+1} ---")
         # Access structured items
@@ -85,7 +99,11 @@ except ValueError as e:
 
 # Async version
 structured_output_async: List[PageContent] = await markdown_converter.to_markdown_structured_async(image_path)
-
+# Async version with page selection
+structured_output_specific_async: List[PageContent] = await markdown_converter.to_markdown_structured_async(
+    image_path, 
+    pages=[1, 3, 5]
+)
 ```
 **Note:** The `to_markdown_structured` method expects the LLM to return both Markdown and a specific JSON format. The `extract_thinking_json` utility is used internally to parse this.
 
@@ -96,4 +114,4 @@ The converter uses specific system prompts depending on the method called:
 - `DEFAULT_MARKDOWN_PROMPT`: Used by `to_markdown` (when using LLM). Instructs the LLM to output *only* well-formatted Markdown.
 - `MARKDOWN_VERIFICATION_PROMPT`: Potentially used for refining existing text (internal flag `allow_verification`).
 
-These prompts guide the LLM's output format. 
+These prompts guide the LLM's output format.
