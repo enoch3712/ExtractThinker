@@ -106,6 +106,11 @@ The text content is already accurate, but may lack proper Markdown formatting. Y
 Preserve all the original information while improving its readability through proper Markdown formatting.
 """
 
+    PLACEHOLDER_INSTRUCTION = (
+        "**Formatting Instruction:** The text above contains placeholders "
+        "(like '[Image content not extracted...]') indicating where visual information "
+        "from an image could not be retrieved."
+    )
 
     def __init__(
         self, document_loader: Optional[DocumentLoader] = None, llm: Optional[LLM] = None
@@ -140,13 +145,14 @@ Preserve all the original information while improving its readability through pr
         if require_llm and self.llm is None:
             raise ValueError("LLM is required for this operation but not set.")
 
-    def to_markdown_structured(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[PageContent]:
+    def to_markdown_structured(self, source: Union[str, IO, List[Union[str, IO]]], pages: Optional[List[int]] = None) -> List[PageContent]:
         """
         Processes document(s) using the LLM to extract structured content per page.
         This method requires vision capabilities and expects the document to contain images.
         
         Args:
             source: A single file path/stream or a list of them.
+            pages: Optional list of page numbers to process (1-indexed). If None, all pages are processed.
 
         Returns:
             A list where each element is a string containing Markdown content followed by 
@@ -154,6 +160,7 @@ Preserve all the original information while improving its readability through pr
 
         Raises:
             ValueError: If the document loader does not find any images in the source.
+            ValueError: If any specified page number is invalid.
         """
         self._validate_dependencies(require_llm=True) # LLM is mandatory here
 
@@ -183,6 +190,16 @@ Preserve all the original information while improving its readability through pr
             has_images = any(isinstance(page, dict) and page.get('image') for page in pages_data)
             if not has_images:
                 raise ValueError("to_markdown_structured requires a document containing images, but none were found by the loader.")
+
+            # Validate page numbers if specified
+            if pages is not None:
+                if not all(isinstance(p, int) and p > 0 for p in pages):
+                    raise ValueError("Page numbers must be positive integers")
+                if max(pages) > len(pages_data):
+                    raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
+                # Convert to 0-based indices
+                page_indices = [p - 1 for p in pages]
+                pages_data = [pages_data[i] for i in page_indices]
 
             result_strings = [None] * len(pages_data) # Pre-allocate list
 
@@ -284,11 +301,7 @@ Preserve all the original information while improving its readability through pr
                 # Construct an instruction to append *after* the main text
                 instruction = (
                     "\n\n---\n"
-                    "**Formatting Instruction:** The text above contains placeholders (like '[Image content not extracted...]') "
-                    "indicating where visual information from an image could not be retrieved. "
-                    "When formatting the available text into Markdown, please explicitly acknowledge these missing parts "
-                    "within the structure (e.g., by keeping the placeholder text or adding a note like '*[Image content unavailable]*')."
-                    "\n---\n"
+                    + self.PLACEHOLDER_INSTRUCTION + "\n---\n"
                 )
                 # Append the instruction to the text that will be sent
                 final_text_for_llm += instruction
@@ -519,7 +532,7 @@ Preserve all the original information while improving its readability through pr
 
     # --- Copied Methods from Extractor --- END ---
 
-    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> List[str]:
+    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> List[str]:
          """
          Converts the source document(s) to Markdown.
          This method requires an LLM to be configured.
@@ -528,12 +541,14 @@ Preserve all the original information while improving its readability through pr
          Args:
              source: A single file path/stream or a list of them.
              vision: If True, enables image processing.
+             pages: Optional list of page numbers to process (1-indexed). If None, all pages are processed.
 
          Returns:
              A list of strings, each containing the Markdown representation of a page.
              
          Raises:
              ValueError: If LLM is not configured.
+             ValueError: If any specified page number is invalid.
          """
          # Always validate that LLM is present - it's required
          if not self.llm:
@@ -555,6 +570,16 @@ Preserve all the original information while improving its readability through pr
                  pages_data = self.document_loader.load(source)
                  if not isinstance(pages_data, list):
                      pages_data = [pages_data] if pages_data else []
+
+                 # Validate page numbers if specified
+                 if pages is not None:
+                     if not all(isinstance(p, int) and p > 0 for p in pages):
+                         raise ValueError("Page numbers must be positive integers")
+                     if max(pages) > len(pages_data):
+                         raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
+                     # Convert to 0-based indices
+                     page_indices = [p - 1 for p in pages]
+                     pages_data = [pages_data[i] for i in page_indices]
                  
                  # If vision is True, check if we have any images
                  if vision:
@@ -621,7 +646,7 @@ Preserve all the original information while improving its readability through pr
              if self.document_loader:
                  print("Falling back to basic conversion.")
                  # Call basic conversion but convert its result to a list too
-                 basic_result = self._basic_to_markdown(source, vision=vision)
+                 basic_result = self._basic_to_markdown(source, vision=vision, pages=pages)
                  return [basic_result]
              else:
                  raise
@@ -657,7 +682,7 @@ Preserve all the original information while improving its readability through pr
             print(f"LLM request failed for page: {e}")
             raise
 
-    def _basic_to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> str:
+    def _basic_to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> str:
          """
          Performs basic Markdown conversion without using an LLM.
          (Essentially the previous implementation of to_markdown)
@@ -665,6 +690,7 @@ Preserve all the original information while improving its readability through pr
          Args:
              source: Input source.
              vision: If True, includes image data in the output.
+             pages: Optional list of page numbers to process (1-indexed). If None, all pages are processed.
          """
          self._validate_dependencies(require_llm=False)
 
@@ -684,6 +710,16 @@ Preserve all the original information while improving its readability through pr
             pages_data = self.document_loader.load(source)
             if not isinstance(pages_data, list):
                 pages_data = [pages_data] if pages_data else []
+
+            # Validate page numbers if specified
+            if pages is not None:
+                if not all(isinstance(p, int) and p > 0 for p in pages):
+                    raise ValueError("Page numbers must be positive integers")
+                if max(pages) > len(pages_data):
+                    raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
+                # Convert to 0-based indices
+                page_indices = [p - 1 for p in pages]
+                pages_data = [pages_data[i] for i in page_indices]
 
             markdown_parts = [""] * len(pages_data)
             with ThreadPoolExecutor() as executor:
@@ -736,16 +772,16 @@ Preserve all the original information while improving its readability through pr
         separator = "\n" if text_content and image_md else ""
         return text_content + separator + image_md
 
-    async def to_markdown_structured_async(self, source: Union[str, IO, List[Union[str, IO]]]) -> List[PageContent]:
+    async def to_markdown_structured_async(self, source: Union[str, IO, List[Union[str, IO]]], pages: Optional[List[int]] = None) -> List[PageContent]:
          """ 
          Asynchronously extracts structured content using vision and returns raw strings with
          markdown and JSON sections.
          """
          # No vision flag needed for the sync method call
-         return await asyncio.to_thread(self.to_markdown_structured, source)
+         return await asyncio.to_thread(self.to_markdown_structured, source, pages=pages)
 
-    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False) -> List[str]:
+    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> List[str]:
         """ Asynchronously converts to Markdown. """
         # The decision logic is handled by the synchronous to_markdown method
         # We just need to pass the arguments along.
-        return await asyncio.to_thread(self.to_markdown, source, vision=vision) 
+        return await asyncio.to_thread(self.to_markdown, source, vision=vision, pages=pages) 
