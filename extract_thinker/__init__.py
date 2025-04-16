@@ -33,6 +33,7 @@ from .document_loader.document_loader_google_document_ai import (
 )
 from .warning import filter_pydantic_v2_warnings
 from .document_loader.document_loader_mistral_ocr import DocumentLoaderMistralOCR, MistralOCRConfig
+from .markdown.markdown_converter import MarkdownConverter, PageContent
 filter_pydantic_v2_warnings()
 
 __all__ = [
@@ -81,4 +82,6 @@ __all__ = [
     'BatchJob',
     'DocumentLoaderMistralOCR',
     'MistralOCRConfig',
+    'MarkdownConverter',
+    'PageContent',
 ]

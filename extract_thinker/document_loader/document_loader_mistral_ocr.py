@@ -31,6 +31,7 @@ class MistralOCRConfig:
         pages: Specific pages to process (optional)
         image_limit: Maximum number of images to extract (optional)
         image_min_size: Minimum image size to extract (optional)
+        allow_image_recursive: Whether to allow recursive image extraction (default: False)
     """
     api_key: str
     model: str = "mistral-ocr-latest"
@@ -40,7 +41,8 @@ class MistralOCRConfig:
     pages: Optional[List[int]] = None
     image_limit: Optional[int] = None
     image_min_size: Optional[int] = None
-
+    allow_image_recursive: bool = False
+    
     def __post_init__(self):
         """Validate configuration after initialization."""
         if not self.api_key:
@@ -576,7 +578,7 @@ class DocumentLoaderMistralOCR(CachedDocumentLoader):
                     page_dict["dimensions"] = page["dimensions"]
 
                 image_extraction_results = {} # Store img_id -> extracted_text
-                if "images" in page and page["images"]:
+                if "images" in page and page["images"] and self.config.allow_image_recursive:
                     futures = []
                     with ThreadPoolExecutor() as executor:
                         for img in page["images"]:
