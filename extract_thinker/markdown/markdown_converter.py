@@ -44,11 +44,21 @@ JSON Schema:
 
 Instructions:
 1. Create proper Markdown with headings, lists, formatting etc.
+   - Format headings with # syntax (# for main headings, ## for sub-headings, etc.)
+   - Format lists with proper bullet points (*, -) or numbers (1., 2., etc.)
+   - Apply proper emphasis using **bold**, *italic*, or `code` where appropriate
+   - Create proper links using [text](url) format if applicable
+   - Format code blocks with triple backticks ``` if applicable
+   - Format tables using proper Markdown table syntax if applicable
+   - Use block quotes with > where appropriate
 2. Include ALL content from the image in your Markdown output.
 3. After the Markdown section, add a JSON block that follows the above schema.
 4. The JSON should break down the Markdown into logical sections with certainty scores.
 5. Make sure the certainty scores accurately reflect your confidence (1-10).
 6. Make sure you keep things like checkboxes, lists, etc. as is.
+7. IMPORTANT: If you see a placeholder for an image (e.g. [img-1.jpeg], <!-- image -->, etc.), NEVER include the placeholder directly in your output. ALWAYS replace it with the actual content or description of what the image shows.
+   Example: Replace [img-1.jpeg] with "Signature of William Smith" or appropriate description of what's in the image.
+8. MAINTAIN ALL THE ORIGINAL CONTENT AND MEANING - do not add or remove information.
 
 Your response format should be:
 
@@ -77,33 +87,19 @@ Focus on creating high-quality, well-structured Markdown first, then provide the
 Convert the image into well-formatted Markdown content.
 
 Instructions:
-1. Create proper Markdown with headings, lists, formatting etc.
-2. Include ALL content from the image in your Markdown output.
-3. Format headings with # syntax (# for main headings, ## for sub-headings, etc.)
-4. Format lists with proper bullet points (*, -) or numbers (1., 2., etc.)
-5. Apply proper emphasis using **bold**, *italic*, or `code` where appropriate
-6. Create proper links using [text](url) format if applicable
-7. Format code blocks with triple backticks ``` if applicable
-8. Format tables using proper Markdown table syntax if applicable
-9. Make sure you keep things like checkboxes, lists, etc. as is.
+Create proper Markdown with headings, lists, formatting etc.
+Include ALL content from the image in your Markdown output.
+Format headings with # syntax (# for main headings, ## for sub-headings, etc.)
+Format lists with proper bullet points (*, -) or numbers (1., 2., etc.)
+Apply proper emphasis using **bold**, *italic*, or `code` where appropriate
+Create proper links using [text](url) format if applicable
+Format code blocks with triple backticks ``` if applicable
+Format tables using proper Markdown table syntax if applicable
+Make sure you keep things like checkboxes, lists, etc. as is.
+IMPORTANT: If you see a placeholder for an image (e.g. [img-1.jpeg], <!-- image -->, etc.), NEVER include the placeholder directly in your output. ALWAYS replace it with the actual content or description of what the image shows.
+Example: Replace [img-1.jpeg] with "Signature of William Smith" or appropriate description of what's in the image.
 
 Your response should ONLY include the formatted Markdown content without any additional JSON structure or explanations.
-"""
-
-    MARKDOWN_VERIFICATION_PROMPT = """
-Look at the image provided and reformat the text content into well-structured Markdown. 
-The text content is already accurate, but may lack proper Markdown formatting. Your task is to:
-
-1. Format headings with # syntax (# for main headings, ## for sub-headings, etc.)
-2. Format lists with proper bullet points (*, -) or numbers (1., 2., etc.)
-3. Apply proper emphasis using **bold**, *italic*, or `code` where appropriate
-4. Create proper links using [text](url) format
-5. Format code blocks with triple backticks ```
-6. Format tables using proper Markdown table syntax if applicable
-7. Use block quotes with > where appropriate
-8. MAINTAIN ALL THE ORIGINAL CONTENT AND MEANING - do not add or remove information
-
-Preserve all the original information while improving its readability through proper Markdown formatting.
 """
 
     PLACEHOLDER_INSTRUCTION = (
