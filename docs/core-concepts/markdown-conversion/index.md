@@ -1,5 +1,10 @@
 # Markdown Conversion
 
+<div align="center">
+  <img src="../../assets/markdown.png" alt="Process Flow" width="50%">
+</div>
+
+
 The `MarkdownConverter` class provides functionality to convert documents (including text and images) into Markdown format. It leverages a configured Language Model (LLM) for sophisticated conversion, especially when dealing with images or requiring structured output.
 
 ## Core Concepts
