@@ -13,6 +13,8 @@ from extract_thinker.models.classification_response import ClassificationRespons
 from tests.models.invoice import CreditNoteContract, FinancialContract, InvoiceContract
 from tests.models.driver_license import DriverLicense, IdentificationContract
 from extract_thinker.global_models import get_lite_model, get_big_model
+import pytest
+from pydantic import BaseModel
 
 # Setup environment and common paths
 load_dotenv()
@@ -26,6 +28,14 @@ COMMON_CLASSIFICATIONS = [
     Classification(name="Driver License", description="This is a driver license"),
     Classification(name="Invoice", description="This is an invoice"),
 ]
+
+# Dummy contracts for the large tree example
+class BankStatementContract(BaseModel): pass
+class ContractAgreementContract(BaseModel): pass
+class LegalNoticeContract(BaseModel): pass
+class PassportContract(BaseModel): pass
+class SalesInvoiceContract(BaseModel): pass
+class PurchaseInvoiceContract(BaseModel): pass
 
 def setup_extractors():
     """Sets up and returns a list of configured extractors."""
@@ -271,6 +281,215 @@ def test_with_tree():
     assert result.classification.name == "Invoice"
     assert result.classification.description == "This is an invoice"
     assert result.classification.contract == InvoiceContract
+    # Verify UUID matching worked (assuming financial_docs.children[0] is the Invoice node)
+    expected_invoice_node = next(node for node in financial_docs.children if node.name == "Invoice")
+    assert result.classification.uuid == expected_invoice_node.classification.uuid
+
+
+def test_tree_classification_low_confidence():
+    """Test tree classification raises error when confidence is below threshold."""
+    process = setup_process_with_gpt4_extractor()
+
+    # Reuse the same tree structure from test_with_tree
+    financial_docs = ClassificationNode(
+        name="Financial Document",
+        classification=Classification(
+            name="Financial Document",
+            description="This is a financial document",
+            contract=FinancialContract,
+        ),
+        children=[
+            ClassificationNode(
+                name="Invoice",
+                classification=Classification(
+                    name="Invoice",
+                    description="This is an invoice",
+                    contract=InvoiceContract,
+                )
+            ),
+            ClassificationNode(
+                name="Credit Note",
+                classification=Classification(
+                    name="Credit Note",
+                    description="This is a credit note",
+                    contract=CreditNoteContract,
+                )
+            )
+        ]
+    )
+    legal_docs = ClassificationNode(
+        name="Identity Documents",
+        classification=Classification(
+            name="Identity Documents",
+            description="This is an identity document",
+            contract=IdentificationContract,
+        ),
+        children=[
+            ClassificationNode(
+                name="Driver License",
+                classification=Classification(
+                    name="Driver License",
+                    description="This is a driver license",
+                    contract=DriverLicense,
+                )
+            )
+        ]
+    )
+    classification_tree = ClassificationTree(
+        nodes=[financial_docs, legal_docs]
+    )
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_path = os.path.join(current_dir, 'files','invoice.pdf')
+
+    # Set an impossibly high threshold
+    high_threshold = 10.1 # Force confidence < threshold
+
+    # Assert that the correct ValueError is raised due to low confidence
+    with pytest.raises(ValueError):
+        process.classify(pdf_path, classification_tree, threshold=high_threshold)
+
+
+def test_large_classification_tree():
+    """Test classification with a larger, multi-level tree."""
+    process = setup_process_with_gpt4_extractor()
+
+    # --- Define Tree Structure ---
+
+    # Level 3: Invoice Types
+    sales_invoice_node = ClassificationNode(
+        name="Sales Invoice",
+        classification=Classification(
+            name="Sales Invoice",
+            description="An invoice sent to a customer detailing products/services sold and amount due.",
+            contract=SalesInvoiceContract, # Specific contract for Sales Invoice
+        )
+    )
+    purchase_invoice_node = ClassificationNode(
+        name="Purchase Invoice",
+        classification=Classification(
+            name="Purchase Invoice",
+            description="An invoice received from a supplier detailing products/services bought.",
+            contract=PurchaseInvoiceContract, # Specific contract for Purchase Invoice
+        )
+    )
+
+    # Level 2: Financial Subtypes (Invoice node becomes a parent)
+    invoice_node = ClassificationNode(
+        name="Invoice/Bill", # More general name
+        classification=Classification(
+            name="Invoice/Bill",
+            description="A general bill requesting payment for goods or services.",
+            contract=InvoiceContract, # General invoice contract remains here
+        ),
+        children=[sales_invoice_node, purchase_invoice_node] # Add Level 3 children
+    )
+    credit_note_node = ClassificationNode(
+        name="Credit Note",
+        classification=Classification(
+            name="Credit Note",
+            description="A document correcting a previous invoice or returning funds.",
+            contract=CreditNoteContract,
+        )
+    )
+    bank_statement_node = ClassificationNode(
+        name="Bank Statement",
+        classification=Classification(
+            name="Bank Statement",
+            description="A summary of financial transactions occurring over a given period.",
+            contract=BankStatementContract,
+        )
+    )
+
+    # Level 1: Financial Documents Root
+    financial_docs = ClassificationNode(
+        name="Financial Document",
+        classification=Classification(
+            name="Financial Document",
+            description="Documents related to financial transactions or status.",
+            contract=FinancialContract,
+        ),
+        children=[invoice_node, credit_note_node, bank_statement_node]
+    )
+
+    # Level 2: Legal Subtypes
+    contract_agreement_node = ClassificationNode(
+        name="Contract/Agreement",
+        classification=Classification(
+            name="Contract/Agreement",
+            description="A legally binding agreement between parties.",
+            contract=ContractAgreementContract,
+        )
+    )
+    legal_notice_node = ClassificationNode(
+        name="Legal Notice",
+        classification=Classification(
+            name="Legal Notice",
+            description="A formal notification required or permitted by law.",
+            contract=LegalNoticeContract,
+        )
+    )
+
+    # Level 1: Legal Documents Root
+    legal_docs = ClassificationNode(
+        name="Legal Document",
+        classification=Classification(
+            name="Legal Document",
+            description="Documents with legal significance or implications.",
+            contract=None, # Example: Root might not have a specific contract
+        ),
+        children=[contract_agreement_node, legal_notice_node]
+    )
+
+    # Level 2: Identification Subtypes
+    driver_license_node = ClassificationNode(
+        name="Driver License",
+        classification=Classification(
+            name="Driver License",
+            description="Official document permitting an individual to operate a motor vehicle.",
+            contract=DriverLicense,
+        )
+    )
+    passport_node = ClassificationNode(
+        name="Passport",
+        classification=Classification(
+            name="Passport",
+            description="Official government document certifying identity and citizenship for travel.",
+            contract=PassportContract,
+        )
+    )
+
+    # Level 1: Identity Documents Root
+    identity_docs = ClassificationNode(
+        name="Identification Document",
+        classification=Classification(
+            name="Identification Document",
+            description="Documents used to verify a person's identity.",
+            contract=IdentificationContract,
+        ),
+        children=[driver_license_node, passport_node]
+    )
+
+    # Top Level Tree
+    classification_tree = ClassificationTree(
+        nodes=[financial_docs, legal_docs, identity_docs]
+    )
+
+    # --- Perform Classification ---
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Using the same invoice PDF as before
+    pdf_path = os.path.join(current_dir, 'files', 'invoice.pdf')
+
+    # Classify with a reasonable threshold
+    result = process.classify(pdf_path, classification_tree, threshold=7)
+
+    # --- Assert Results ---
+    assert result is not None, "Classification should return a result."
+    assert result.name == "Sales Invoice", "The document should be classified as a Sales Invoice."
+    assert result.classification is not None, "Result should contain classification details."
+    # Verify it picked the correct node using UUID
+    assert result.classification.uuid == sales_invoice_node.classification.uuid, "Result UUID should match the Sales Invoice node UUID."
+    assert result.classification.contract == SalesInvoiceContract, "Result contract should be SalesInvoiceContract."
 
 
 def test_mom_classification_layers():
@@ -338,3 +557,7 @@ def test_mom_classification_layers():
     assert final_result.classification.name == "Credit Note"
     assert final_result.classification.description == "A document issued to reverse a previous transaction, showing returned items and credit amount, usually referencing an original invoice"
     assert final_result.classification.contract == CreditNoteContract
+
+
+if __name__ == "__main__":
+    test_tree_classification_low_confidence()

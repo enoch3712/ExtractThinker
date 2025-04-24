@@ -1,6 +1,6 @@
 from typing import Any, Optional, Type
-from pydantic import BaseModel, field_validator
-from extract_thinker.models.contract import Contract
+from pydantic import BaseModel, field_validator, Field
+from uuid import UUID, uuid4
 import os
 
 class Classification(BaseModel):
@@ -10,14 +10,13 @@ class Classification(BaseModel):
     extraction_contract: Optional[Type] = None
     image: Optional[str] = None
     extractor: Optional[Any] = None
+    uuid: UUID = Field(default_factory=uuid4)
 
     @field_validator('contract', mode='before')
     def validate_contract(cls, v):
         if v is not None:
             if not isinstance(v, type):
                 raise ValueError('contract must be a type')
-            if not issubclass(v, Contract):
-                raise ValueError('contract must be a subclass of Contract')
         return v
 
     @field_validator('extraction_contract', mode='before')
@@ -25,8 +24,6 @@ class Classification(BaseModel):
         if v is not None:
             if not isinstance(v, type):
                 raise ValueError('extraction_contract must be a type')
-            if not issubclass(v, Contract):
-                raise ValueError('extraction_contract must be a subclass of Contract')
         return v
 
     def set_image(self, image_path: str):
