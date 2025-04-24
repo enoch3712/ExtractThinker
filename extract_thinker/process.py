@@ -152,6 +152,12 @@ class Process:
                 image=image
             )
 
+            # Handle cases where classification fails at this level
+            if classification_response is None:
+                raise ValueError(
+                    "Classification failed at the current level. Could not determine a match."
+                )
+
             if classification_response.confidence < threshold:
                 raise ValueError(
                     f"Classification confidence {classification_response.confidence} "
@@ -160,10 +166,11 @@ class Process:
 
             best_classification = classification_response
 
+            # Use UUID for robust matching instead of name
             matching_node = next(
                 (
                     node for node in current_nodes
-                    if node.classification.name == best_classification.name
+                    if node.classification.uuid == best_classification.classification.uuid
                 ),
                 None
             )
