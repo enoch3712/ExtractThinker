@@ -134,7 +134,7 @@ extractor_job_role.load_document_loader(
 extractor_job_role.load_llm("gpt-4o")
 role_result = extractor_job_role.extract(job_role_path, RoleContract)
 
-print(role_result.json())
+print(role_result.model_dump_json())
 
 extractor_candidate = Extractor()
 extractor_candidate.load_document_loader(
@@ -148,10 +148,10 @@ extractor_candidate.load_llm(llm)
 
 resume_content_path = os.path.join(cwd, "examples", "files", "CV_Candidate.pdf")
 
-job_role_content = "This is the job cotent. to be mapped: \n" + json_to_yaml(json.loads(role_result.json()))
+job_role_content = "This is the job content to be mapped: \n" + json_to_yaml(json.loads(role_result.model_dump_json()))
 
 result = extractor_candidate.extract(resume_content_path,
                                      ResumeContract,
                                      content=job_role_content)
 
-print(result.json())
+print(result.model_dump_json())
