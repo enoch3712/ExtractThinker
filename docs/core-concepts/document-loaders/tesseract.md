@@ -78,6 +78,27 @@ The `TesseractConfig` class supports the following options:
 - Caching support
 - No cloud service required
 
+## 🪟 Windows Installation
+
+If you're using Windows, follow these steps to install Tesseract OCR:
+
+1. Download the Tesseract installer from [UB Mannheim's GitHub repository](https://github.com/UB-Mannheim/tesseract/wiki)
+2. Choose the appropriate installer:
+   - For 64-bit Windows: `tesseract-ocr-w64-setup-xxx.exe`
+   - For 32-bit Windows: `tesseract-ocr-w32-setup-xxx.exe`
+3. During installation:
+   - Choose the default installation path (`C:\Program Files\Tesseract-OCR`)
+   - **Important**: Check the box for "Add to system PATH"
+   - Complete the installation
+4. Set up environment variables by creating a `.env` file in your project's root directory:
+```
+TESSERACT_PATH="C:\Program Files\Tesseract-OCR\tesseract.exe"
+```
+5. Verify installation by opening a new PowerShell window and running:
+```powershell
+where.exe tesseract
+```
+
 ## Notes
 
 - Vision mode is always enabled

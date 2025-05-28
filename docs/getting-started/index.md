@@ -22,7 +22,7 @@
     </a>
 </div>
 
-Is a flexible document intelligence framework that helps you extract and classify structured data from various documents, acting like an **ORM** for document processing workflows. One phrase you say is **“Document Intelligence for LLMs”** or **“LangChain for Intelligent Document Processing.”** The motivation is to create niche features required for document processing, like splitting large documents and advanced classification.
+Is a flexible document intelligence framework that helps you extract and classify structured data from various documents, acting like an **ORM** for document processing workflows. One phrase you say is **"Document Intelligence for LLMs"** or **"LangChain for Intelligent Document Processing."** The motivation is to create niche features required for document processing, like splitting large documents and advanced classification.
 
 ---
 
