@@ -37,57 +37,6 @@ Install ExtractThinker using pip:
 pip install extract_thinker
 ```
 
-## 🪟 Windows Setup Guide
-
-If you're using Windows, follow these additional steps to set up the required dependencies:
-
-### 1. Install Tesseract OCR
-1. Download the Tesseract installer from [UB Mannheim's GitHub repository](https://github.com/UB-Mannheim/tesseract/wiki)
-2. Choose the appropriate installer:
-   - For 64-bit Windows: `tesseract-ocr-w64-setup-xxx.exe`
-   - For 32-bit Windows: `tesseract-ocr-w32-setup-xxx.exe`
-3. During installation:
-   - Choose the default installation path (`C:\Program Files\Tesseract-OCR`)
-   - **Important**: Check the box for "Add to system PATH"
-   - Complete the installation
-
-### 2. Set Up Environment Variables
-1. Create a `.env` file in your project's root directory (same level as `pyproject.toml`)
-2. Add the following lines to your `.env` file:
-```
-TESSERACT_PATH="C:\Program Files\Tesseract-OCR\tesseract.exe"
-OPENAI_API_KEY="your-openai-api-key-here"
-```
-3. Replace `your-openai-api-key-here` with your actual OpenAI API key
-
-### 3. Verify Installation
-1. Open a new PowerShell window (the PATH changes require a new terminal session)
-2. Verify Tesseract installation:
-```powershell
-where.exe tesseract
-```
-3. You should see the path to your Tesseract executable
-
-### 4. Running Examples
-1. Make sure you're in your project's virtual environment:
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-2. If you get a security error about running scripts, run:
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-```
-3. Run your example script:
-```powershell
-python examples/extractor_basic.py
-```
-
-### Common Issues and Solutions
-- **Tesseract not found**: Make sure Tesseract is installed and added to PATH. Try restarting your terminal.
-- **Environment variables not loading**: Ensure your `.env` file is in the correct location and has the correct format.
-- **Script execution policy**: If you get a security error, use the `Set-ExecutionPolicy` command shown above.
-- **Virtual environment issues**: Make sure you're using the correct Python version (3.9+) and have activated the virtual environment.
-
 ## 🛠️ Usage
 
 ### Basic Extraction Example
