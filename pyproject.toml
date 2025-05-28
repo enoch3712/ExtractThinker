@@ -18,7 +18,7 @@ pyyaml = ">=6.0.2"
 tiktoken = {version = ">=0.8.0", python = ">=3.9,<3.13"}
 python-magic = ">=0.4.27"
 playwright = ">=1.52.0"
-libmagic = ">=5.39,<6.0"
+libmagic = "*"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^7.1.2"
