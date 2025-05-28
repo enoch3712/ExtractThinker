@@ -7,23 +7,25 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.14"
-pydantic = "^2.10.4"
-litellm = "^1.61.13"
-pillow = ">=10.4,<12.0"
-pypdfium2 = "^4.29.0"
-instructor = "^1.7.2"
-python-dotenv = "^1.0.1"
-cachetools = "^5.5.2"
-pyyaml = "^6.0.1"
-tiktoken = {version = "^0.8.0", python = ">=3.9,<3.13"}
-python-magic = "^0.4.27"
-playwright = "^1.50.0"
+pydantic = ">=2.11.5"
+litellm = ">=1.71.1"
+pillow = ">=11.2.1,<12.0"
+pypdfium2 = ">=4.30.1"
+instructor = ">=1.8.3"
+python-dotenv = ">=1.1.0"
+cachetools = ">=5.5.2"
+pyyaml = ">=6.0.2"
+tiktoken = {version = ">=0.8.0", python = ">=3.9,<3.13"}
+python-magic = ">=0.4.27"
+playwright = ">=1.52.0"
+libmagic = "*"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^7.1.2"
 black = "^24.10.0"
 ipykernel = "^6.29.5"
 pytest = "^8.2.0"
+numpy = "^1.26.4"
 
 [build-system]
 requires = ["poetry-core"]
