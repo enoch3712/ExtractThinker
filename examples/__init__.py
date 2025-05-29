@@ -1,0 +1,3 @@
+"""
+ExtractThinker example implementations
+""" 
