@@ -13,14 +13,15 @@ class InvoiceContract(Contract):
     invoice_date: str
 
 
-tesseract_path = os.getenv("TESSERACT_PATH")
+# Use the direct path to tesseract
+tesseract_path = "/opt/homebrew/bin/tesseract"
 test_file_path = os.path.join(cwd, "tests", "test_images", "invoice.png")
 
 extractor = Extractor()
 extractor.load_document_loader(
     DocumentLoaderTesseract(tesseract_path)
 )
-extractor.load_llm("claude-3-haiku-20240307")
+extractor.load_llm("gpt-4o")
 
 result = extractor.extract(test_file_path, InvoiceContract)
 
