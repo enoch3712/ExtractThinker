@@ -21,7 +21,7 @@ extractor = Extractor()
 extractor.load_document_loader(
     DocumentLoaderTesseract(tesseract_path)
 )
-extractor.load_llm("gpt-4")
+extractor.load_llm("gpt-4o")
 
 result = extractor.extract(test_file_path, InvoiceContract)
 
