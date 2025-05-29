@@ -40,7 +40,7 @@ def setup_extractor():
     extractor.load_document_loader(DocumentLoaderTesseract(tesseract_path))
     
     # Configure LLM
-    extractor.load_llm("gpt-4")
+    extractor.load_llm("gpt-4o")
     
     return extractor
 
