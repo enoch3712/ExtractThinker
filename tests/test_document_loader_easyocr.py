@@ -1,11 +1,8 @@
 import os
-import time
 import pytest
-from PIL import Image
-import io
+import numpy as np
 from extract_thinker.document_loader.document_loader_easy_ocr import DocumentLoaderEasyOCR, EasyOCRConfig
 from .test_document_loader_base import BaseDocumentLoaderTest
-import numpy as np
 
 
 class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):

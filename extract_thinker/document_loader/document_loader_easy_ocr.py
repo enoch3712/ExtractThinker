@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 from PIL import Image
 import numpy as np
 from dataclasses import dataclass, field
@@ -13,14 +13,12 @@ from extract_thinker.document_loader.cached_document_loader import CachedDocumen
 @dataclass
 class EasyOCRConfig:
     """Configuration for EasyOCR loader.
-    
-    Args: 
-        lang_list: list of languages to use 
-        gpu: whether to use gpu
-        download_enabled: whether to download models
-        cache_ttl: time to live for cache
-        
-    
+
+    Args:
+        lang_list: List of languages to use for OCR
+        gpu: Whether to use GPU acceleration
+        download_enabled: Whether to download models automatically
+        cache_ttl: Time-to-live for cache in seconds
     """
     lang_list: List[str] = field(default_factory=lambda: ['en'])
     gpu: bool = True
@@ -38,7 +36,7 @@ class EasyOCRConfig:
 
 
 class DocumentLoaderEasyOCR(CachedDocumentLoader):
-    SUPPORTED_FORMATS = ["png", "jpg", "jpeg", "tiff", "webp"]
+    SUPPORTED_FORMATS = ["png", "jpg", "jpeg", "tiff", "tif", "webp"]
 
     def __init__(self, config: EasyOCRConfig):
         super().__init__()
@@ -51,11 +49,17 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
         ext = source.split('.')[-1].lower()
         return ext in self.SUPPORTED_FORMATS
 
-    def load(self, source: str) -> List[List[Dict[str, Any]]]:
-        return self.load_document(source)
-
     @cachedmethod(cache=attrgetter('cache'), key=lambda _, path: hashkey(path))
-    def load_document(self, image_path: str) -> List[List[Dict[str, Any]]]:
+    def load(self, image_path: str) -> List[List[Dict[str, Any]]]:
+        """Load and process an image using EasyOCR.
+
+        Args:
+            image_path: Path to the image file
+
+        Returns:
+            List of pages, where each page contains a list of OCR results.
+            Each OCR result is a dictionary with 'text', 'probability', and 'bbox' keys.
+        """
         with Image.open(image_path).convert("RGB") as img:
             ocr_result = self.config.reader.readtext(np.array(img))
         page_data = []
