@@ -13,6 +13,7 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
     def easyocr_config(self):
         return EasyOCRConfig( lang_list=['en'],
                               gpu=False, 
+                              cache_ttl=300,
                               download_enabled=True)
 
     @pytest.fixture
@@ -94,7 +95,7 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
             os.remove(pdf_path)
 
     def test_language_configuration(self, test_file_path):
-    # Test single language
+    # Test one language
       loader = DocumentLoaderEasyOCR(EasyOCRConfig(lang_list=['en']))
       pages = loader.load(test_file_path)
       assert len(pages) > 0
@@ -106,7 +107,7 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
 
 
     def test_simple_initialization_easyocr(self):
-      """Test simple initialization and basic functionality for EasyOCR"""
+      #Test simple initialization and basic functionality for EasyOCR"
       config = EasyOCRConfig(lang_list=["en"])
       loader = DocumentLoaderEasyOCR(config)
 

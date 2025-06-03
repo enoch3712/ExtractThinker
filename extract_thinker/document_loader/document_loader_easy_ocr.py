@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 from PIL import Image
 import numpy as np
 from dataclasses import dataclass, field
-from cachetools import cachedmethod, LRUCache
+from cachetools import cachedmethod, TTLCache
 from cachetools.keys import hashkey
 import easyocr
 import pdf2image
@@ -21,10 +21,12 @@ class EasyOCRConfig:
         lang_list: the languages to use for OCR
         gpu: whether to use GPU for OCR
         download_enabled: whether to download the models if they are not found
+        cache_ttl: time-to-live for OCR result caching, in seconds
     """
-    lang_list: List[str] = field(default_factory=lambda: ['en']) #default is english 
+    lang_list: List[str] = field(default_factory=lambda: ['en'])
     gpu: bool = True
     download_enabled: bool = True
+    cache_ttl: int = 300  # 🆕 TTL for cache in seconds (default: 10 minutes)
 
     def __post_init__(self):
         if not self.lang_list:
@@ -43,7 +45,7 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
         super().__init__()
         self.config = config
         self.vision_mode = False  # easyocr is mostly normal text extraction
-        self.cache = LRUCache(maxsize=128)  # Initialize cache for @cachedmethod
+        self.cache = TTLCache(maxsize=128, ttl=self.config.cache_ttl)  # 🆕 TTL-based cache
 
     def set_vision_mode(self, enabled: bool) -> None:
         """Enable or disable vision mode."""
@@ -51,14 +53,11 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
 
     def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:
         """Check if vision mode is supported for this source."""
-        # Use same check as can_handle for now, all supported formats allowed
         return self.can_handle(source)
 
     def can_handle(self, source: Union[str, BytesIO]) -> bool:
-        # Check if source is a BytesIO
         if isinstance(source, BytesIO):
             return True
-        # Check if source is a string with a valid extension
         if isinstance(source, str):
             if '.' not in source:
                 return False
@@ -67,7 +66,6 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
         return False
 
     def load(self, source: Union[str, BytesIO]) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
-        # Read file bytes from path or BytesIO
         file_bytes = source.getvalue() if isinstance(source, BytesIO) else open(source, 'rb').read()
         page_results = self.load_document(file_bytes)
 
@@ -115,5 +113,3 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
             if file_bytes.startswith(b'%PDF'):
                 return pdf2image.convert_from_bytes(file_bytes)
             raise RuntimeError(f"Failed to process file: {e}")
-
-    
