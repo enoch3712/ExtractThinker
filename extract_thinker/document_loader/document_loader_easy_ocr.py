@@ -30,8 +30,8 @@ class EasyOCRConfig:
         """Initialize EasyOCR reader with configuration settings and validation."""
         if not self.lang_list:
             raise ValueError("lang_list must contain at least one language code.")
-        if self.cache_ttl < 0:
-            raise ValueError("cache_ttl must be non-negative.")
+        if self.cache_ttl <= 0:
+            raise ValueError("cache_ttl must be positive.")
 
         self.reader = easyocr.Reader(
             lang_list=self.lang_list,

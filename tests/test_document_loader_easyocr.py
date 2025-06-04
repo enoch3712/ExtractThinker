@@ -93,8 +93,8 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
         with pytest.raises(ValueError, match="lang_list must contain at least one"):
             EasyOCRConfig(lang_list=[])
         # raise error if cache_ttl is negative
-        with pytest.raises(ValueError, match="cache_ttl must be non-negative"):
-            EasyOCRConfig(cache_ttl=-1)
+        with pytest.raises(ValueError, match="cache_ttl must be positive"):
+            EasyOCRConfig(cache_ttl=0)
 
 
   
