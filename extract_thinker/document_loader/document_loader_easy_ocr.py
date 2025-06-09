@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 from cachetools import cachedmethod, TTLCache
 from cachetools.keys import hashkey
 from operator import attrgetter
-import easyocr
-import json
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import is_pdf_stream
@@ -39,6 +37,14 @@ class EasyOCRConfig:
             raise ValueError("lang_list must contain at least one language code.")
         if self.cache_ttl <= 0:
             raise ValueError("cache_ttl must be positive.")
+
+        try:
+            import easyocr
+        except ImportError:
+            raise ImportError(
+                "The 'easyocr' package is required for this loader but is not installed. "
+                "Please install it with: pip install easyocr"
+            )
 
         self.reader = easyocr.Reader(
             lang_list=self.lang_list,
