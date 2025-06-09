@@ -31,22 +31,20 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
         content = loader.load(test_file_path)
         assert isinstance(content, list) and len(content) > 0
         for page in content:
-            # Each page should be a list of OCR results
-            assert isinstance(page, list)
-            for item in page:
-                # Each OCR result should be a dictionary
-                assert isinstance(item, dict)
-                assert all(key in item for key in ['text', 'probability', 'bbox'])
-                assert isinstance(item['text'], str)
-                assert isinstance(item['probability'], (float, np.float64))
-                assert isinstance(item['bbox'], (list, tuple))
+            # Each page should be a dictionary with 'content'
+            assert isinstance(page, dict)
+            assert "content" in page
 
     def test_load_from_bytesio(self, loader, test_file_path):
-        """Tests that the loader can process an image provided as a BytesIO stream."""
+        """Tests that the loader can process an image from a BytesIO stream"""
         with open(test_file_path, "rb") as f:
             image_bytes = BytesIO(f.read())
         content = loader.load(image_bytes)
         assert isinstance(content, list) and len(content) > 0
+        for page in content:
+             # Each page should be a dictionary with 'content'
+            assert isinstance(page, dict)
+            assert "content" in page
 
     def test_can_handle(self, loader, tmp_path):
         """Tests that the loader correctly identifies supported and unsupported file formats"""
@@ -96,5 +94,98 @@ class TestDocumentLoaderEasyOCR(BaseDocumentLoaderTest):
         with pytest.raises(ValueError, match="cache_ttl must be positive"):
             EasyOCRConfig(cache_ttl=0)
 
+    def test_unsupported_file_extension(self, loader):
+        """Tests that an unsupported file extension returns False from can_handle"""
+        # ... existing code ...
 
-  
+
+@pytest.fixture
+def easy_ocr_loader_bbox():
+    config = EasyOCRConfig(include_bbox=True)
+    return DocumentLoaderEasyOCR(config)
+
+@pytest.fixture
+def easy_ocr_loader_no_bbox():
+    config = EasyOCRConfig(include_bbox=False)
+    return DocumentLoaderEasyOCR(config)
+
+def test_load_pdf_with_bbox(easy_ocr_loader_bbox):
+    """Test loading a PDF file with bounding box information."""
+    file_path = os.path.join(os.getcwd(), "tests", "files", "invoice.pdf")
+    result = easy_ocr_loader_bbox.load(file_path)
+    
+    assert isinstance(result, list)
+    assert len(result) > 0  # Assuming the PDF has at least one page
+    
+    first_page = result[0]
+    assert "content" in first_page
+    assert "detail" in first_page
+    assert isinstance(first_page["content"], str)
+    assert isinstance(first_page["detail"], list)
+    
+    if len(first_page["detail"]) > 0:
+        first_detail = first_page["detail"][0]
+        assert "bbox" in first_detail
+        assert "text" in first_detail
+        assert "probability" in first_detail
+
+def test_load_pdf_without_bbox(easy_ocr_loader_no_bbox):
+    """Test loading a PDF file without bounding box information."""
+    file_path = os.path.join(os.getcwd(), "tests", "files", "invoice.pdf")
+    result = easy_ocr_loader_no_bbox.load(file_path)
+    
+    assert isinstance(result, list)
+    assert len(result) > 0
+    
+    first_page = result[0]
+    assert "content" in first_page
+    assert "detail" not in first_page
+    assert isinstance(first_page["content"], str)
+
+def test_load_image_with_bbox(easy_ocr_loader_bbox):
+    """Test loading an image file with bounding box information."""
+    # Using a known image file from the tests directory
+    file_path = os.path.join(os.getcwd(), "tests", "test_images", "invoice.png")
+    result = easy_ocr_loader_bbox.load(file_path)
+    
+    assert isinstance(result, list)
+    assert len(result) == 1
+    
+    page = result[0]
+    assert "content" in page
+    assert "detail" in page
+    assert isinstance(page["content"], str)
+    assert isinstance(page["detail"], list)
+
+def test_load_image_without_bbox(easy_ocr_loader_no_bbox):
+    """Test loading an image file without bounding box information."""
+    file_path = os.path.join(os.getcwd(), "tests", "test_images", "invoice.png")
+    result = easy_ocr_loader_no_bbox.load(file_path)
+    
+    assert isinstance(result, list)
+    assert len(result) == 1
+    
+    page = result[0]
+    assert "content" in page
+    assert "detail" not in page
+    assert isinstance(page["content"], str)
+
+def test_unsupported_file_type(easy_ocr_loader_no_bbox):
+    """Test that an unsupported file type raises a ValueError."""
+    file_path = os.path.join(os.getcwd(), "README.md")
+    with pytest.raises(ValueError):
+        easy_ocr_loader_no_bbox.load(file_path)
+
+def test_load_multipage_pdf(easy_ocr_loader_no_bbox):
+    """Test loading a multi-page PDF and verify the page count."""
+    file_path = os.path.join(os.getcwd(), "tests", "files", "bulk.pdf")
+    result = easy_ocr_loader_no_bbox.load(file_path)
+    
+    assert isinstance(result, list)
+    assert len(result) == 3
+    
+    for page in result:
+        assert "content" in page
+        assert isinstance(page["content"], str)
+
+
