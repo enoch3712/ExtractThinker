@@ -18,6 +18,16 @@ class AzureConfig:
         cache_ttl: Cache time-to-live in seconds (default: 300)
         model_id: Azure model ID to use (default: "prebuilt-layout")
         max_retries: Maximum number of retries for failed requests (default: 3)
+        features: List of advanced features to enable (default: None)
+            Available features:
+            - "ocrHighResolution": High resolution OCR for better small text recognition
+            - "formulas": Extract mathematical formulas in LaTeX format  
+            - "styleFont": Extract font properties (family, style, weight, color)
+            - "barcodes": Extract barcodes and QR codes
+            - "languages": Detect document languages
+            - "keyValuePairs": Extract key-value pairs from forms
+            - "queryFields": Enable custom field extraction
+            - "searchablePDF": Convert scanned PDFs to searchable format
     """
     # Class level constants for allowed model IDs
     # Primary general-purpose models
@@ -50,6 +60,18 @@ class AzureConfig:
         "prebuilt-payStub",           # Pay stubs
         "prebuilt-creditCard"         # Credit cards
     ]
+    
+    # Available advanced features
+    AVAILABLE_FEATURES: ClassVar[List[str]] = [
+        "ocrHighResolution",    # High resolution OCR for small text
+        "formulas",             # Mathematical formula extraction
+        "styleFont",            # Font property extraction
+        "barcodes",             # Barcode and QR code extraction
+        "languages",            # Language detection
+        "keyValuePairs",        # Key-value pair extraction
+        "queryFields",          # Custom field extraction
+        "searchablePDF"         # Searchable PDF generation
+    ]
 
     subscription_key: str
     endpoint: str
@@ -57,9 +79,10 @@ class AzureConfig:
     cache_ttl: int = 300
     model_id: str = "prebuilt-layout"  # Default to layout as it's most versatile
     max_retries: int = 3
+    features: Optional[List[str]] = None
 
     def __post_init__(self):
-        """Validate model ID after initialization."""
+        """Validate model ID and features after initialization."""
         allowed_models = self.GENERAL_MODELS + self.SPECIALIZED_MODELS
         if self.model_id not in allowed_models:
             raise ValueError(
@@ -67,6 +90,15 @@ class AzureConfig:
                 f"General purpose models: {self.GENERAL_MODELS}\n"
                 f"Specialized models: {self.SPECIALIZED_MODELS}"
             )
+        
+        # Validate features if provided
+        if self.features:
+            invalid_features = [f for f in self.features if f not in self.AVAILABLE_FEATURES]
+            if invalid_features:
+                raise ValueError(
+                    f"Invalid features: {invalid_features}. "
+                    f"Available features: {self.AVAILABLE_FEATURES}"
+                )
 
     @property
     def is_general_model(self) -> bool:
@@ -77,6 +109,26 @@ class AzureConfig:
     def is_specialized_model(self) -> bool:
         """Check if the current model is a specialized model."""
         return self.model_id in self.SPECIALIZED_MODELS
+    
+    @property
+    def has_high_resolution_ocr(self) -> bool:
+        """Check if high resolution OCR is enabled."""
+        return self.features is not None and "ocrHighResolution" in self.features
+    
+    @property
+    def has_formula_extraction(self) -> bool:
+        """Check if formula extraction is enabled."""
+        return self.features is not None and "formulas" in self.features
+    
+    @property
+    def has_font_extraction(self) -> bool:
+        """Check if font property extraction is enabled."""
+        return self.features is not None and "styleFont" in self.features
+    
+    @property
+    def has_barcode_extraction(self) -> bool:
+        """Check if barcode extraction is enabled."""
+        return self.features is not None and "barcodes" in self.features
 
 
 class DocumentLoaderAzureForm(CachedDocumentLoader):
@@ -85,7 +137,8 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
     SUPPORTED_FORMATS = ["pdf", "jpeg", "jpg", "png", "bmp", "tiff", "heif", "docx", "xlsx", "pptx", "html"]
     
     def __init__(self, subscription_key: Union[str, AzureConfig], endpoint: Optional[str] = None, 
-                 content: Optional[Any] = None, cache_ttl: int = 300, model_id: Optional[str] = None):
+                 content: Optional[Any] = None, cache_ttl: int = 300, model_id: Optional[str] = None,
+                 features: Optional[List[str]] = None):
         """Initialize loader.
         
         Args:
@@ -94,6 +147,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
             content: Initial content (optional, only used if subscription_key is a string)
             cache_ttl: Cache time-to-live in seconds (default: 300, only used if subscription_key is a string)
             model_id: Azure model ID to use (optional, only used if subscription_key is a string)
+            features: List of advanced features to enable (optional, only used if subscription_key is a string)
         """
         # Check required dependencies before any other initialization
         self._check_dependencies()
@@ -108,7 +162,8 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 endpoint=endpoint if endpoint else "",
                 content=content,
                 cache_ttl=cache_ttl,
-                model_id=model_id if model_id else "prebuilt-layout"
+                model_id=model_id if model_id else "prebuilt-layout",
+                features=features
             )
         
         super().__init__(self.config.content, self.config.cache_ttl)
@@ -165,6 +220,10 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
         - tables: Any tables found on the page
         - forms: Form fields if using a forms-capable model
         - image: The page image (if vision_mode is True)
+        - formulas: Mathematical formulas if formula extraction is enabled
+        - fonts: Font properties if font extraction is enabled
+        - barcodes: Barcodes and QR codes if barcode extraction is enabled
+        - languages: Detected languages if language detection is enabled
         
         Args:
             source: Either a file path or BytesIO stream
@@ -179,16 +238,23 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
             # Process with Azure Form Recognizer
             for attempt in range(self.config.max_retries):
                 try:
+                    # Prepare arguments for begin_analyze_document
+                    analyze_kwargs = {}
+                    if self.config.features:
+                        analyze_kwargs['features'] = self.config.features
+                    
                     if isinstance(source, str):
                         with open(source, "rb") as document:
                             poller = self.client.begin_analyze_document(
                                 self.config.model_id, 
-                                document
+                                document,
+                                **analyze_kwargs
                             )
                     else:
                         poller = self.client.begin_analyze_document(
                             self.config.model_id, 
-                            source
+                            source,
+                            **analyze_kwargs
                         )
 
                     result = poller.result()
@@ -241,6 +307,75 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                             page_forms[key_content] = value_content
                     
                     page_dict["forms"] = page_forms
+
+                # Add advanced features if enabled and available
+                
+                # Add formulas if formula extraction is enabled
+                if self.config.has_formula_extraction and hasattr(result, 'formulas'):
+                    page_formulas = []
+                    for formula in result.formulas:
+                        # Check if formula belongs to this page
+                        formula_regions = getattr(formula, 'bounding_regions', [])
+                        is_on_current_page = any(
+                            region.page_number == page.page_number 
+                            for region in formula_regions
+                        ) if formula_regions else True
+                        
+                        if is_on_current_page:
+                            page_formulas.append({
+                                'value': getattr(formula, 'value', ''),
+                                'confidence': getattr(formula, 'confidence', 0),
+                                'kind': getattr(formula, 'kind', 'unknown')
+                            })
+                    page_dict["formulas"] = page_formulas
+
+                # Add font information if font extraction is enabled
+                if self.config.has_font_extraction and hasattr(result, 'styles'):
+                    page_fonts = []
+                    for style in result.styles:
+                        # Check if style belongs to this page
+                        style_spans = getattr(style, 'spans', [])
+                        if style_spans:
+                            page_fonts.append({
+                                'font_family': getattr(style, 'font_family', ''),
+                                'font_style': getattr(style, 'font_style', ''),
+                                'font_weight': getattr(style, 'font_weight', ''),
+                                'color': getattr(style, 'color', ''),
+                                'confidence': getattr(style, 'confidence', 0)
+                            })
+                    page_dict["fonts"] = page_fonts
+
+                # Add barcodes if barcode extraction is enabled
+                if self.config.has_barcode_extraction and hasattr(result, 'barcodes'):
+                    page_barcodes = []
+                    for barcode in result.barcodes:
+                        # Check if barcode belongs to this page
+                        barcode_regions = getattr(barcode, 'bounding_regions', [])
+                        is_on_current_page = any(
+                            region.page_number == page.page_number 
+                            for region in barcode_regions
+                        ) if barcode_regions else True
+                        
+                        if is_on_current_page:
+                            page_barcodes.append({
+                                'kind': getattr(barcode, 'kind', ''),
+                                'value': getattr(barcode, 'value', ''),
+                                'confidence': getattr(barcode, 'confidence', 0)
+                            })
+                    page_dict["barcodes"] = page_barcodes
+
+                # Add languages if language detection is enabled
+                if hasattr(result, 'languages'):
+                    page_languages = []
+                    for language in result.languages:
+                        # Check if language detection belongs to this page
+                        language_spans = getattr(language, 'spans', [])
+                        if language_spans:
+                            page_languages.append({
+                                'locale': getattr(language, 'locale', ''),
+                                'confidence': getattr(language, 'confidence', 0)
+                            })
+                    page_dict["languages"] = page_languages
 
                 # If vision mode is enabled, add page image
                 if self.vision_mode:
