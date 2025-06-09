@@ -215,6 +215,9 @@ class Extractor:
         Returns:
             The parsed result from the LLM as validated by response_model.
         """
+        if isinstance(source, dict) and self.document_loader is None:
+            self.document_loader = DocumentLoaderData()
+        
         self._validate_dependencies(response_model, vision)
         self.extra_content = content
         self.completion_strategy = completion_strategy
