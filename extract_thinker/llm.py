@@ -32,6 +32,12 @@ class LLM:
     MAX_TOKEN_LIMIT = 120000  # Maximum token limit (for Claude 3.7 Sonnet)
     MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
     MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
+    
+    # Model-specific token limits
+    MODEL_TOKEN_LIMITS = {
+        "gpt-4o": 12000,  # Reasonable middle ground for GPT-4o
+        "gpt-4o-mini": 12000,  # Same limit for mini version
+    }
 
     def __init__(
         self,
@@ -75,6 +81,22 @@ class LLM:
             )
         else:
             raise ValueError(f"Unsupported backend: {self.backend}")
+
+    def _get_model_max_tokens(self) -> int:
+        """Get the maximum tokens allowed for the current model."""
+        # Only apply special limits for GPT-4o models
+        if self.model in self.MODEL_TOKEN_LIMITS:
+            return self.MODEL_TOKEN_LIMITS[self.model]
+        
+        # Default to the general MAX_TOKEN_LIMIT for all other models
+        return self.MAX_TOKEN_LIMIT
+
+    def _get_effective_token_limit(self) -> int:
+        """Get the effective token limit considering model constraints."""
+        model_limit = self._get_model_max_tokens()
+        if self.token_limit is None:
+            return model_limit
+        return min(self.token_limit, model_limit)
 
     @staticmethod
     def _check_pydantic_ai():
@@ -149,6 +171,10 @@ class LLM:
         
         # Calculate content tokens
         content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, self.MAX_TOKEN_LIMIT)
+        
+        # Apply model-specific limit
+        model_limit = self._get_model_max_tokens()
+        content_tokens = min(content_tokens, model_limit)
         
         # Calculate thinking budget (1/3 of content tokens)
         thinking_tokens = int(page_count * self.DEFAULT_PAGE_TOKENS * self.DEFAULT_THINKING_RATIO)
@@ -271,7 +297,7 @@ class LLM:
             "temperature": self.temperature,
             "response_model": response_model,
             "max_retries": 1,
-            "max_tokens": self.token_limit,
+            "max_tokens": self._get_effective_token_limit(),
             "timeout": self.TIMEOUT,
         }
         
@@ -338,7 +364,7 @@ class LLM:
                     raw_response = litellm.completion(
                         model=self.model,
                         messages=messages,
-                        max_tokens=self.token_limit,
+                        max_tokens=self._get_effective_token_limit(),
                         thinking=thinking_param,
                     )
                 except Exception as e:
@@ -348,7 +374,7 @@ class LLM:
                         raw_response = litellm.completion(
                             model=self.model,
                             messages=messages,
-                            max_tokens=self.token_limit,
+                            max_tokens=self._get_effective_token_limit(),
                         )
                     else:
                         raise e
@@ -356,7 +382,7 @@ class LLM:
                 raw_response = litellm.completion(
                     model=self.model,
                     messages=messages,
-                    max_tokens=self.token_limit,
+                    max_tokens=self._get_effective_token_limit(),
                 )
         return raw_response.choices[0].message.content
 
