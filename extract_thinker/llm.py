@@ -32,11 +32,10 @@ class LLM:
     MAX_TOKEN_LIMIT = 120000  # Maximum token limit (for Claude 3.7 Sonnet)
     MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
     MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
-    
+
     # Model-specific token limits
     MODEL_TOKEN_LIMITS = {
         "gpt-4o": 12000,  # Reasonable middle ground for GPT-4o
-        "gpt-4o-mini": 12000,  # Same limit for mini version
     }
 
     def __init__(
@@ -46,7 +45,7 @@ class LLM:
         backend: LLMEngine = LLMEngine.DEFAULT
     ):
         """Initialize LLM with specified backend.
-        
+
         Args:
             model: The model name (e.g. "gpt-4", "claude-3")
             token_limit: Optional maximum tokens
@@ -74,29 +73,13 @@ class LLM:
             from pydantic_ai.models import KnownModelName
             from typing import cast
             import asyncio
-            
+
             self.client = None
             self.agent = Agent(
                 cast(KnownModelName, self.model)
             )
         else:
             raise ValueError(f"Unsupported backend: {self.backend}")
-
-    def _get_model_max_tokens(self) -> int:
-        """Get the maximum tokens allowed for the current model."""
-        # Only apply special limits for GPT-4o models
-        if self.model in self.MODEL_TOKEN_LIMITS:
-            return self.MODEL_TOKEN_LIMITS[self.model]
-        
-        # Default to the general MAX_TOKEN_LIMIT for all other models
-        return self.MAX_TOKEN_LIMIT
-
-    def _get_effective_token_limit(self) -> int:
-        """Get the effective token limit considering model constraints."""
-        model_limit = self._get_model_max_tokens()
-        if self.token_limit is None:
-            return model_limit
-        return min(self.token_limit, model_limit)
 
     @staticmethod
     def _check_pydantic_ai():
@@ -121,6 +104,15 @@ class LLM:
                 "Please install it with `pip install pydantic-ai`."
             )
 
+    def _get_model_max_tokens(self) -> int:
+        """Get the maximum tokens allowed for the current model."""
+        # Only apply special limit for GPT-4o
+        if self.model == "gpt-4o":
+            return self.MODEL_TOKEN_LIMITS["gpt-4o"]
+
+        # Default to the general MAX_TOKEN_LIMIT for all other models
+        return self.MAX_TOKEN_LIMIT
+
     def load_router(self, router: Router) -> None:
         """Load a LiteLLM router for model fallbacks."""
         if self.backend != LLMEngine.DEFAULT:
@@ -129,7 +121,7 @@ class LLM:
 
     def set_temperature(self, temperature: float) -> None:
         """Set the temperature for LLM requests.
-        
+
         Args:
             temperature (float): Temperature value between 0 and 1
         """
@@ -137,7 +129,7 @@ class LLM:
 
     def set_thinking(self, is_thinking: bool) -> None:
         """Set whether the LLM should handle thinking.
-        
+
         Args:
             is_thinking (bool): Whether to enable thinking
         """
@@ -146,10 +138,10 @@ class LLM:
 
     def set_dynamic(self, is_dynamic: bool) -> None:
         """Set whether the LLM should handle dynamic content.
-        
+
         When dynamic is True, the LLM will attempt to parse and validate JSON responses.
         This is useful for handling structured outputs like masking mappings.
-        
+
         Args:
             is_dynamic (bool): Whether to enable dynamic content handling
         """
@@ -157,32 +149,28 @@ class LLM:
 
     def set_page_count(self, page_count: int) -> None:
         """Set the page count to calculate token limits for thinking.
-        
+
         Each page is assumed to have DEFAULT_PAGE_TOKENS tokens (text + image).
         Thinking budget is calculated as DEFAULT_THINKING_RATIO of the content tokens.
-        
+
         Args:
             page_count (int): Number of pages in the document
         """
         if page_count <= 0:
             raise ValueError("Page count must be a positive integer")
-            
+
         self.page_count = page_count
-        
+
         # Calculate content tokens
         content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, self.MAX_TOKEN_LIMIT)
-        
-        # Apply model-specific limit
-        model_limit = self._get_model_max_tokens()
-        content_tokens = min(content_tokens, model_limit)
-        
+
         # Calculate thinking budget (1/3 of content tokens)
         thinking_tokens = int(page_count * self.DEFAULT_PAGE_TOKENS * self.DEFAULT_THINKING_RATIO)
-        
+
         # Apply min/max constraints
         thinking_tokens = max(thinking_tokens, self.MIN_THINKING_BUDGET)
         thinking_tokens = min(thinking_tokens, self.MAX_THINKING_BUDGET)
-        
+
         # Update token limit and thinking budget
         self.token_limit = content_tokens
         self.thinking_budget = thinking_tokens
@@ -203,21 +191,16 @@ class LLM:
                 except RuntimeError:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                
+
                 result = loop.run_until_complete(
                     self.agent.run(
-                        combined_prompt, 
+                        combined_prompt,
                         result_type=response_model if response_model else str
                     )
                 )
                 return result.data
             except Exception as e:
                 raise ValueError(f"Failed to extract from source: {str(e)}")
-
-        # Uncomment the following lines if you need to calculate max_tokens
-        # contents = map(lambda message: message['content'], messages)
-        # all_contents = ' '.join(contents)
-        # max_tokens = num_tokens_from_string(all_contents)
 
         # if is sync, response model is None if dynamic true and used for dynamic parsing after llm request
         request_model = None if self.is_dynamic else response_model
@@ -246,7 +229,7 @@ class LLM:
         content = response.choices[0].message.content
         if self.is_dynamic:
             return extract_thinking_json(content, response_model)
-            
+
         return content
 
     def _request_with_router(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
@@ -288,7 +271,7 @@ class LLM:
                 temperature=self.temperature,
                 timeout=self.TIMEOUT,
             )
-            
+
     def _request_direct(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
         """Handle direct request with or without thinking parameter"""
         base_params = {
@@ -297,10 +280,10 @@ class LLM:
             "temperature": self.temperature,
             "response_model": response_model,
             "max_retries": 1,
-            "max_tokens": self._get_effective_token_limit(),
+            "max_tokens": self._get_model_max_tokens(),  # <- capped max tokens here
             "timeout": self.TIMEOUT,
         }
-        
+
         if self.is_thinking:
             # Try with thinking parameter
             thinking_param = {
@@ -325,6 +308,8 @@ class LLM:
 
     def raw_completion(self, messages: List[Dict[str, str]]) -> str:
         """Make raw completion request without response model."""
+        max_tokens = self._get_model_max_tokens()  # <- capped max tokens here
+
         if self.router:
             if self.is_thinking:
                 # Add thinking parameter for supported models
@@ -364,7 +349,7 @@ class LLM:
                     raw_response = litellm.completion(
                         model=self.model,
                         messages=messages,
-                        max_tokens=self._get_effective_token_limit(),
+                        max_tokens=max_tokens,
                         thinking=thinking_param,
                     )
                 except Exception as e:
@@ -374,7 +359,7 @@ class LLM:
                         raw_response = litellm.completion(
                             model=self.model,
                             messages=messages,
-                            max_tokens=self._get_effective_token_limit(),
+                            max_tokens=max_tokens,
                         )
                     else:
                         raise e
@@ -382,7 +367,7 @@ class LLM:
                 raw_response = litellm.completion(
                     model=self.model,
                     messages=messages,
-                    max_tokens=self._get_effective_token_limit(),
+                    max_tokens=max_tokens,
                 )
         return raw_response.choices[0].message.content
 
