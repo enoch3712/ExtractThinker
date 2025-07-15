@@ -68,6 +68,165 @@ class TestDocumentLoaderAzureForm(BaseDocumentLoaderTest):
         assert "Invalid model ID" in str(exc_info.value)
         assert "invalid-model" in str(exc_info.value)
 
+    def test_azure_config_advanced_features(self):
+        """Test AzureConfig validation for advanced features."""
+        # Test valid features
+        config_with_features = AzureConfig(
+            subscription_key="test",
+            endpoint="test",
+            features=["ocrHighResolution", "formulas", "barcodes"]
+        )
+        assert config_with_features.has_high_resolution_ocr
+        assert config_with_features.has_formula_extraction
+        assert not config_with_features.has_font_extraction
+        assert config_with_features.has_barcode_extraction
+
+        # Test all valid features
+        all_features = [
+            "ocrHighResolution",
+            "formulas", 
+            "styleFont",
+            "barcodes",
+            "languages",
+            "keyValuePairs",
+            "queryFields",
+            "searchablePDF"
+        ]
+        config_all_features = AzureConfig(
+            subscription_key="test",
+            endpoint="test",
+            features=all_features
+        )
+        assert config_all_features.has_high_resolution_ocr
+        assert config_all_features.has_formula_extraction
+        assert config_all_features.has_font_extraction
+        assert config_all_features.has_barcode_extraction
+
+        # Test invalid features
+        with pytest.raises(ValueError) as exc_info:
+            AzureConfig(
+                subscription_key="test",
+                endpoint="test",
+                features=["invalidFeature", "anotherInvalid"]
+            )
+        assert "Invalid features" in str(exc_info.value)
+        assert "invalidFeature" in str(exc_info.value)
+
+        # Test config without features
+        config_no_features = AzureConfig(
+            subscription_key="test",
+            endpoint="test"
+        )
+        assert not config_no_features.has_high_resolution_ocr
+        assert not config_no_features.has_formula_extraction
+        assert not config_no_features.has_font_extraction
+        assert not config_no_features.has_barcode_extraction
+
+    def test_azure_high_resolution_ocr(self, config, test_file_path):
+        """Test high resolution OCR feature."""
+        # Configure with high resolution OCR
+        config.features = ["ocrHighResolution"]
+        config.model_id = "prebuilt-read"  # Use read model for OCR
+        
+        loader = DocumentLoaderAzureForm(config)
+        
+        # Verify configuration
+        assert loader.config.has_high_resolution_ocr
+        assert not loader.config.has_formula_extraction
+        
+        # Process document
+        pages = loader.load(test_file_path)
+        
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        assert "content" in pages[0]
+        assert isinstance(pages[0]["content"], str)
+        assert len(pages[0]["content"]) > 0
+        print(f"High-res OCR extracted {len(pages[0]['content'])} characters")
+
+    def test_azure_multiple_advanced_features(self, config, test_file_path):
+        """Test multiple advanced features together."""
+        # Configure with multiple features
+        config.features = [
+            "ocrHighResolution",
+            "barcodes",
+            "languages"
+        ]
+        config.model_id = "prebuilt-layout"  # Use layout for comprehensive analysis
+        
+        loader = DocumentLoaderAzureForm(config)
+        
+        # Verify configuration
+        assert loader.config.has_high_resolution_ocr
+        assert loader.config.has_barcode_extraction
+        assert not loader.config.has_formula_extraction
+        assert not loader.config.has_font_extraction
+        
+        # Process document
+        pages = loader.load(test_file_path)
+        
+        assert isinstance(pages, list)
+        assert len(pages) > 0
+        assert "content" in pages[0]
+        
+        # Check for advanced features in output
+        page = pages[0]
+        assert "content" in page
+        assert "tables" in page
+        assert "forms" in page
+        
+        # These fields may or may not be present depending on document content
+        # but they should be accessible if the features are enabled
+        if "barcodes" in page:
+            assert isinstance(page["barcodes"], list)
+        if "languages" in page:
+            assert isinstance(page["languages"], list)
+
+    def test_azure_loader_with_individual_feature_parameters(self):
+        """Test loader initialization with individual feature parameters."""
+        loader = DocumentLoaderAzureForm(
+            subscription_key=os.getenv("AZURE_SUBSCRIPTION_KEY"),
+            endpoint=os.getenv("AZURE_ENDPOINT"),
+            model_id="prebuilt-read",
+            features=["ocrHighResolution", "barcodes"]
+        )
+        
+        assert isinstance(loader.config, AzureConfig)
+        assert loader.config.has_high_resolution_ocr
+        assert loader.config.has_barcode_extraction
+        assert not loader.config.has_formula_extraction
+        assert not loader.config.has_font_extraction
+
+    def test_azure_from_credentials_with_features(self):
+        """Test from_credentials class method with advanced features."""
+        loader = DocumentLoaderAzureForm.from_credentials(
+            subscription_key=os.getenv("AZURE_SUBSCRIPTION_KEY"),
+            endpoint=os.getenv("AZURE_ENDPOINT"),
+            features=["ocrHighResolution"],
+            model_id="prebuilt-read"
+        )
+        
+        assert isinstance(loader.config, AzureConfig)
+        assert loader.config.has_high_resolution_ocr
+        assert loader.config.model_id == "prebuilt-read"
+        assert not loader.config.has_formula_extraction
+
+    def test_available_features_constant(self):
+        """Test that AVAILABLE_FEATURES constant contains expected features."""
+        expected_features = {
+            "ocrHighResolution",
+            "formulas",
+            "styleFont", 
+            "barcodes",
+            "languages",
+            "keyValuePairs",
+            "queryFields",
+            "searchablePDF"
+        }
+        
+        actual_features = set(AzureConfig.AVAILABLE_FEATURES)
+        assert expected_features == actual_features
+
     def test_azure_read_model(self, config, test_file_path):
         """Test OCR/Read model extraction."""
         config.model_id = "prebuilt-read"

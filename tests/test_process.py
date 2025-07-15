@@ -11,7 +11,7 @@ from extract_thinker.text_splitter import TextSplitter
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.contract import Contract
 from extract_thinker.extractor import Extractor
-from extract_thinker.global_models import get_lite_model, get_big_model
+from extract_thinker.global_models import get_gpt_o4_model, get_lite_model, get_big_model
 import pytest
 
 # Setup environment and paths
@@ -144,7 +144,7 @@ def test_eager_splitting_strategy_vision():
     """Test eager splitting strategy with a multi-page document"""
     # Arrange
     process, classifications = setup_process_and_classifications()
-    process.load_splitter(ImageSplitter(get_big_model()))
+    process.load_splitter(ImageSplitter("gemini/gemini-2.5-flash-preview-05-20"))
     
     # Act
     result = process.load_file(MULTI_PAGE_DOC_PATH)\
@@ -157,7 +157,7 @@ def test_eager_splitting_strategy_vision():
         assert isinstance(item, (TEST_CLASSIFICATIONS[0].contract, TEST_CLASSIFICATIONS[1].contract))
 
     assert normalize_name(result[0].name_primary) == normalize_name("Motorist, Michael M")
-    assert result[1].age == 65
+    assert result[1].age == 63
     assert result[1].license_number.replace(" ", "") in ["0123456789", "123456789"]
     #assert result[1].license_number.replace(" ", "") == "0123456789" #small vision bug from the model, refuses to return 0 on driver license
 

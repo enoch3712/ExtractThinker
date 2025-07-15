@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "extract_thinker"
-version = "0.1.13"
+version = "0.1.14"
 description = "Library to extract data from files and documents agnositicaly using LLMs"
 authors = ["Júlio Almeida <enoch3712@gmail.com>"]
 readme = "README.md"
@@ -19,7 +19,6 @@ tiktoken = {version = ">=0.8.0", python = ">=3.9,<3.13"}
 python-magic = ">=0.4.27"
 playwright = ">=1.52.0"
 libmagic = "*"
-easyocr = "^1.7.1"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^7.1.2"

@@ -13,6 +13,9 @@ class ConcatenationHandler(CompletionHandler):
         
     def _is_valid_json_continuation(self, response: str) -> bool:
         """Check if the response is a valid JSON continuation."""
+        if not response:
+            return False
+        
         cleaned_response = response.strip()
         
         # Check if response contains JSON markers

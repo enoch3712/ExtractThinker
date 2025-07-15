@@ -32,6 +32,7 @@ class LLM:
     MAX_TOKEN_LIMIT = 120000  # Maximum token limit (for Claude 3.7 Sonnet)
     MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
     MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
+    DEFAULT_OUTPUT_TOKENS = 32000
 
     # Model-specific token limits
     MODEL_TOKEN_LIMITS = {
@@ -60,6 +61,7 @@ class LLM:
         self.is_thinking = False  # Initialize is_thinking flag
         self.page_count = None  # Initialize page count
         self.thinking_budget = self.THINKING_BUDGET_TOKENS  # Default thinking budget
+        self.thinking_token_limit: Optional[int] = None
 
         if self.backend == LLMEngine.DEFAULT:
             self.client = instructor.from_litellm(
@@ -172,7 +174,7 @@ class LLM:
         thinking_tokens = min(thinking_tokens, self.MAX_THINKING_BUDGET)
 
         # Update token limit and thinking budget
-        self.token_limit = content_tokens
+        self.thinking_token_limit = content_tokens
         self.thinking_budget = thinking_tokens
 
     def request(
@@ -234,6 +236,20 @@ class LLM:
 
     def _request_with_router(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
         """Handle request using router with or without thinking parameter"""
+        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        if self.token_limit is not None:
+            max_tokens = self.token_limit
+        elif self.is_thinking:
+            max_tokens = self.thinking_token_limit
+        
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "response_model": response_model,
+            "temperature": self.temperature,
+            "timeout": self.TIMEOUT,
+            "max_completion_tokens": max_tokens,
+        }
         if self.is_thinking:
             # Add thinking parameter for supported models
             thinking_param = {
@@ -274,6 +290,12 @@ class LLM:
 
     def _request_direct(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
         """Handle direct request with or without thinking parameter"""
+        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        if self.token_limit is not None:
+            max_tokens = self.token_limit
+        elif self.is_thinking:
+            max_tokens = self.thinking_token_limit
+
         base_params = {
             "model": self.model,
             "messages": messages,
@@ -285,59 +307,24 @@ class LLM:
         }
 
         if self.is_thinking:
-            # Try with thinking parameter
-            thinking_param = {
-                "type": "enabled",
-                "budget_tokens": self.thinking_budget
-            }
-            try:
-                return self.client.chat.completions.create(
-                    **base_params,
-                    thinking=thinking_param,
-                )
-            except Exception as e:
-                # If thinking parameter causes an error, try without it
-                if "property 'thinking' is unsupported" in str(e):
-                    print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
-                    return self.client.chat.completions.create(**base_params)
-                else:
-                    raise e
-        else:
-            # Normal request without thinking parameter
-            return self.client.chat.completions.create(**base_params)
+            if litellm.supports_reasoning(self.model):
+                # Try with thinking parameter
+                thinking_param = {
+                    "type": "enabled",
+                    "budget_tokens": self.thinking_budget
+                }
+                base_params["thinking"] = thinking_param
+            else:
+                print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+        
+        return self.client.chat.completions.create(**base_params)
 
     def raw_completion(self, messages: List[Dict[str, str]]) -> str:
         """Make raw completion request without response model."""
         max_tokens = self._get_model_max_tokens()  # <- capped max tokens here
 
         if self.router:
-            if self.is_thinking:
-                # Add thinking parameter for supported models
-                thinking_param = {
-                    "type": "enabled",
-                    "budget_tokens": self.thinking_budget
-                }
-                try:
-                    raw_response = self.router.completion(
-                        model=self.model,
-                        messages=messages,
-                        thinking=thinking_param,
-                    )
-                except Exception as e:
-                    # If thinking parameter causes an error, try without it
-                    if "property 'thinking' is unsupported" in str(e):
-                        print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
-                        raw_response = self.router.completion(
-                            model=self.model,
-                            messages=messages,
-                        )
-                    else:
-                        raise e
-            else:
-                raw_response = self.router.completion(
-                    model=self.model,
-                    messages=messages,
-                )
+            raw_response = self.router.completion(**params)
         else:
             if self.is_thinking:
                 # Add thinking parameter for supported models
