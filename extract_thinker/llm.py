@@ -33,6 +33,11 @@ class LLM:
     MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
     MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
     DEFAULT_OUTPUT_TOKENS = 32000
+    
+    # Model-specific token limits - using 12000 as middle ground for GPT-4o
+    MODEL_TOKEN_LIMITS = {
+        "gpt-4o": 12000,
+    }
 
     def __init__(
         self,
@@ -219,11 +224,11 @@ class LLM:
 
     def _request_with_router(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
         """Handle request using router with or without thinking parameter"""
-        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        max_tokens = self._get_model_max_tokens()
         if self.token_limit is not None:
-            max_tokens = self.token_limit
+            max_tokens = min(self.token_limit, max_tokens)
         elif self.is_thinking:
-            max_tokens = self.thinking_token_limit
+            max_tokens = min(self.thinking_token_limit, max_tokens) if self.thinking_token_limit else max_tokens
         
         params = {
             "model": self.model,
@@ -248,11 +253,11 @@ class LLM:
             
     def _request_direct(self, messages: List[Dict[str, str]], response_model: Optional[str]) -> Any:
         """Handle direct request with or without thinking parameter"""
-        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        max_tokens = self._get_model_max_tokens()
         if self.token_limit is not None:
-            max_tokens = self.token_limit
+            max_tokens = min(self.token_limit, max_tokens)
         elif self.is_thinking:
-            max_tokens = self.thinking_token_limit
+            max_tokens = min(self.thinking_token_limit, max_tokens) if self.thinking_token_limit else max_tokens
 
         base_params = {
             "model": self.model,
@@ -293,11 +298,11 @@ class LLM:
             except Exception as e:
                 raise ValueError(f"Failed to extract from source: {str(e)}")
 
-        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        max_tokens = self._get_model_max_tokens()
         if self.token_limit is not None:
-            max_tokens = self.token_limit
+            max_tokens = min(self.token_limit, max_tokens)
         elif self.is_thinking:
-            max_tokens = self.thinking_token_limit
+            max_tokens = min(self.thinking_token_limit, max_tokens) if self.thinking_token_limit else max_tokens
 
         params = {
             "model": self.model,
@@ -326,3 +331,12 @@ class LLM:
     def set_timeout(self, timeout_ms: int) -> None:
         """Set the timeout value for LLM requests in milliseconds."""
         self.TIMEOUT = timeout_ms
+
+    def _get_model_max_tokens(self) -> int:
+        """Get the maximum tokens allowed for the current model."""
+        # Only apply special limit for GPT-4o
+        if self.model == "gpt-4o":
+            return self.MODEL_TOKEN_LIMITS["gpt-4o"]
+
+        # Default to the general MAX_TOKEN_LIMIT for all other models
+        return self.MAX_TOKEN_LIMIT
