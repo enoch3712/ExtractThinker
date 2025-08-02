@@ -322,6 +322,52 @@ class LLM:
             raw_response = litellm.completion(**params)
         
         return raw_response.choices[0].message.content
+    
+    def raw_completion_complete(self, messages: List[Dict[str, str]]) -> str:
+        """Make raw completion request without response model."""
+        if self.backend == LLMEngine.PYDANTIC_AI:
+            # Combine messages into a single prompt
+            combined_prompt = " ".join([m["content"] for m in messages])
+            try:
+                result = asyncio.run(
+                    self.agent.run(
+                        combined_prompt, 
+                        result_type=str
+                    )
+                )
+                return result.data
+            except Exception as e:
+                raise ValueError(f"Failed to extract from source: {str(e)}")
+
+        max_tokens = self.DEFAULT_OUTPUT_TOKENS
+        if self.token_limit is not None:
+            max_tokens = self.token_limit
+        elif self.is_thinking:
+            max_tokens = self.thinking_token_limit
+
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "max_completion_tokens": max_tokens,
+        }
+
+        if self.is_thinking:
+            if litellm.supports_reasoning(self.model):
+                # Add thinking parameter for supported models
+                thinking_param = {
+                    "type": "enabled",
+                    "budget_tokens": self.thinking_budget
+                }
+                params["thinking"] = thinking_param
+            else:
+                print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
+        
+        if self.router:
+            raw_response = self.router.completion(**params)
+        else:
+            raw_response = litellm.completion(**params)
+        
+        return raw_response.choices[0]
 
     def set_timeout(self, timeout_ms: int) -> None:
         """Set the timeout value for LLM requests in milliseconds."""
