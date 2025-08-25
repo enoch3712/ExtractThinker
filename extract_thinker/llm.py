@@ -6,22 +6,35 @@ from litellm import Router
 from extract_thinker.llm_engine import LLMEngine
 from extract_thinker.utils import add_classification_structure, extract_thinking_json
 
-# Add these constants at the top of the file, after the imports
-DYNAMIC_PROMPT_TEMPLATE = """Please provide your thinking process within <think> tags, followed by your JSON output.
+# Helper to build the dynamic prompt used when `is_dynamic=True`.
+# We expose it as a standalone function so that callers (or subclasses)
+# can supply their own variants if needed.
 
-JSON structure:
-{prompt}
 
-OUTPUT example:
-<think>
-Your step-by-step reasoning and analysis goes here...
-</think>
+def build_dynamic_prompt(structure: str, *, think_tag: str = "think") -> str:
+    """Return the dynamic prompt used for classification style requests.
 
-##JSON OUTPUT
-{{
-    ...
-}}
-"""
+    Args:
+        structure: The JSON structure/fields to be returned by the model.
+        think_tag: The XML-style tag that should wrap the model's chain-of-thought.
+
+    This helper allows downstream users to customise the surrounding text
+    (for example, changing the tag name or adding extra instructions) rather
+    than editing a hard-coded string inside *llm.py*.
+    """
+
+    return (
+        f"Please provide your thinking process within <{think_tag}> tags, "
+        "followed by your JSON output.\n\n"
+        "JSON structure:\n"
+        f"{structure}\n\n"
+        "OUTPUT example:\n"
+        f"<{think_tag}>\n"
+        "Your step-by-step reasoning and analysis goes here...\n"
+        f"</{think_tag}>\n\n"
+        "##JSON OUTPUT\n"
+        "{\n    ...\n}"  # placeholder keeps JSON fence out of model context
+    )
 
 class LLM:
     TIMEOUT = 3000  # Timeout in milliseconds
@@ -33,11 +46,11 @@ class LLM:
     MAX_THINKING_BUDGET = 64000  # Maximum thinking budget
     MIN_THINKING_BUDGET = 1200  # Minimum thinking budget
     DEFAULT_OUTPUT_TOKENS = 32000
-    
-    # Model-specific token limits - using 12000 as middle ground for GPT-4o
-    MODEL_TOKEN_LIMITS = {
-        "gpt-4o": 12000,
-    }
+
+    # A single default completion-token limit that is accepted by the vast
+    # majority of models.  If a model supports more (or you need fewer), pass
+    # `token_limit=` when instantiating `LLM` to override this value.
+    DEFAULT_MAX_COMPLETION_TOKENS = 8000
 
     def __init__(
         self,
@@ -199,7 +212,7 @@ class LLM:
         working_messages = messages.copy()
         if self.is_dynamic and response_model:
             structure = add_classification_structure(response_model)
-            prompt = DYNAMIC_PROMPT_TEMPLATE.format(prompt=structure)
+            prompt = build_dynamic_prompt(structure)
             working_messages.append({
                 "role": "system",
                 "content": prompt
@@ -333,10 +346,11 @@ class LLM:
         self.TIMEOUT = timeout_ms
 
     def _get_model_max_tokens(self) -> int:
-        """Get the maximum tokens allowed for the current model."""
-        # Only apply special limit for GPT-4o
-        if self.model == "gpt-4o":
-            return self.MODEL_TOKEN_LIMITS["gpt-4o"]
+        """Return the default maximum completion-token limit.
 
-        # Default to the general MAX_TOKEN_LIMIT for all other models
-        return self.MAX_TOKEN_LIMIT
+        This constant (DEFAULT_MAX_COMPLETION_TOKENS) is meant to work for ~99 %
+        of models.  If you need a different value, supply `token_limit=` when
+        creating the `LLM` instance.
+        """
+
+        return self.DEFAULT_MAX_COMPLETION_TOKENS
