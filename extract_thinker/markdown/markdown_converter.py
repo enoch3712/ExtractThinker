@@ -556,9 +556,9 @@ Your response should ONLY include the formatted Markdown content without any add
                  # We have both LLM and DocumentLoader
                  
                  # Configure document loader for vision if needed
-                 if vision and hasattr(self.document_loader, 'set_vision_mode'):
+                 if hasattr(self.document_loader, 'set_vision_mode'):
                      try:
-                         self.document_loader.set_vision_mode(True)
+                         self.document_loader.set_vision_mode(vision)
                      except Exception as e:
                          print(f"Warning: Failed to set vision mode on document loader: {e}")
                  
@@ -697,9 +697,9 @@ Your response should ONLY include the formatted Markdown content without any add
                  raise ValueError("Document loader is required.")
 
             # Configure document loader for vision if needed and supported
-            if vision and hasattr(self.document_loader, 'set_vision_mode'):
+            if hasattr(self.document_loader, 'set_vision_mode'):
                 try:
-                    self.document_loader.set_vision_mode(True)
+                    self.document_loader.set_vision_mode(vision)
                 except Exception as e:
                     print(f"Warning: Failed to set vision mode on document loader: {e}")
 
