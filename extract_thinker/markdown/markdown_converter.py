@@ -8,6 +8,9 @@ from extract_thinker.llm import LLM
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.utils import encode_image, json_to_formatted_string, extract_thinking_json
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ContentItem(BaseModel):
     """Represents a single piece of extracted content with certainty."""
@@ -176,7 +179,7 @@ Your response should ONLY include the formatted Markdown content without any add
                     # If setting vision mode fails, we probably can't proceed as expected.
                     raise ValueError(f"Failed to set vision mode on document loader: {e}") from e
             else:
-                print("Warning: Document loader does not have set_vision_mode. Assuming it handles vision implicitly.")
+                logger.warning("Document loader does not have set_vision_mode. Assuming it handles vision implicitly.")
 
             pages_data = self.document_loader.load(source)
             if not isinstance(pages_data, list):
@@ -208,7 +211,7 @@ Your response should ONLY include the formatted Markdown content without any add
                     try:
                         result_strings[index] = future.result()
                     except Exception as exc:
-                        print(f'Page {index + 1} processing failed: {exc}')
+                        logger.error('Page %d processing failed: %s', index + 1, exc)
                         result_strings[index] = f"<!-- Error processing page {index + 1}: {exc} -->"
 
             return result_strings
@@ -293,7 +296,7 @@ Your response should ONLY include the formatted Markdown content without any add
             placeholders_found = re.findall(placeholder_pattern, processed_text)
 
             if placeholders_found:
-                print(f"Detected {len(placeholders_found)} image extraction placeholder(s). Adding specific instructions to content.")
+                logger.info("Detected %d image extraction placeholder(s). Adding specific instructions to content.", len(placeholders_found))
                 # Construct an instruction to append *after* the main text
                 instruction = (
                     "\n\n---\n"
@@ -354,7 +357,7 @@ Your response should ONLY include the formatted Markdown content without any add
             raise ValueError("LLM is required for structured extraction but not configured.")
 
         if not isinstance(page_data, dict):
-            print(f"Warning: Unexpected page data type: {type(page_data)}. Skipping LLM processing for this page.")
+            logger.warning("Unexpected page data type: %s. Skipping LLM processing for this page.", type(page_data))
             return f"<!-- Error: Unexpected page data type: {type(page_data)} -->"
 
         messages = self._build_messages(self._build_message_content(page_data, vision=True))
@@ -364,7 +367,7 @@ Your response should ONLY include the formatted Markdown content without any add
             raw_response = self.llm.raw_completion(messages=messages)
             return extract_thinking_json(raw_response, PageContent)
         except Exception as e:
-            print(f"LLM request failed for page: {e}")
+            logger.error("LLM request failed for page: %s", e)
             raise
 
     def _process_content_data(
@@ -522,9 +525,9 @@ Your response should ONLY include the formatted Markdown content without any add
                             }
                         })
                     else:
-                         print(f"Warning: Could not get base64 for image item: {type(img)}")
+                         logger.warning("Could not get base64 for image item: %s", type(img))
                 except Exception as e:
-                     print(f"Warning: Error processing image item {type(img)}: {e}")
+                     logger.warning("Error processing image item %s: %s", type(img), e)
 
     # --- Copied Methods from Extractor --- END ---
 
@@ -560,7 +563,7 @@ Your response should ONLY include the formatted Markdown content without any add
                      try:
                          self.document_loader.set_vision_mode(vision)
                      except Exception as e:
-                         print(f"Warning: Failed to set vision mode on document loader: {e}")
+                         logger.warning("Failed to set vision mode on document loader: %s", e)
                  
                  # Load the document
                  pages_data = self.document_loader.load(source)
@@ -581,7 +584,7 @@ Your response should ONLY include the formatted Markdown content without any add
                  if vision:
                      has_images = any(isinstance(page, dict) and (page.get('image') or page.get('images')) for page in pages_data)
                      if not has_images:
-                         print("Warning: Vision processing enabled but no images found. Will process as text-only.")
+                         logger.warning("Vision processing enabled but no images found. Will process as text-only.")
                  
                  # Process pages in parallel
                  markdown_parts = [None] * len(pages_data)  # Pre-allocate list
@@ -595,7 +598,7 @@ Your response should ONLY include the formatted Markdown content without any add
                          try:
                              markdown_parts[index] = future.result()
                          except Exception as exc:
-                             print(f'Page {index + 1} processing failed: {exc}')
+                             logger.error('Page %d processing failed: %s', index + 1, exc)
                              markdown_parts[index] = f"<!-- Error processing page {index + 1}: {exc} -->"
                  
                  # Return the list of markdown parts instead of joining them
@@ -634,13 +637,13 @@ Your response should ONLY include the formatted Markdown content without any add
                      markdown_content = self.llm.request(messages=messages)
                      return [markdown_content]
                  except Exception as e:
-                     print(f"LLM request failed: {e}")
+                     logger.error("LLM request failed: %s", e)
                      raise
                  
          except Exception as e:
-             print(f"Error in markdown conversion: {e}")
+             logger.error("Error in markdown conversion: %s", e)
              if self.document_loader:
-                 print("Falling back to basic conversion.")
+                 logger.info("Falling back to basic conversion.")
                  # Call basic conversion but convert its result to a list too
                  basic_result = self._basic_to_markdown(source, vision=vision, pages=pages)
                  return [basic_result]
@@ -664,7 +667,7 @@ Your response should ONLY include the formatted Markdown content without any add
             raise ValueError("LLM is required for markdown extraction but not configured.")
 
         if not isinstance(page_data, dict):
-            print(f"Warning: Unexpected page data type: {type(page_data)}. Skipping LLM processing for this page.")
+            logger.warning("Unexpected page data type: %s. Skipping LLM processing for this page.", type(page_data))
             return f"<!-- Error: Unexpected page data type: {type(page_data)} -->"
 
         # Use structured=False to get only Markdown content without JSON
@@ -675,7 +678,7 @@ Your response should ONLY include the formatted Markdown content without any add
             markdown_content = self.llm.request(messages=messages)
             return markdown_content.choices[0].message.content
         except Exception as e:
-            print(f"LLM request failed for page: {e}")
+            logger.error("LLM request failed for page: %s", e)
             raise
 
     def _basic_to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> str:
@@ -701,7 +704,7 @@ Your response should ONLY include the formatted Markdown content without any add
                 try:
                     self.document_loader.set_vision_mode(vision)
                 except Exception as e:
-                    print(f"Warning: Failed to set vision mode on document loader: {e}")
+                    logger.warning("Failed to set vision mode on document loader: %s", e)
 
             pages_data = self.document_loader.load(source)
             if not isinstance(pages_data, list):
@@ -728,7 +731,7 @@ Your response should ONLY include the formatted Markdown content without any add
                     try:
                         markdown_parts[index] = future.result()
                     except Exception as exc:
-                        print(f'Basic Page {index + 1} conversion failed: {exc}')
+                        logger.error('Basic page %d conversion failed: %s', index + 1, exc)
                         markdown_parts[index] = f"\n\n<!-- Error converting page {index + 1}: {exc} -->\n\n"
 
             return "\n\n".join(part for part in markdown_parts if part)
@@ -743,7 +746,7 @@ Your response should ONLY include the formatted Markdown content without any add
             vision: If True, include the first image in Markdown format.
         """
         if not isinstance(page_data, dict):
-            print(f"Warning: Unexpected page data type: {type(page_data)}. Converting to string.")
+            logger.warning("Unexpected page data type: %s. Converting to string.", type(page_data))
             return str(page_data)
 
         text_content = page_data.get("content", "")
@@ -760,9 +763,9 @@ Your response should ONLY include the formatted Markdown content without any add
                           # Basic image tag, assuming PNG
                           image_md = f"\n![Page Image](data:image/png;base64,{b64_img})\n"
                      else:
-                         print(f"Warning: Image data is not in bytes format: {type(first_image_data)}")
+                         logger.warning("Image data is not in bytes format: %s", type(first_image_data))
                  except Exception as e:
-                     print(f"Error processing image on page: {e}")
+                     logger.error("Error processing image on page: %s", e)
                      image_md = "\n<!-- Error processing image -->\n"
 
         separator = "\n" if text_content and image_md else ""

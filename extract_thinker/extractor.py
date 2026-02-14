@@ -1,7 +1,6 @@
 import asyncio
 import base64
 from typing import Any, Dict, List, Optional, IO, Type, Union, get_origin, get_type_hints, get_args, Annotated
-from instructor.batch import BatchJob
 import uuid
 from pydantic import BaseModel
 from extract_thinker.document_loader.document_loader_data import DocumentLoaderData
@@ -13,6 +12,7 @@ from extract_thinker.models.classification import Classification
 from extract_thinker.models.classification_response import ClassificationResponse, ClassificationResponseInternal
 from extract_thinker.llm import LLM
 import os
+import tempfile
 from extract_thinker.document_loader.loader_interceptor import LoaderInterceptor
 from extract_thinker.document_loader.llm_interceptor import LlmInterceptor
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -83,7 +83,11 @@ class Extractor:
             return self.document_loader
         
         # Check all registered loaders
+        checked_loaders = set()
         for loader in self.document_loaders_by_file_type.values():
+            if loader in checked_loaders:
+                continue
+            checked_loaders.add(loader)
             if loader.can_handle(source):
                 return loader
             
@@ -983,7 +987,7 @@ class Extractor:
             )
 
         # Create batch directory if it doesn't exist
-        batch_dir = os.path.join(os.getcwd(), "extract_thinker_batch")
+        batch_dir = tempfile.gettempdir()
         os.makedirs(batch_dir, exist_ok=True)
 
         # Generate unique paths if not provided
