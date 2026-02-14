@@ -6,6 +6,9 @@ from extract_thinker.completion_handler import CompletionHandler
 from extract_thinker.utils import encode_image, json_to_formatted_string, make_all_fields_optional
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ConflictResolution(BaseModel):
     resolved_fields: Dict[str, Dict[str, Any]] = Field(
@@ -58,7 +61,7 @@ class PaginationHandler(CompletionHandler):
                     results.append(result)
                 except Exception as e:
                     # Log error but continue processing other pages
-                    print(f"Error processing page: {str(e)}")
+                    logger.error("Error processing page: %s", e)
                     
         if not results:
             raise ValueError("No valid results obtained from any page")
