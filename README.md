@@ -257,6 +257,29 @@ print("Invoice Number:", result.invoice_number)
 print("Invoice Date:", result.invoice_date)
 ```
 
+### MiniMax Integration Example
+
+ExtractThinker supports [MiniMax](https://www.minimax.io/) models via the `minimax/` prefix. Set your API key and use MiniMax models for document extraction:
+
+```python
+import os
+from extract_thinker import Extractor, DocumentLoaderPyPdf, Contract
+
+os.environ["MINIMAX_API_KEY"] = "your-minimax-api-key"
+
+class InvoiceContract(Contract):
+    invoice_number: str
+    invoice_date: str
+
+extractor = Extractor()
+extractor.load_document_loader(DocumentLoaderPyPdf())
+extractor.load_llm("minimax/MiniMax-M2.7")  # or "minimax/MiniMax-M2.7-highspeed"
+
+result = extractor.extract("invoice.pdf", InvoiceContract)
+print("Invoice Number:", result.invoice_number)
+print("Invoice Date:", result.invoice_date)
+```
+
 ## 📚 Documentation and Resources
 
 - **Examples**: Check out the examples directory for Jupyter notebooks and scripts demonstrating various use cases.
@@ -271,6 +294,7 @@ ExtractThinker supports integration with multiple LLM providers:
 - **Anthropic**: Integrate with Claude models.
 - **Cohere**: Utilize Cohere's language models.
 - **Azure OpenAI**: Connect with Azure's OpenAI services.
+- **MiniMax**: Use MiniMax M2.7 / M2.5 models with up to 1M context.
 - **Local Models**: Ollama compatible models.
 
 ## ⚙️ How It Works
