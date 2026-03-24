@@ -19,3 +19,13 @@ def get_gpt_mini_model():
 def get_gpt_o4_model():
     """Return the GPT-4o model."""
     return "gpt-4o"
+
+
+def get_minimax_model():
+    """Return the MiniMax M2.7 model (1M context)."""
+    return "minimax/MiniMax-M2.7"
+
+
+def get_minimax_highspeed_model():
+    """Return the MiniMax M2.7-highspeed model (1M context, faster)."""
+    return "minimax/MiniMax-M2.7-highspeed"

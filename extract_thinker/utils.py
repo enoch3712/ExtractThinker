@@ -539,6 +539,46 @@ def extract_thinking_json(thinking_text: str, response_model: type[BaseModel]) -
     except Exception as e:
         raise ValueError(f"Failed to parse thinking output: {str(e)}\nInput text was: {thinking_text[:200]}...")
 
+MINIMAX_API_BASE = "https://api.minimax.io/v1"
+MINIMAX_MODELS = [
+    "MiniMax-M2.7",
+    "MiniMax-M2.7-highspeed",
+    "MiniMax-M2.5",
+    "MiniMax-M2.5-highspeed",
+]
+
+
+def is_minimax_model(model: str) -> bool:
+    """Check if a model string refers to a MiniMax model.
+
+    Recognises both the ``minimax/`` convenience prefix and bare model names
+    that belong to the MiniMax family (e.g. ``MiniMax-M2.7``).
+    """
+    model_lower = model.lower()
+    if model_lower.startswith("minimax/"):
+        return True
+    # Also match openai/MiniMax-* (user may have already rewritten)
+    for m in MINIMAX_MODELS:
+        if m.lower() in model_lower:
+            return True
+    return False
+
+
+def resolve_minimax_model(model: str) -> str:
+    """Rewrite a ``minimax/...`` model string to ``openai/...`` for litellm.
+
+    If the model already uses the ``openai/`` prefix or is bare, it is
+    normalised to ``openai/<model_name>`` so that litellm routes the request
+    through its OpenAI-compatible provider.
+    """
+    if model.lower().startswith("minimax/"):
+        return "openai/" + model[len("minimax/"):]
+    if model.lower().startswith("openai/"):
+        return model
+    # Bare model name
+    return "openai/" + model
+
+
 def is_vision_error(error: Exception) -> bool:
     if isinstance(error.args[0], litellm.BadRequestError):
         return True

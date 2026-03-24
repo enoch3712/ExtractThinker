@@ -1,10 +1,17 @@
 import asyncio
+import os
 from typing import List, Dict, Any, Optional
 import instructor
 import litellm
 from litellm import Router
 from extract_thinker.llm_engine import LLMEngine
-from extract_thinker.utils import add_classification_structure, extract_thinking_json
+from extract_thinker.utils import (
+    add_classification_structure,
+    extract_thinking_json,
+    is_minimax_model,
+    resolve_minimax_model,
+    MINIMAX_API_BASE,
+)
 
 # Helper to build the dynamic prompt used when `is_dynamic=True`.
 # We expose it as a standalone function so that callers (or subclasses)
@@ -56,16 +63,30 @@ class LLM:
         self,
         model: str,
         token_limit: int = None,
-        backend: LLMEngine = LLMEngine.DEFAULT
+        backend: LLMEngine = LLMEngine.DEFAULT,
+        api_base: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         """Initialize LLM with specified backend.
-        
+
         Args:
-            model: The model name (e.g. "gpt-4", "claude-3")
+            model: The model name (e.g. "gpt-4", "claude-3", "minimax/MiniMax-M2.7")
             token_limit: Optional maximum tokens
             backend: LLMBackend enum (default: LITELLM)
+            api_base: Optional custom API base URL (auto-detected for MiniMax)
+            api_key: Optional API key (auto-detected from env for MiniMax)
         """
-        self.model = model
+        # Auto-detect MiniMax models and configure accordingly
+        self._is_minimax = is_minimax_model(model)
+        if self._is_minimax:
+            self.model = resolve_minimax_model(model)
+            self.api_base = api_base or MINIMAX_API_BASE
+            self.api_key = api_key or os.environ.get("MINIMAX_API_KEY")
+        else:
+            self.model = model
+            self.api_base = api_base
+            self.api_key = api_key
+
         self.token_limit = token_limit
         self.router = None
         self.is_dynamic = False
@@ -124,9 +145,25 @@ class LLM:
             raise ValueError("Router is only supported with LITELLM backend")
         self.router = router
 
+    def _get_extra_params(self) -> Dict[str, Any]:
+        """Return provider-specific extra parameters (api_base, api_key)."""
+        params: Dict[str, Any] = {}
+        if self.api_base:
+            params["api_base"] = self.api_base
+        if self.api_key:
+            params["api_key"] = self.api_key
+        return params
+
+    def _effective_temperature(self) -> float:
+        """Return the temperature value, clamped for MiniMax models."""
+        temp = self.temperature
+        if self._is_minimax:
+            temp = max(0.0, min(temp, 1.0))
+        return temp
+
     def set_temperature(self, temperature: float) -> None:
         """Set the temperature for LLM requests.
-        
+
         Args:
             temperature (float): Temperature value between 0 and 1
         """
@@ -242,14 +279,15 @@ class LLM:
             max_tokens = min(self.token_limit, max_tokens)
         elif self.is_thinking:
             max_tokens = min(self.thinking_token_limit, max_tokens) if self.thinking_token_limit else max_tokens
-        
+
         params = {
             "model": self.model,
             "messages": messages,
             "response_model": response_model,
-            "temperature": self.temperature,
+            "temperature": self._effective_temperature(),
             "timeout": self.TIMEOUT,
             "max_completion_tokens": max_tokens,
+            **self._get_extra_params(),
         }
         if self.is_thinking:
             if litellm.supports_reasoning(self.model):
@@ -275,13 +313,14 @@ class LLM:
         base_params = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
+            "temperature": self._effective_temperature(),
             "response_model": response_model,
             "max_retries": 1,
             "max_completion_tokens": max_tokens,
             "timeout": self.TIMEOUT,
+            **self._get_extra_params(),
         }
-        
+
         if self.is_thinking:
             if litellm.supports_reasoning(self.model):
                 # Try with thinking parameter
@@ -321,6 +360,7 @@ class LLM:
             "model": self.model,
             "messages": messages,
             "max_completion_tokens": max_tokens,
+            **self._get_extra_params(),
         }
 
         if self.is_thinking:
@@ -333,7 +373,7 @@ class LLM:
                 params["thinking"] = thinking_param
             else:
                 print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
-        
+
         if self.router:
             raw_response = self.router.completion(**params)
         else:
