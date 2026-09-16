@@ -24,7 +24,7 @@ def test_critical_classification():
     # Setup
     document_loader = DocumentLoaderPyPdf()
     extractor = Extractor(document_loader)
-    extractor.load_llm("groq/llama-3.3-70b-versatile")
+    extractor.load_llm(os.getenv("EXTRACT_THINKER_TEST_MODEL", "groq/openai/gpt-oss-120b"))
 
     process = Process()
     process.add_classify_extractor([[extractor]])

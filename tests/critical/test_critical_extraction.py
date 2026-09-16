@@ -44,7 +44,7 @@ def test_critical_extract_with_pypdf():
 
     extractor = Extractor()
     extractor.load_document_loader(DocumentLoaderPyPdf())
-    extractor.load_llm("groq/llama-3.3-70b-versatile")
+    extractor.load_llm(os.getenv("EXTRACT_THINKER_TEST_MODEL", "groq/openai/gpt-oss-120b"))
 
     result = extractor.extract(test_file_path, InvoiceContract)
 
