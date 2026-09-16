@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+import copy
 import yaml
 from PIL import Image
 import litellm
@@ -252,15 +253,19 @@ def make_all_fields_optional(model: Any) -> Any:
     fields = {}
     for field_name, field in model.model_fields.items():
         annotation = field.annotation
+        field_info = copy.deepcopy(field)
+        field_info.default = None
+        field_info.default_factory = None
         # Check if field is already optional
         if get_origin(annotation) is not Union or type(None) not in get_args(annotation):
-            fields[field_name] = (Optional[field.annotation], None)
+            fields[field_name] = (Optional[field.annotation], field_info)
         else:
-            fields[field_name] = (field.annotation, None)
+            fields[field_name] = (field.annotation, field_info)
 
     NewModel = create_model(
         model.__name__ + "Optional",
-        __base__=model,
+        # Validate application-level invariants only after all pages are merged.
+        __config__=model.model_config,
         **fields
     )
     return NewModel

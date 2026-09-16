@@ -35,9 +35,17 @@ from .warning import filter_pydantic_v2_warnings
 from .document_loader.document_loader_mistral_ocr import DocumentLoaderMistralOCR, MistralOCRConfig
 from .document_loader.document_loader_easy_ocr import EasyOCRConfig, DocumentLoaderEasyOCR
 from .markdown.markdown_converter import MarkdownConverter, PageContent
+from .models.document_evidence import BoundingBox, DocumentRegion, Signature
+from .document_loader.document_loader_pymupdf import DocumentLoaderPyMuPDF, PyMuPDFConfig
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'BoundingBox',
+    'DocumentRegion',
+    'Signature',
+    'DocumentLoaderPyMuPDF',
+    'PyMuPDFConfig',
     'Extractor',
     'LLM',
     'DocumentLoader',

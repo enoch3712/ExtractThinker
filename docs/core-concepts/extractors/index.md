@@ -119,3 +119,15 @@ result = extractor.extract(
 Each individual page must still fit the model's context. Use an appropriate
 model, image size, and provider context configuration. Schema validation does
 not establish factual accuracy: verify critical fields against the source.
+
+Pagination preserves source-page order even when parallel requests finish in a
+different order. It rejects the document if any page fails rather than returning
+an apparently complete result with missing pages. Required fields absent from
+all pages fail final contract validation; they are not replaced with invented
+empty strings. Unresolved scalar conflicts also raise an error.
+
+Partial page schemas retain field descriptions, aliases and constraints. Custom
+contract validators run on the final merged object, when all pages are available.
+For conflicting fields, the resolution step may need context from several pages;
+that request must also fit the chosen model. Pagination does not guarantee that
+an arbitrary document fits every provider's context window.

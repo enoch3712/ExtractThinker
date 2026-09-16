@@ -279,7 +279,17 @@ class Extractor:
                 merged_content = {
                     "content": merged_text,
                     "images": merged_images,
-                    "metadata": {"num_documents": len(all_contents)}
+                    "metadata": {
+                        "num_documents": len(all_contents),
+                        "sources": [
+                            {
+                                "source_index": index + 1,
+                                "metadata": item.get("metadata", {}),
+                                **{key: item[key] for key in ("page_number", "tables", "forms", "regions", "signatures") if key in item},
+                            }
+                            for index, item in enumerate(all_contents)
+                        ],
+                    }
                 }
                 
                 # Optionally, prepend any extra content provided by the caller.
@@ -354,6 +364,7 @@ class Extractor:
 
         # If content is already in universal format, return as is
         if isinstance(content, dict) and "content" in content:
+            content = dict(content)
             # Ensure 'images' is a list
             if "image" in content and "images" not in content:
                 # Merge single 'image' into 'images'
@@ -370,9 +381,17 @@ class Extractor:
         if isinstance(content, list):
             text_content = []
             images = []
+            page_metadata = []
             
             for page in content:
                 if isinstance(page, dict):
+                    evidence = {
+                        key: page[key] for key in ("page_number", "tables", "forms", "regions", "signatures")
+                        if key in page
+                    }
+                    if evidence:
+                        evidence.setdefault("page_number", len(page_metadata) + 1)
+                    page_metadata.append(evidence)
                     # Extract text content
                     if 'content' in page:
                         # Add page content
@@ -398,7 +417,10 @@ class Extractor:
             return {
                 "content": "\n\n".join(text_content) if text_content else "",
                 "images": images,
-                "metadata": {"num_pages": len(content)}
+                "metadata": {
+                    "num_pages": len(content),
+                    **({"pages": page_metadata} if any(page_metadata) else {}),
+                }
             }
 
         # Handle string content
@@ -480,9 +502,19 @@ class Extractor:
         Returns:
             Parsed response matching response_model
         """
-        # If source is already a list, use it directly
-        if isinstance(source, list):
+        # A list of preloaded page dictionaries differs from a list of files.
+        if isinstance(source, list) and all(isinstance(page, dict) for page in source):
             content = source
+        elif isinstance(source, dict):
+            content = [source]
+        elif isinstance(source, list):
+            content = []
+            for item in source:
+                document_loader = self.get_document_loader(item)
+                if document_loader is None:
+                    raise ValueError("No suitable document loader found for a source in the list.")
+                document_loader.set_vision_mode(vision)
+                content.extend(document_loader.load(item))
         else:
             # Get appropriate document loader
             document_loader = self.get_document_loader(source)
@@ -490,7 +522,11 @@ class Extractor:
                 raise ValueError("No suitable document loader found for the input.")
 
             # Load content using list method
+            document_loader.set_vision_mode(vision)
             content = document_loader.load(source)
+
+        if not vision:
+            content = self.remove_images_from_content(content)
 
         # Handle based on strategy
         if completion_strategy == CompletionStrategy.PAGINATE:
