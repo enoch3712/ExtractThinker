@@ -66,6 +66,7 @@ nav:
           - Overview: core-concepts/process/index.md
       - Extractors: 
           - Overview: core-concepts/extractors/index.md
+          - Page Retrieval (SQLite): core-concepts/extractors/retrieval.md
           - Batch Processing: core-concepts/extractors/batch.md
           - Image & Chart Processing: core-concepts/extractors/image_charts.md
       - Splitters: 
