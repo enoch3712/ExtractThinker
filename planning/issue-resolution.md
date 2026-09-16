@@ -11,12 +11,12 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#347](https://github.com/enoch3712/ExtractThinker/issues/347) | [Enhance] To support api_version param in Document Intelligence Documen Loader | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Azure API-version forwarding tests |
 | [#326](https://github.com/enoch3712/ExtractThinker/issues/326) | [BUG] CompletionStrategy.CONCATENATE mapping | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | JSON fragment, whitespace, schema-replacement and bounded retry tests |
 | [#313](https://github.com/enoch3712/ExtractThinker/issues/313) | [Feature] Keep Tag in markdown (optional) | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | Protected source tags restored verbatim; missing/reordered tags fail |
-| [#312](https://github.com/enoch3712/ExtractThinker/issues/312) | [Feature] RAG for Extraction (SQLite). | Implemented; delivery pending | SQLite FTS5 retriever and loader wrapper; 100-page selection and full extractor prompt regression, persistence and document isolation tests |
+| [#312](https://github.com/enoch3712/ExtractThinker/issues/312) | [Feature] RAG for Extraction (SQLite). | Closed; merged in [#370](https://github.com/enoch3712/ExtractThinker/pull/370) | SQLite FTS5 retriever and loader wrapper; 100-page selection and full extractor prompt regression, persistence and document isolation tests |
 | [#311](https://github.com/enoch3712/ExtractThinker/issues/311) | [Feature] Add images, per page, to markdown | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | All source page images embedded with media types and original page labels; separate from model vision |
 | [#310](https://github.com/enoch3712/ExtractThinker/issues/310) | [Feature] Page selection for DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Common load_pages API; real PDF and cached-data selection tests |
 | [#309](https://github.com/enoch3712/ExtractThinker/issues/309) | No module named 'docling_core.types.doc.page' | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Reproducible import diagnostics, dependency repair guide, fresh SDK conversion and page/configuration regressions |
 | [#287](https://github.com/enoch3712/ExtractThinker/issues/287) | [Feature] Bounding Box Capabilities | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Source-backed normalized regions with extraction metadata propagation; PyMuPDF adapter |
-| [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Pending | — |
+| [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Implemented; delivery pending | Configurable complexity scoring and numeric thresholds; schema/text/page/image metrics, capability guards and routing diagnostics tested |
 | [#280](https://github.com/enoch3712/ExtractThinker/issues/280) | PyMuPDF DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Optional PyMuPDF loader; real text, tables, encrypted files, vision and rotation tests |
 | [#258](https://github.com/enoch3712/ExtractThinker/issues/258) | Multiple partial calls | Pending | — |
 | [#252](https://github.com/enoch3712/ExtractThinker/issues/252) | ExtractThinker MCP | Pending | — |
@@ -93,3 +93,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - SQLite retrieval selects relevant pages before model calls and preserves source metadata. The full document is still parsed; ranking is lexical.
 - GitHub confirms #369 merged (20 issues closed; nine remaining).
 - 179 offline tests passed on Python 3.12; 22 retrieval/page-selection checks also passed on Python 3.9 and 3.13. Strict docs build passed.
+
+## Eighth batch
+
+- ComplexityRouter selects user-configured LLMs using a customizable workload score and capability guards. No claim of automatic quality/cost prediction.
+- GitHub confirms #370 merged (21 issues closed; eight remaining).
+- 193 offline tests passed on Python 3.12; all 14 routing tests also passed on Python 3.9 and 3.13. Strict docs build passed.
