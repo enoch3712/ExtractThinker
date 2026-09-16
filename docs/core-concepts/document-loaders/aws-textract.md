@@ -89,4 +89,32 @@ The `TextractConfig` class supports the following options:
 - "QUERIES" feature type is not supported
 - Vision mode is supported for image formats
 - AWS credentials are required unless using a pre-configured client
-- Rate limits and quotas apply based on your AWS account 
+- Rate limits and quotas apply based on your AWS account
+## Temporary credentials and credential profiles
+
+For temporary credentials, pass all three values, including the session token:
+
+```python
+import os
+from extract_thinker import DocumentLoaderAWSTextract, TextractConfig
+
+loader = DocumentLoaderAWSTextract(TextractConfig(
+    aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+    aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    aws_session_token=os.environ["AWS_SESSION_TOKEN"],
+    region_name=os.environ["AWS_DEFAULT_REGION"],
+))
+```
+
+`aws_session_token` also works as a constructor keyword. Expired temporary
+credentials must be refreshed through your AWS authentication flow.
+
+To use Boto3's environment/profile/role credential chain, omit explicit keys:
+
+```python
+loader = DocumentLoaderAWSTextract(region_name="us-east-1")
+```
+
+For a named profile, create a client with `boto3.Session(profile_name="my-profile")`
+and pass it to `DocumentLoaderAWSTextract.from_client(client)`. An injected client
+is used unchanged. See the [Boto3 credential guide](https://docs.aws.amazon.com/boto3/latest/guide/credentials.html).

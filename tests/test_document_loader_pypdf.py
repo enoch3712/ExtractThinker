@@ -35,8 +35,10 @@ class TestDocumentLoaderPyPdf(BaseDocumentLoaderTest):
         assert "content" in first_page
         
         # Verify expected content is present
-        content = first_page["content"]
-        assert "Universityof NewYork" in content
+        # PDF text layout/whitespace can vary between pypdf versions; the
+        # actual institution and employer must remain present and in order.
+        content = "".join(first_page["content"].split())
+        assert "UniversityofNewYork" in content
         assert "XYZInnovations" in content
 
     def test_config_validation(self):
