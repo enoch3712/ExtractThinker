@@ -1140,7 +1140,7 @@ class Extractor:
         Returns:
             bool: True if batch processing is supported, False otherwise.
         """
-        if not self.llm or not self.llm.model:
+        if not self.llm or not self.llm.model or not getattr(self.llm, "supports_batch", True):
             return False
             
         return any(

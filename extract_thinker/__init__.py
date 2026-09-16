@@ -46,9 +46,15 @@ from .document_loader.document_loader_adobe import DocumentLoaderAdobePDF, Adobe
 
 from .retrieval import SQLitePageRetriever, PageMatch, DocumentLoaderRAG
 
+from .model_router import ComplexityRouter, ModelRoute, RequestComplexity, RoutingDecision
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'ComplexityRouter',
+    'ModelRoute',
+    'RequestComplexity',
+    'RoutingDecision',
     'SQLitePageRetriever',
     'PageMatch',
     'DocumentLoaderRAG',
