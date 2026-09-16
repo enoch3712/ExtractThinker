@@ -46,6 +46,21 @@ def encode_image(image_source: Union[str, BytesIO, bytes, Image.Image]) -> str:
     except Exception as e:
         raise Exception(f"Failed to encode image: {str(e)}")
 
+def image_to_data_url(image_source):
+    """Encode an image with its actual media type, preserving PIL transparency."""
+    if isinstance(image_source, Image.Image):
+        output = BytesIO()
+        image_source.save(output, format='PNG')
+        encoded = base64.b64encode(output.getvalue()).decode('ascii')
+    else:
+        encoded = encode_image(image_source)
+    with Image.open(BytesIO(base64.b64decode(encoded))) as image:
+        mime = Image.MIME.get(image.format)
+        if mime is None:
+            raise ValueError('Unsupported image media type')
+    return f'data:{mime};base64,{encoded}'
+
+
 def is_pdf_stream(stream: Union[BytesIO, str]) -> bool:
     """
     Checks if the provided stream is a PDF.

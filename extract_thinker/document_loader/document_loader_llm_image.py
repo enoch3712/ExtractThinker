@@ -46,7 +46,7 @@ class DocumentLoaderLLMImage(CachedDocumentLoader):
     Document loader that handles images and PDFs, converting them to a format suitable for vision LLMs.
     This loader is used as a fallback when no other loader is available and vision mode is required.
     """
-    SUPPORTED_FORMATS = ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp']
+    SUPPORTED_FORMATS = ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp', 'webp']
     
     def __init__(
         self,

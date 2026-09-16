@@ -168,3 +168,5 @@ Scripts/vba_extract.py
 
 # Macos
 .DS_Store
+# Local MCP service credentials
+server.env

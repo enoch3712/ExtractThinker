@@ -1,0 +1,14 @@
+services:
+  extractthinker:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: server.env
+        required: false
+    volumes:
+      - "${EXTRACT_THINKER_DOCUMENTS:-./examples/service-data}:/data:ro"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped

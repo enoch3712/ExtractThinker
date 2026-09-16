@@ -27,6 +27,7 @@ nav:
   - "": index.md
   - Getting Started:
       - Overview: getting-started/index.md
+      - MCP & Docker: getting-started/mcp-container.md
   - "Concepts & Components":
       - Document Loaders: 
           - Overview: core-concepts/document-loaders/index.md
