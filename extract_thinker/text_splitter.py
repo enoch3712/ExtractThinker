@@ -2,9 +2,9 @@ from typing import List, Any
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
-from extract_thinker.models.eager_doc_group import DocGroupsEager, EagerDocGroup
 from extract_thinker.splitter import Splitter
 from extract_thinker.llm import LLM
+from extract_thinker.models.split_classification import NumericPagePair, NumericDocumentGroups
 
 class TextSplitter(Splitter):
 
@@ -44,45 +44,38 @@ class TextSplitter(Splitter):
 
     {self._classifications_to_text(classifications)}
 
-    Return your analysis in the following JSON format:
+    Use the numeric classification IDs from the list, never names.
+Include every source page exactly once, in original order.
+Return your analysis in the following JSON format:
     {{
         "belongs_to_same_document": true/false,
-        "classification_page1": "classification name from the list above",
-        "classification_page2": "classification name from the list above",
+        "classification_page1": 1,
+        "classification_page2": 1,
         "reasoning": "explanation of your decision"
     }}"""
 
-        try:
-            response = self.llm.request(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Page 1:\n{page1}\n\nPage 2:\n{page2}\n\n{content}"
-                    }
-                ],
-                response_model=DocGroups2
-            )
-            return response
-        except Exception as e:
-            # Fallback response if analysis fails
-            return DocGroups2(
-                    belongs_to_same_document=True,  # Conservative approach: keep pages together
-                    classification_page1=classifications[0].name,  # Default to first classification
-                    classification_page2=classifications[0].name
-                )
-        
+        response = self.llm.request(
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Page 1:\n{page1}\n\nPage 2:\n{page2}\n\n{content}"
+                }
+            ],
+            response_model=NumericPagePair
+        )
+        return self._resolve_pair(response, classifications)
+
     def split_lazy_doc_group(self, document: List[dict], classifications: List[Classification]) -> DocGroups:
         """
         Process a document lazily by comparing consecutive pages to determine document boundaries.
         Returns a list of DocGroups2 objects representing the document groupings.
         """
         if len(document) < 2:
-            # Handle single-page documents
-            return [DocGroups2(
-                belongs_to_same_document=True,
-                classification_page1=classifications[0].name,  # Default to first classification
-                classification_page2=None
-            )]
+            from extract_thinker.models.doc_group import DocGroup
+            result = DocGroups()
+            result.doc_groups = [DocGroup(group.pages, group.classification, group.classification_id)
+                                 for group in self.split_eager_doc_group(document, classifications)]
+            return result
 
         # Create and process page pairs
         page_pairs = self.split_document_into_groups(document)
@@ -104,6 +97,8 @@ class TextSplitter(Splitter):
         """
         Process entire document at once using eager strategy
         """
+        if not document:
+            return []
         # Combine all text from the document
         all_texts = [page['content'] for page in document]
                 
@@ -112,55 +107,41 @@ Consider content flow, writing style, formatting patterns, and document structur
 
 {self._classifications_to_text(classifications)}
 
+Use the numeric classification IDs from the list, never names.
+Include every source page exactly once, in original order.
 Return your analysis in the following JSON format:
     {{
         "reasoning": "detailed explanation of your analysis",
         "groupOfDocuments": [
             {{
-                "classification": "Invoice",
+                "classification": 1,
                 "pages": [1, 2]
             }}
         ]
     }}"""
         
-        try:
-            response = self.llm.request(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": "\n=== PAGE BREAK ===\n".join(all_texts) + "\n\n" + content
-                    }
-                ],
-                response_model=DocGroupsEager
-            )
+        response = self.llm.request(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "\n=== PAGE BREAK ===\n".join(all_texts) + "\n\n" + content
+                }
+            ],
+            response_model=NumericDocumentGroups
+        )
 
-            # Convert DocGroupsEager into List[EagerDocGroup]
-            eager_groups = []
-            for group in response.groupOfDocuments:
-                eager_group = EagerDocGroup(
-                    pages=group.pages,
-                    classification=group.classification
-                )
-                eager_groups.append(eager_group)
-                
-            return eager_groups
-            
-        except Exception as e:
-            # Fallback: treat all pages as one group
-            eager_group = EagerDocGroup(
-                pages=list(range(1, len(document) + 1)),
-                classification="unknown"  # Add a default classification
-            )
-            return [eager_group]
-        
+        return self._resolve_eager(response, classifications, len(document))
+
     def _classifications_to_text(self, classifications: List[Classification]) -> str:
         """
         Converts a list of Classification objects into a formatted text string
         including their names, descriptions and contract structures.
         """
-        classifications_text = "##Classifications\n"
-        for classification in classifications:
-            classifications_text += f"### {classification.name}\n"
+        if not classifications:
+            raise ValueError("At least one classification is required")
+        classifications_text = "##Classifications (numeric IDs)\n"
+        for identifier, classification in enumerate(classifications, 1):
+            classifications_text += f"### ID {identifier}: {classification.name}\n"
             classifications_text += f"**Description:** {classification.description}\n\n"
             
             if classification.contract:

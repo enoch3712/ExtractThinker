@@ -86,3 +86,21 @@ However, consider Lazy Splitting when:
 
 - Choose strategy based on document size and page count
 - Consider context window limitations of your LLM
+
+## Reliable classification IDs
+
+Text, image, and Markdown splitters assign one-based numeric IDs to classifications in the order supplied to each split request. The model selects IDs, and the returned groups contain both `classification` (the original display name) and `classification_id` (the numeric selection). `Process.extract()` uses the ID to select the original contract and extractor, so two classifications can share a display name without being confused.
+
+```python
+classifications = [
+    Classification(name="Invoice", description="Sales invoice", contract=SalesInvoice, extractor=sales_extractor),
+    Classification(name="Invoice", description="Purchase invoice", contract=PurchaseInvoice, extractor=purchase_extractor),
+]
+groups = splitter.split_eager_doc_group(pages, classifications)
+for group in groups:
+    print(group.pages, group.classification_id, group.classification)
+```
+
+IDs belong to the supplied classification list, not a global registry. Preserve that list's order when using the results outside `Process`. Legacy groups that contain only a name remain accepted when the name identifies exactly one classification; unknown or duplicate names raise an error.
+
+Split failures now propagate instead of silently choosing the first classification or returning an `unknown` group. Eager splitting rejects omitted, duplicated, reordered, or out-of-range pages. Lazy splitting rejects conflicting classifications across overlapping page comparisons. These checks prevent silent routing errors; they do not guarantee that the model's semantic classification is correct. Single-page direct splitter calls perform classification, and empty input returns empty groups.

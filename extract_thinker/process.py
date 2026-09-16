@@ -207,7 +207,7 @@ class Process:
         if self.splitter is None:
             raise ValueError("No splitter loaded. Please load a splitter using load_splitter() before splitting.")
 
-        self.split_classifications = classifications
+        self.split_classifications = list(classifications)
 
         document_loader = self.get_document_loader(self.file_path)
         if document_loader is None:
@@ -245,17 +245,14 @@ class Process:
             raise ValueError("Document groups have not been initialized")
 
         async def _extract(doc_group):
-            # Find matching classification and extractor
-            classificationStr = doc_group.classification
-            extractor: Optional[Extractor] = None
-            contract = None
-
-            for classification in self.split_classifications:
-                if classification.name == classificationStr:
-                    extractor = classification.extractor
-                    # If an extraction_contract is provided, use it; otherwise, use the default contract
-                    contract = classification.extraction_contract or classification.contract
-                    break
+            from extract_thinker.models.split_classification import resolve_classification
+            classification = resolve_classification(
+                self.split_classifications,
+                getattr(doc_group, "classification_id", None),
+                doc_group.classification,
+            )
+            extractor = classification.extractor
+            contract = classification.extraction_contract or classification.contract
 
             if extractor is None:
                 raise ValueError("Extractor not found for classification")

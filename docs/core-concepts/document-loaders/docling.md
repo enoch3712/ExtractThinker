@@ -1,113 +1,83 @@
 # Docling Document Loader
 
-The Docling loader is a specialized document processor that excels at handling complex document layouts and table structures. It provides advanced OCR capabilities and precise table detection.
+Docling converts documents to Markdown with optional OCR and table structure detection. The SDK is optional; importing ExtractThinker does not load Docling.
 
-## Supported Formats
+## Installation and dependency repair
 
-### Documents
-- pdf
-- doc/docx
-- ppt/pptx
-- xls/xlsx
+Install Docling into the same environment as ExtractThinker:
 
-### Images
-- jpeg/jpg
-- png
-- tiff
-- bmp
-- gif
-- webp
-
-### Text
-- txt
-- html
-- xml
-- json
-
-### Others
-- csv
-- tsv
-- zip
-
-## Usage
-
-### Basic Usage
-
-```python
-from extract_thinker import DocumentLoaderDocling
-
-# Initialize with default settings
-loader = DocumentLoaderDocling()
-
-# Load document
-pages = loader.load("path/to/your/document.pdf")
-
-# Process extracted content
-for page in pages:
-    # Access text content
-    text = page["content"]
-    # Access tables if available
-    tables = page.get("tables", [])
+```bash
+python -m pip install docling
+python -m pip check
 ```
 
-### Configuration-based Usage
+An error such as `No module named 'docling_core.types.doc.page'` comes from Docling's dependency imports. It usually indicates an inconsistent `docling` / `docling-core` installation. The loader now preserves the original exception and reports installed package versions.
+
+Resolve the SDK and its dependencies together:
+
+```bash
+python -m pip install --upgrade --upgrade-strategy eager docling
+python -m pip check
+```
+
+If the import still fails, create a fresh virtual environment and install ExtractThinker and Docling together. Avoid upgrading or pinning `docling-core` independently. Current Docling releases require Python 3.10 or newer; ExtractThinker's Python 3.9 support does not imply that every optional SDK supports it. See [Docling installation](https://docling-project.github.io/docling/getting_started/installation/).
+
+## Basic usage
 
 ```python
 from extract_thinker import DocumentLoaderDocling, DoclingConfig
 
-# Create configuration
-config = DoclingConfig(
-    ocr_enabled=True,                # Enable OCR processing
-    table_structure_enabled=True,    # Enable table structure detection
-    tesseract_cmd="path/to/tesseract", # Custom Tesseract path
-    force_full_page_ocr=False,      # Use selective OCR
-    do_cell_matching=True,          # Enable cell content matching
-    format_options={                # Format-specific options
-        "pdf": {"dpi": 300},
-        "image": {"enhance": True}
-    },
-    cache_ttl=600                   # Cache results for 10 minutes
-)
-
-# Initialize loader with configuration
-loader = DocumentLoaderDocling(config)
-
-# Load and process document
-pages = loader.load("path/to/your/document.pdf")
+loader = DocumentLoaderDocling(DoclingConfig(
+    ocr_enabled=False,
+    table_structure_enabled=True,
+    do_cell_matching=True,
+))
+pages = loader.load("invoice.pdf")
+for page in pages:
+    print(page["page_number"], page["markdown"])
 ```
 
-## Configuration Options
+Each result has `content` and `markdown` containing the same Markdown, a one-based `page_number`, and `image` (bytes when rendered, otherwise `None`). Tables appear in the Markdown; this adapter does not return a separate `tables` list. Paginated documents retain their pages, including PDFs loaded from URLs. Formats without page information return one result for the entire document.
 
-The `DoclingConfig` class supports the following options:
+PDF, DOCX, PPTX, XLSX, HTML, Markdown, AsciiDoc, supported XML formats, plain text, and common raster images are accepted by this adapter. Actual parsing depends on the installed Docling version and its backend dependencies. A `BytesIO` source is treated as a PDF; use a path with the correct extension for other formats. The caller's stream position is preserved.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `content` | Any | None | Initial content to process |
-| `cache_ttl` | int | 300 | Cache time-to-live in seconds |
-| `ocr_enabled` | bool | False | Enable OCR processing |
-| `table_structure_enabled` | bool | True | Enable table structure detection |
-| `tesseract_cmd` | str | None | Path to Tesseract executable |
-| `force_full_page_ocr` | bool | False | Force OCR on entire page |
-| `do_cell_matching` | bool | True | Enable cell content matching |
-| `format_options` | Dict | None | Format-specific processing options |
+## Configuration
 
-## Features
+| Option | Default | Effect |
+| --- | --- | --- |
+| `cache_ttl` | `300` | Cache lifetime in seconds |
+| `ocr_enabled` | `False` | Enable OCR in the PDF pipeline |
+| `table_structure_enabled` | `True` | Enable table structure detection |
+| `force_full_page_ocr` | `False` | Apply OCR across the entire page |
+| `do_cell_matching` | `True` | Match table cells to source content |
+| `format_options` | `None` | Supply Docling format option objects; overrides the simple pipeline settings |
+| `content` | `None` | Optional initial content |
 
-- Advanced table structure detection
-- Selective OCR processing
-- Cell content matching
-- Format-specific optimizations
-- Custom Tesseract integration
-- Table content deduplication
-- Multi-format support
-- Caching support
-- Stream-based loading
+When using `format_options`, pass SDK objects rather than arbitrary dictionaries:
 
-## Notes
+```python
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractCliOcrOptions
+from docling.document_converter import PdfFormatOption
+from extract_thinker import DocumentLoaderDocling, DoclingConfig
 
-- Vision mode is supported for image formats
-- OCR requires Tesseract installation
-- Table detection works best with structured documents
-- Performance depends on document complexity
-- Handles both scanned and digital documents
-- Supports multiple document formats through format-specific optimizations 
+pipeline = PdfPipelineOptions(do_ocr=True)
+pipeline.ocr_options = TesseractCliOcrOptions(
+    tesseract_cmd="tesseract",
+    force_full_page_ocr=True,
+)
+loader = DocumentLoaderDocling(DoclingConfig(format_options={
+    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline),
+}))
+```
+
+Tesseract must be installed separately for this example. PDF pipelines may download model artifacts on first use. Custom OCR configuration belongs in the SDK's `ocr_options`; `DoclingConfig` does not accept `tesseract_cmd` directly.
+
+## Images and selected pages
+
+```python
+loader.set_vision_mode(True)
+pages = loader.load_pages("invoice.pdf", [1, 3])
+```
+
+Page images are rendered once per uncached load and matched to their source page. URL documents without page information expose captured images in `images`. Rendering requires the relevant PDF/image/browser support. Page selection occurs after conversion and does not reduce upstream parsing work.

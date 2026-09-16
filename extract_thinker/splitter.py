@@ -47,47 +47,49 @@ class Splitter(ABC):
         page2 = group[1] if len(group) > 1 else None
         return self.belongs_to_same_document(group[0], page2, contract)
 
+    def _resolve_pair(self, response, classifications):
+        from extract_thinker.models.split_classification import resolve_classification
+        first = resolve_classification(classifications, response.classification_page1)
+        second = resolve_classification(classifications, response.classification_page2)
+        if response.belongs_to_same_document and response.classification_page1 != response.classification_page2:
+            raise ValueError("Pages in the same document must have the same classification ID")
+        return DocGroups2(
+            reasoning=response.reasoning,
+            belongs_to_same_document=response.belongs_to_same_document,
+            classification_page1=first.name, classification_page2=second.name,
+            classification_id_page1=response.classification_page1,
+            classification_id_page2=response.classification_page2,
+        )
+
+    def _resolve_eager(self, response, classifications, page_count):
+        from extract_thinker.models.split_classification import resolve_classification
+        flattened = [page for group in response.groupOfDocuments for page in group.pages]
+        if flattened != list(range(1, page_count + 1)) or any(not group.pages for group in response.groupOfDocuments):
+            raise ValueError("Split groups must cover every page exactly once, in source order")
+        return [EagerDocGroup(
+            pages=group.pages,
+            classification=resolve_classification(classifications, group.classification).name,
+            classification_id=group.classification,
+        ) for group in response.groupOfDocuments]
+
     def aggregate_doc_groups(self, doc_groups_tasks: List[DocGroups2]) -> DocGroups:
-        """
-        Aggregate the results from belongs_to_same_document comparisons into final document groups.
-        This is the base implementation that can be used by all splitter implementations.
-        """
-        doc_groups = DocGroups()
-        current_group = DocGroup(pages=[], classification="")
-        page_number = 1
-
+        """Combine adjacent comparisons without discarding classification conflicts."""
+        result = DocGroups()
         if not doc_groups_tasks:
-            return doc_groups
-
-        # Handle the first group
-        doc_group = doc_groups_tasks[0]
-        if doc_group.belongs_to_same_document:
-            current_group.pages = [1, 2]
-            current_group.classification = doc_group.classification_page1
-        else:
-            # First page is its own document
-            current_group.pages = [1]
-            current_group.classification = doc_group.classification_page1
-            doc_groups.doc_groups.append(current_group)
-            
-            # Start new group with second page
-            current_group = DocGroup(pages=[2], classification=doc_group.classification_page2)
-
-        page_number += 1
-
-        # Process remaining groups
-        for doc_group in doc_groups_tasks[1:]:
-            if doc_group.belongs_to_same_document:
-                current_group.pages.append(page_number + 1)
+            return result
+        first = doc_groups_tasks[0]
+        current = DocGroup([1], first.classification_page1, first.classification_id_page1)
+        previous_name, previous_id = first.classification_page1, first.classification_id_page1
+        for page, pair in enumerate(doc_groups_tasks, 2):
+            if (pair.classification_page1, pair.classification_id_page1) != (previous_name, previous_id):
+                raise ValueError(f"Conflicting classifications for page {page - 1}")
+            if pair.belongs_to_same_document:
+                if (pair.classification_page1, pair.classification_id_page1) != (pair.classification_page2, pair.classification_id_page2):
+                    raise ValueError("Pages in the same document must have the same classification")
+                current.pages.append(page)
             else:
-                doc_groups.doc_groups.append(current_group)
-                current_group = DocGroup(
-                    pages=[page_number + 1],
-                    classification=doc_group.classification_page2
-                )
-            page_number += 1
-
-        # Add the last group
-        doc_groups.doc_groups.append(current_group)
-
-        return doc_groups
+                result.doc_groups.append(current)
+                current = DocGroup([page], pair.classification_page2, pair.classification_id_page2)
+            previous_name, previous_id = pair.classification_page2, pair.classification_id_page2
+        result.doc_groups.append(current)
+        return result
