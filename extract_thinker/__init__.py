@@ -52,9 +52,17 @@ from .field_extraction import FieldExtraction
 
 from .masking import EntityMasker, MaskingSession, MaskedContent, DocumentLoaderMasked
 
+from .events import DocumentLoaderEvents, VisionEventDetector, PageSignals, DocumentEvent, DocumentEventType, EventRule
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'DocumentLoaderEvents',
+    'VisionEventDetector',
+    'PageSignals',
+    'DocumentEvent',
+    'DocumentEventType',
+    'EventRule',
     'EntityMasker',
     'MaskingSession',
     'MaskedContent',

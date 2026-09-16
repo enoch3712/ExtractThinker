@@ -26,9 +26,9 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#141](https://github.com/enoch3712/ExtractThinker/issues/141) | Make sure classification is right after split | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Numeric classification IDs propagate through text/image/Markdown splitting and Process extraction; ambiguous names and invalid groups rejected |
 | [#121](https://github.com/enoch3712/ExtractThinker/issues/121) | Parallel extraction of images (and more) | Closed; merged in [#372](https://github.com/enoch3712/ExtractThinker/pull/372) | FieldExtraction annotations and extract_fields; concurrent groups, per-field model/vision, aliases, pagination and final validation tests |
 | [#79](https://github.com/enoch3712/ExtractThinker/issues/79) | Object types - Signatures, BoundingBoxes | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Exported BoundingBox, DocumentRegion and Signature contract types; validation/round-trip tests |
-| [#48](https://github.com/enoch3712/ExtractThinker/issues/48) | Events: Add IDP events  | Pending | — |
+| [#48](https://github.com/enoch3712/ExtractThinker/issues/48) | Events: Add IDP events  | Implemented; delivery pending | Vision page signal detector, handwritten/chart/image events, local rules and callbacks; pipeline and failure-order regressions |
 | [#46](https://github.com/enoch3712/ExtractThinker/issues/46) | validator call after the llm call | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Real Instructor adapter with offline transport exercises Pydantic post-validation; enrichment recipe added |
-| [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Implemented; delivery pending | Local reversible entity/regex masking, multi-file sessions and text-loader integration; prompt and restoration regression tests |
+| [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Closed; merged in [#373](https://github.com/enoch3712/ExtractThinker/pull/373) | Local reversible entity/regex masking, multi-file sessions and text-loader integration; prompt and restoration regression tests |
 | [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Pending | — |
 | [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Closed; merged in [#369](https://github.com/enoch3712/ExtractThinker/pull/369) | Adobe SDK job integration, CSV tables, source page mapping and normalized regions; offline SDK tests |
 | [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
@@ -112,3 +112,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - Reviewed legacy PR #72; its LLM-based masking approach is not reused. The new API uses local masking and has explicit coverage limitations.
 - GitHub confirms #372 merged (24 issues closed; five remaining).
 - 215 offline tests passed on Python 3.12; twelve masking tests passed on Python 3.9 and 3.13. Strict docs build passed.
+
+## Eleventh batch
+
+- DocumentLoaderEvents supports handwritten/chart/image detection via a configured vision LLM, custom detectors and local rules. Detection finishes before callbacks run.
+- GitHub confirms #373 merged (25 issues closed; four remaining).
+- 224 offline tests passed on Python 3.12; nine event tests passed on Python 3.9 and 3.13. Strict docs build passed.

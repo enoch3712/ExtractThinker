@@ -296,7 +296,7 @@ class Extractor:
                             {
                                 "source_index": index + 1,
                                 "metadata": item.get("metadata", {}),
-                                **{key: item[key] for key in ("page_number", "tables", "forms", "regions", "signatures") if key in item},
+                                **{key: item[key] for key in ("page_number", "tables", "forms", "regions", "signatures", "events") if key in item},
                             }
                             for index, item in enumerate(all_contents)
                         ],
@@ -397,7 +397,7 @@ class Extractor:
             for page in content:
                 if isinstance(page, dict):
                     evidence = {
-                        key: page[key] for key in ("page_number", "tables", "forms", "regions", "signatures")
+                        key: page[key] for key in ("page_number", "tables", "forms", "regions", "signatures", "events")
                         if key in page
                     }
                     if evidence:
