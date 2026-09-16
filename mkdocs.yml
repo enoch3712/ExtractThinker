@@ -53,6 +53,7 @@ nav:
           - Mistral OCR: core-concepts/document-loaders/mistral-ocr.md
       - LLM Integration:
           - Overview: core-concepts/llm-integration/index.md
+          - Ollama & Large Documents: core-concepts/llm-integration/ollama.md
           - Complexity Router: core-concepts/llm-integration/complexity-router.md
           - Thinking Models: core-concepts/llm-integration/thinking-models.md
       - Markdown Conversion:

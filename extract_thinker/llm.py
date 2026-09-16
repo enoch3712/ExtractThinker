@@ -58,6 +58,7 @@ class LLM:
         token_limit: int = None,
         backend: LLMEngine = LLMEngine.DEFAULT,
         completion_kwargs: Optional[Dict[str, Any]] = None,
+        structured_output: bool = False,
     ):
         """Initialize LLM with specified backend.
         
@@ -66,13 +67,21 @@ class LLM:
             token_limit: Optional maximum output tokens, overriding the default
             backend: LLMBackend enum (default: LITELLM)
             completion_kwargs: Provider options such as logprobs and top_logprobs
+            structured_output: Request provider-native JSON Schema output (provider support required)
         """
+        if not isinstance(structured_output, bool):
+            raise ValueError("structured_output must be a boolean")
+        if structured_output and backend != LLMEngine.DEFAULT:
+            raise ValueError("structured_output requires the default LiteLLM backend")
+        self.structured_output = structured_output
         self.model = model
         if token_limit is not None and (isinstance(token_limit, bool) or not isinstance(token_limit, int) or token_limit <= 0):
             raise ValueError("token_limit must be a positive integer")
         self.token_limit = token_limit
         self.completion_kwargs = dict(completion_kwargs or {})
         reserved = {"model", "messages", "response_model", "max_tokens", "max_completion_tokens", "stream"}
+        if structured_output:
+            reserved.add("response_format")
         if reserved.intersection(self.completion_kwargs):
             raise ValueError(f"completion_kwargs cannot override: {sorted(reserved.intersection(self.completion_kwargs))}")
         if backend != LLMEngine.DEFAULT and self.completion_kwargs:
@@ -90,7 +99,7 @@ class LLM:
         if self.backend == LLMEngine.DEFAULT:
             self.client = instructor.from_litellm(
                 litellm.completion,
-                mode=instructor.Mode.MD_JSON
+                mode=instructor.Mode.JSON_SCHEMA if structured_output else instructor.Mode.MD_JSON
             )
             self.agent = None
         elif self.backend == LLMEngine.PYDANTIC_AI:
@@ -133,6 +142,8 @@ class LLM:
         """Load a LiteLLM router for model fallbacks."""
         if self.backend != LLMEngine.DEFAULT:
             raise ValueError("Router is only supported with LITELLM backend")
+        if self.structured_output:
+            raise ValueError("structured_output does not support the raw LiteLLM router; use direct LLM routes")
         self.router = router
 
     def set_temperature(self, temperature: float) -> None:
@@ -161,6 +172,8 @@ class LLM:
         Args:
             is_dynamic (bool): Whether to enable dynamic content handling
         """
+        if is_dynamic and self.structured_output:
+            raise ValueError("Dynamic parsing cannot be combined with structured_output")
         self.is_dynamic = is_dynamic
 
     def set_page_count(self, page_count: int) -> None:
