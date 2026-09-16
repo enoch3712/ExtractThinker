@@ -67,6 +67,7 @@ nav:
           - Overview: core-concepts/process/index.md
       - Extractors: 
           - Overview: core-concepts/extractors/index.md
+          - Parallel Field Extraction: core-concepts/extractors/parallel-fields.md
           - Page Retrieval (SQLite): core-concepts/extractors/retrieval.md
           - Batch Processing: core-concepts/extractors/batch.md
           - Image & Chart Processing: core-concepts/extractors/image_charts.md
