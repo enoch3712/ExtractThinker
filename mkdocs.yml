@@ -11,21 +11,12 @@ theme:
   palette:
     - scheme: default
       primary: custom
-      accent: teal
-      toggle:
-        icon: material/weather-night
-        name: Switch to dark mode
-    - scheme: slate
-      primary: custom
-      accent: teal
-      toggle:
-        icon: material/weather-sunny
-        name: Switch to light mode
+      accent: pink
   logo: assets/logomain.png
   favicon: assets/favicon.png
   font:
-    text: 'Inter'
-    code: 'JetBrains Mono'
+    text: 'Roboto'
+    code: 'Roboto Mono'
 
 # Documentation source
 docs_dir: docs
@@ -33,7 +24,7 @@ use_directory_urls: true
 # strict: true
 
 nav:
-  - Home: index.md
+  - "": index.md
   - Getting Started:
       - Overview: getting-started/index.md
       - 2026 Update: getting-started/2026-update.md

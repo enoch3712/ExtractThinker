@@ -1,4 +1,10 @@
-# Your first extraction
+# ExtractThinker
+
+<div align="center">
+  <img src="../assets/extract-thinker-overview.png" alt="ExtractThinker overview" width="50%">
+</div>
+
+## Your first extraction
 
 Start with a small text invoice, verify loading without an API key, then extract a typed result. Python 3.9–3.13 is supported by the core library; the optional MCP service requires Python 3.10+.
 
