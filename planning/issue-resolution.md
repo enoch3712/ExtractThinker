@@ -16,15 +16,15 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#310](https://github.com/enoch3712/ExtractThinker/issues/310) | [Feature] Page selection for DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Common load_pages API; real PDF and cached-data selection tests |
 | [#309](https://github.com/enoch3712/ExtractThinker/issues/309) | No module named 'docling_core.types.doc.page' | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Reproducible import diagnostics, dependency repair guide, fresh SDK conversion and page/configuration regressions |
 | [#287](https://github.com/enoch3712/ExtractThinker/issues/287) | [Feature] Bounding Box Capabilities | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Source-backed normalized regions with extraction metadata propagation; PyMuPDF adapter |
-| [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Implemented; delivery pending | Configurable complexity scoring and numeric thresholds; schema/text/page/image metrics, capability guards and routing diagnostics tested |
+| [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Closed; merged in [#371](https://github.com/enoch3712/ExtractThinker/pull/371) | Configurable complexity scoring and numeric thresholds; schema/text/page/image metrics, capability guards and routing diagnostics tested |
 | [#280](https://github.com/enoch3712/ExtractThinker/issues/280) | PyMuPDF DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Optional PyMuPDF loader; real text, tables, encrypted files, vision and rotation tests |
-| [#258](https://github.com/enoch3712/ExtractThinker/issues/258) | Multiple partial calls | Pending | — |
+| [#258](https://github.com/enoch3712/ExtractThinker/issues/258) | Multiple partial calls | Implemented; delivery pending | FieldExtraction annotations and extract_fields; concurrent groups, per-field model/vision, aliases, pagination and final validation tests |
 | [#252](https://github.com/enoch3712/ExtractThinker/issues/252) | ExtractThinker MCP | Pending | — |
 | [#247](https://github.com/enoch3712/ExtractThinker/issues/247) | The security token included in the request is invalid | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | AWS temporary credentials and credential-chain tests |
 | [#235](https://github.com/enoch3712/ExtractThinker/issues/235) | Markdown Splitter Strategy | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | MarkdownSplitter supports deterministic heading sections and semantic page grouping |
 | [#150](https://github.com/enoch3712/ExtractThinker/issues/150) | bad content | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Azure blank-cell/multiple-table/table-only regressions |
 | [#141](https://github.com/enoch3712/ExtractThinker/issues/141) | Make sure classification is right after split | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Numeric classification IDs propagate through text/image/Markdown splitting and Process extraction; ambiguous names and invalid groups rejected |
-| [#121](https://github.com/enoch3712/ExtractThinker/issues/121) | Parallel extraction of images (and more) | Pending | — |
+| [#121](https://github.com/enoch3712/ExtractThinker/issues/121) | Parallel extraction of images (and more) | Implemented; delivery pending | FieldExtraction annotations and extract_fields; concurrent groups, per-field model/vision, aliases, pagination and final validation tests |
 | [#79](https://github.com/enoch3712/ExtractThinker/issues/79) | Object types - Signatures, BoundingBoxes | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Exported BoundingBox, DocumentRegion and Signature contract types; validation/round-trip tests |
 | [#48](https://github.com/enoch3712/ExtractThinker/issues/48) | Events: Add IDP events  | Pending | — |
 | [#46](https://github.com/enoch3712/ExtractThinker/issues/46) | validator call after the llm call | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Real Instructor adapter with offline transport exercises Pydantic post-validation; enrichment recipe added |
@@ -99,3 +99,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - ComplexityRouter selects user-configured LLMs using a customizable workload score and capability guards. No claim of automatic quality/cost prediction.
 - GitHub confirms #370 merged (21 issues closed; eight remaining).
 - 193 offline tests passed on Python 3.12; all 14 routing tests also passed on Python 3.9 and 3.13. Strict docs build passed.
+
+## Ninth batch
+
+- Partial/parallel extraction supports field annotations, model/vision policies, groups and final contract validation. Source loading occurs once per source.
+- GitHub confirms #371 merged (22 issues closed; seven remaining).
+- 203 offline tests passed on Python 3.12; all ten field-extraction tests also passed on Python 3.9 and 3.13. Strict docs build passed.

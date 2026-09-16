@@ -190,6 +190,13 @@ class Extractor:
         # Return strings or other types unchanged
         return content
 
+    def extract_fields(self, source, response_model, vision=False, content=None,
+                       completion_strategy=CompletionStrategy.FORBIDDEN, max_workers=4):
+        """Extract contract fields/groups in parallel, then validate the whole result."""
+        from extract_thinker.field_extraction import extract_fields
+        return extract_fields(self, source, response_model, vision, content,
+                              completion_strategy, max_workers)
+
     def extract(
         self,
         source: Union[str, IO, List[Union[str, IO]]],
@@ -215,6 +222,10 @@ class Extractor:
         Returns:
             The parsed result from the LLM as validated by response_model.
         """
+        from extract_thinker.field_extraction import has_field_extraction
+        if has_field_extraction(response_model):
+            return self.extract_fields(source, response_model, vision, content, completion_strategy)
+
         if isinstance(source, dict) and self.document_loader is None:
             self.document_loader = DocumentLoaderData()
         

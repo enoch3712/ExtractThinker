@@ -48,9 +48,12 @@ from .retrieval import SQLitePageRetriever, PageMatch, DocumentLoaderRAG
 
 from .model_router import ComplexityRouter, ModelRoute, RequestComplexity, RoutingDecision
 
+from .field_extraction import FieldExtraction
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'FieldExtraction',
     'ComplexityRouter',
     'ModelRoute',
     'RequestComplexity',
