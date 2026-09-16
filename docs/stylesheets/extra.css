@@ -28,3 +28,11 @@
   .et-hero { padding: 1.4rem 1rem; }
   .et-hero .md-button { display: block; text-align: center; margin-right: 0; }
 }
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #a6d9c7;
+}
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary {
+  background-color: #a6d9c7;
+  border-color: #a6d9c7;
+  color: #142923;
+}
