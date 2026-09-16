@@ -1,6 +1,14 @@
 # ExtractThinker 2026 facelift: from 1,597 to 10,000 stars
 
-Prepared 2026-09-16. Proposal and repository audit, not an implemented upgrade or a growth forecast.
+Prepared 2026-09-16. The baseline below records the initial audit; see the delivery update for completed work. The growth plan is not a forecast.
+
+## Delivery update — 2026-09-16
+
+All 29 baseline issues have been closed through reviewed fix/feature batches #364–#376. The [resolution ledger](issue-resolution.md) records implementation and verification evidence, including unavailable private/live reproductions. The core offline suite now has 231 passing tests; an optional MCP suite covers service contracts and transport.
+
+The documentation refresh replaces the redirect homepage, provides a runnable text invoice quickstart, documents new APIs and separates unreleased `main` features from the existing PyPI package. Docker/MCP can be built from source. No package release or star-growth outcome is claimed.
+
+Still outstanding beyond the issue backlog: publishing the prepared CI workflow changes (OAuth workflow scope required), reviewing five older contributor PRs, release/version preparation, broader dependency/tooling cleanup, public evaluation fixtures, and the adoption work below. These are roadmap items, not silently completed tasks.
 
 ## Recommendation
 

@@ -30,7 +30,7 @@ For documentation:
 
 ```bash
 python -m pip install -r requirements-docs.txt
-python -m mkdocs build
+python -m mkdocs build --strict
 ```
 
 Describe the user-visible change, link the issue, and list actual validation in
@@ -38,3 +38,14 @@ your pull request. Update affected documentation and note compatibility changes.
 Do not close an issue solely because a test passes: verify the requested behavior
 and link to the delivered fix. New integrations should stay optional and include
 installation guidance and deterministic adapter tests.
+
+For the optional MCP suite (Python 3.10+):
+
+```bash
+python -m pip install -r requirements-server.txt
+python -m pytest tests/test_mcp_server.py -q
+```
+
+The MCP tests use the real SDK with a fake provider transport. To verify the
+container, build it with `docker compose build`, start it, then check `/healthz`
+and connect an MCP client to `/mcp`. Do not put provider keys in committed files.
