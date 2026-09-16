@@ -4,7 +4,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 
 | Issue | Requirement | State | Evidence |
 | --- | --- | --- | --- |
-| [#357](https://github.com/enoch3712/ExtractThinker/issues/357) | Extractor is ignoring model contract with large documents | Pending | — |
+| [#357](https://github.com/enoch3712/ExtractThinker/issues/357) | Large-document contract failures with Ollama | Implemented; delivery pending | Native JSON Schema mode, seven-page Instructor regression, actual LiteLLM Ollama format mapping, context/pagination recipe; private original reproduction unavailable |
 | [#356](https://github.com/enoch3712/ExtractThinker/issues/356) | Optional argument "token_limit" in class LLM in llm.py not used. | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Explicit completion and page-budget regression tests |
 | [#352](https://github.com/enoch3712/ExtractThinker/issues/352) | How to add logprobs and top_logprobs params? | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Provider option forwarding and metadata tests |
 | [#351](https://github.com/enoch3712/ExtractThinker/issues/351) | Question about the Concatenate completion strategy for multi-page document | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Seven-page vision extraction uses one page per request and merges in order; file lists loaded correctly; docs distinguish input limits from continuation |
@@ -19,7 +19,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Closed; merged in [#371](https://github.com/enoch3712/ExtractThinker/pull/371) | Configurable complexity scoring and numeric thresholds; schema/text/page/image metrics, capability guards and routing diagnostics tested |
 | [#280](https://github.com/enoch3712/ExtractThinker/issues/280) | PyMuPDF DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Optional PyMuPDF loader; real text, tables, encrypted files, vision and rotation tests |
 | [#258](https://github.com/enoch3712/ExtractThinker/issues/258) | Multiple partial calls | Closed; merged in [#372](https://github.com/enoch3712/ExtractThinker/pull/372) | FieldExtraction annotations and extract_fields; concurrent groups, per-field model/vision, aliases, pagination and final validation tests |
-| [#252](https://github.com/enoch3712/ExtractThinker/issues/252) | ExtractThinker MCP | Implemented; delivery pending | MCP 2.x server, JSON Schema extraction, actual SDK roundtrip and Docker transport checks |
+| [#252](https://github.com/enoch3712/ExtractThinker/issues/252) | ExtractThinker MCP | Closed; merged in [#375](https://github.com/enoch3712/ExtractThinker/pull/375) | MCP 2.x server, JSON Schema extraction, actual SDK roundtrip and Docker transport checks |
 | [#247](https://github.com/enoch3712/ExtractThinker/issues/247) | The security token included in the request is invalid | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | AWS temporary credentials and credential-chain tests |
 | [#235](https://github.com/enoch3712/ExtractThinker/issues/235) | Markdown Splitter Strategy | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | MarkdownSplitter supports deterministic heading sections and semantic page grouping |
 | [#150](https://github.com/enoch3712/ExtractThinker/issues/150) | bad content | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Azure blank-cell/multiple-table/table-only regressions |
@@ -29,7 +29,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#48](https://github.com/enoch3712/ExtractThinker/issues/48) | Events: Add IDP events  | Closed; merged in [#374](https://github.com/enoch3712/ExtractThinker/pull/374) | Vision page signal detector, handwritten/chart/image events, local rules and callbacks; pipeline and failure-order regressions |
 | [#46](https://github.com/enoch3712/ExtractThinker/issues/46) | validator call after the llm call | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Real Instructor adapter with offline transport exercises Pydantic post-validation; enrichment recipe added |
 | [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Closed; merged in [#373](https://github.com/enoch3712/ExtractThinker/pull/373) | Local reversible entity/regex masking, multi-file sessions and text-loader integration; prompt and restoration regression tests |
-| [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Implemented; delivery pending | Non-root Docker image, Compose, read-only mounts and setup documentation |
+| [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Closed; merged in [#375](https://github.com/enoch3712/ExtractThinker/pull/375) | Non-root Docker image, Compose, read-only mounts and setup documentation |
 | [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Closed; merged in [#369](https://github.com/enoch3712/ExtractThinker/pull/369) | Adobe SDK job integration, CSV tables, source page mapping and normalized regions; offline SDK tests |
 | [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
 | [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
@@ -125,3 +125,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - GitHub confirms #374 merged (26 issues closed; three remaining).
 - Ten optional service tests passed, including the real Instructor adapter with an offline completion transport. The 224 existing core tests and four new MIME regressions passed; the MIME regressions also passed on Python 3.9 and 3.13. Strict documentation build passed.
 - No paid provider request was made for the container tests.
+
+## Thirteenth batch
+
+- Native structured output is an explicit LLM option, with provider-schema forwarding and guards against dynamic/raw-router bypasses. Ollama recipe distinguishes input context from output limits.
+- GitHub confirms #375 merged (28 issues closed; one remaining). Final Docker image passed HTTP health, tool discovery and structured document-listing checks.
+- 231 core tests passed; three new structured-output regressions also passed on Python 3.9 and 3.13. Strict docs build passed. No live Ollama accuracy claim: original private documents/server were unavailable.
