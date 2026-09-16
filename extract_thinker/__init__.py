@@ -44,9 +44,14 @@ from .document_loader.document_loader_tabula import DocumentLoaderTabula, Tabula
 
 from .document_loader.document_loader_adobe import DocumentLoaderAdobePDF, AdobePDFConfig
 
+from .retrieval import SQLitePageRetriever, PageMatch, DocumentLoaderRAG
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'SQLitePageRetriever',
+    'PageMatch',
+    'DocumentLoaderRAG',
     'DocumentLoaderAdobePDF',
     'AdobePDFConfig',
     'DocumentLoaderCamelot',

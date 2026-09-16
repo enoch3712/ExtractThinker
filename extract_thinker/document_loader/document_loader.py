@@ -105,7 +105,7 @@ class DocumentLoader(ABC):
             raise ValueError("Page selection requires a loader returning a list of page dictionaries")
         if max(selected) > len(loaded):
             raise ValueError(f"Requested page {max(selected)} but document contains {len(loaded)} pages")
-        return [dict(loaded[number - 1], page_number=number) for number in selected]
+        return [dict(loaded[number - 1], page_number=loaded[number - 1].get("page_number", number)) for number in selected]
 
     def getContent(self) -> Any:
         return self.content

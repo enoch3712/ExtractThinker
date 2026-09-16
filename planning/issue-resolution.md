@@ -11,7 +11,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#347](https://github.com/enoch3712/ExtractThinker/issues/347) | [Enhance] To support api_version param in Document Intelligence Documen Loader | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Azure API-version forwarding tests |
 | [#326](https://github.com/enoch3712/ExtractThinker/issues/326) | [BUG] CompletionStrategy.CONCATENATE mapping | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | JSON fragment, whitespace, schema-replacement and bounded retry tests |
 | [#313](https://github.com/enoch3712/ExtractThinker/issues/313) | [Feature] Keep Tag in markdown (optional) | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | Protected source tags restored verbatim; missing/reordered tags fail |
-| [#312](https://github.com/enoch3712/ExtractThinker/issues/312) | [Feature] RAG for Extraction (SQLite). | Pending | — |
+| [#312](https://github.com/enoch3712/ExtractThinker/issues/312) | [Feature] RAG for Extraction (SQLite). | Implemented; delivery pending | SQLite FTS5 retriever and loader wrapper; 100-page selection and full extractor prompt regression, persistence and document isolation tests |
 | [#311](https://github.com/enoch3712/ExtractThinker/issues/311) | [Feature] Add images, per page, to markdown | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | All source page images embedded with media types and original page labels; separate from model vision |
 | [#310](https://github.com/enoch3712/ExtractThinker/issues/310) | [Feature] Page selection for DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Common load_pages API; real PDF and cached-data selection tests |
 | [#309](https://github.com/enoch3712/ExtractThinker/issues/309) | No module named 'docling_core.types.doc.page' | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Reproducible import diagnostics, dependency repair guide, fresh SDK conversion and page/configuration regressions |
@@ -30,7 +30,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#46](https://github.com/enoch3712/ExtractThinker/issues/46) | validator call after the llm call | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Real Instructor adapter with offline transport exercises Pydantic post-validation; enrichment recipe added |
 | [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Pending | — |
 | [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Pending | — |
-| [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Implemented; delivery pending | Adobe SDK job integration, CSV tables, source page mapping and normalized regions; offline SDK tests |
+| [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Closed; merged in [#369](https://github.com/enoch3712/ExtractThinker/pull/369) | Adobe SDK job integration, CSV tables, source page mapping and normalized regions; offline SDK tests |
 | [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
 | [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
 
@@ -87,3 +87,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - Live Adobe service calls were not made; tests intercept the service while using real SDK job objects.
 - GitHub confirms #368 merged (19 issues closed; 10 remaining).
 - 166 offline tests passed on Python 3.12; eight Adobe regressions also passed on Python 3.9 and 3.13. Two real PDF Services SDK 4.3.0 compatibility checks passed using an offline service; strict docs build passed.
+
+## Seventh batch
+
+- SQLite retrieval selects relevant pages before model calls and preserves source metadata. The full document is still parsed; ranking is lexical.
+- GitHub confirms #369 merged (20 issues closed; nine remaining).
+- 179 offline tests passed on Python 3.12; 22 retrieval/page-selection checks also passed on Python 3.9 and 3.13. Strict docs build passed.
