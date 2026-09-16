@@ -11,22 +11,32 @@ theme:
   palette:
     - scheme: default
       primary: custom
-      accent: pink
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
   logo: assets/logomain.png
   favicon: assets/favicon.png
   font:
-    text: 'Roboto'
-    code: 'Roboto Mono'
+    text: 'Inter'
+    code: 'JetBrains Mono'
 
-# Set the homepage to getting-started
+# Documentation source
 docs_dir: docs
 use_directory_urls: true
 # strict: true
 
 nav:
-  - "": index.md
+  - Home: index.md
   - Getting Started:
       - Overview: getting-started/index.md
+      - 2026 Update: getting-started/2026-update.md
       - MCP & Docker: getting-started/mcp-container.md
   - "Concepts & Components":
       - Document Loaders: 
@@ -111,7 +121,7 @@ extra:
       link: https://github.com/enoch3712/ExtractThinker
       name: Extract Thinker on GitHub
 
-copyright: Copyright © 2025 Julio Almeida
+copyright: Copyright © 2026 Julio Almeida
 
 markdown_extensions:
   - attr_list

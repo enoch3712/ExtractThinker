@@ -1,197 +1,56 @@
-# Document Loaders
+# Choose a document loader
 
-Document Loaders are the foundation of ExtractThinker's document processing pipeline. They handle the initial loading and preprocessing of documents, converting them into a standardized format that can be used by other components.
+A loader turns a file or stream into page dictionaries for extraction. Each page contains `content` and may include images, tables, source page numbers or regions. Available fields depend on the parser and input; inspect a representative document before choosing your extraction strategy.
 
-<div align="center">
-  <img src="../../assets/document_loader.png" alt="Document Loader Flow" width="50%">
-</div>
+## Match the loader to the input
 
-## Basic Concept
+| Input or need | Start with | Setup |
+| --- | --- | --- |
+| Plain text | [DocumentLoaderTxt](txt.md) | Core package |
+| Existing page dictionaries | [DocumentLoaderData](data.md) | Core package |
+| PDF text layer | [DocumentLoaderPyPdf](pypdf.md) | `pip install pypdf` |
+| PDF text, tables and geometry | [DocumentLoaderPyMuPDF](pymupdf.md) | Optional PyMuPDF SDK |
+| PDF table layouts | [Camelot or Tabula](pdf-tables.md) | Optional SDK; Tabula also needs Java |
+| Local OCR | [Tesseract](tesseract.md), [EasyOCR](easy_ocr.md) or [Docling](docling.md) | Native tools/model assets vary |
+| Images for a vision LLM | [DocumentLoaderLLMImage](llm-image.md) | Vision-capable extraction model |
+| Managed OCR/document parsing | [Azure](azure-form.md), [AWS](aws-textract.md), [Google](google-document-ai.md), [Adobe](adobe-pdf.md) or [Mistral](mistral-ocr.md) | Provider SDK and credentials |
+| Spreadsheets | [Spreadsheet loader](spreadsheet.md) | Optional spreadsheet dependency |
+| Office formats | [MarkItDown](markitdown.md) or [Doc2txt](doc2txt.md) | Optional parser dependency |
+| Web pages | [Web loader](web-loader.md) | Playwright browser setup |
 
-A Document Loader can return content in two formats:
-- A simple string containing the extracted text
-- A structured object with pages and their content, that depends on the loader
+Optional dependencies are not all installed with the core library. Follow the selected loader's page for supported options and environment requirements. Cloud parsing may upload the source document before the extraction LLM is called.
 
-??? example "Base Document Loader"
-    The base DocumentLoader class defines the interface and common functionality that all loaders must implement:
-    - `load_content_from_file`: Process files from disk
-    - `load_content_from_stream`: Process BytesIO streams
-    - `can_handle`: Validate file types
-    - `convert_to_images`: Convert documents to images
-    ```python
-    --8<-- "extract_thinker/document_loader/document_loader.py"
-    ```
-
-## Core Features
-
-### Configuration Support
-All Document Loaders support configuration-based initialization through dedicated config classes:
+## Inspect the pages
 
 ```python
-from extract_thinker import DocumentLoaderAWSTextract, TextractConfig
-
-# Create configuration
-config = TextractConfig(
-    aws_access_key_id="your_key",
-    feature_types=["TABLES", "FORMS"],
-    cache_ttl=600
-)
-
-# Initialize with configuration
-loader = DocumentLoaderAWSTextract(config)
-```
-
-### Caching
-All Document Loaders include built-in caching capabilities through the `CachedDocumentLoader` base class. This provides automatic caching of document processing results with a configurable TTL:
-
-??? example "Cached Document Loader"
-    The CachedDocumentLoader extends the base loader with caching capabilities:
-    ```python
-    --8<-- "extract_thinker/document_loader/cached_document_loader.py"
-    ```
-
-Example usage of caching:
-```python
-from extract_thinker.document_loader import DocumentLoader
-
-class MyCustomLoader(DocumentLoader):
-    def __init__(self, content: Any = None, cache_ttl: int = 300):
-        super().__init__(content, cache_ttl)  # 300 seconds default TTL
-```
-
-### File Type Support
-Document Loaders automatically validate file types through the `can_handle` method:
-
-```python
-loader = MyCustomLoader()
-if loader.can_handle("document.pdf"):
-    content = loader.load("document.pdf")
-```
-
-### Multiple Input Types
-Loaders support both file paths and BytesIO streams:
-
-```python
-# Load from file
-content = loader.load("document.pdf")
-
-# Load from stream
-with open("document.pdf", "rb") as f:
-    stream = BytesIO(f.read())
-    content = loader.load(stream)
-```
-
-### Vision Mode Support
-Many loaders support vision mode for handling images and visual content:
-
-```python
-# Enable vision mode
-loader.set_vision_mode(True)
-
-# Load document with images
-pages = loader.load("document.pdf")
-for page in pages:
-    text = page["content"]
-    image = page.get("image")  # Available in vision mode
-```
-
-### Image Resizing
-
-```python
-loader = DocumentLoader()
-loader.set_max_image_size(2000)
-```
-
-### Image Conversion
-
-The base loader includes utilities for converting documents to images:
-
-```python
-loader = DocumentLoader()
-images = loader.convert_to_images(
-    "document.pdf",
-    scale=300/72  # DPI scaling
-)
-```
-
-## Common Methods
-
-All Document Loaders implement these core methods:
-
-- `load(source)`: Main entry point for loading documents
-- `set_vision_mode(enabled)`: Enable/disable vision mode
-- `set_max_image_size(size)`: Set the maximum image size
-
-## Best Practices
-
-- Use configuration classes for complex initialization
-- Set appropriate cache TTL based on your use case
-- Check file type support before processing
-- Consider memory usage when processing large files
-- Enable vision mode only when needed
-- Handle both file paths and streams for flexibility
-
-## Available Loaders
-
-ExtractThinker provides several specialized Document Loaders:
-
-### Cloud Services
-- [AWS Textract](aws-textract.md): AWS document processing with support for text, tables, forms, and layout analysis
-- [Azure Form](azure-form.md): Azure's Document Intelligence with multiple model support
-- [Google Document AI](google-document-ai.md): Google's document understanding with native PDF parsing
-
-### Local Processing
-- [PDF Plumber](pdf-plumber.md): Advanced PDF text and table extraction
-- [PyPDF](pypdf.md): Basic PDF processing with password protection support
-- [Tesseract](tesseract.md): Open-source OCR with multiple language support
-- [Doc2txt](doc2txt.md): Microsoft Word document processing
-- [Spreadsheet](spreadsheet.md): Excel and CSV handling
-- [Text File](txt.md): Plain text file handling with encoding support
-- [Markitdown](markitdown.md): Multi-format document processing
-- [Docling](docling.md): Advanced document layout and table analysis
-
-### Special Purpose
-- [Web Loader](web-loader.md): Web page extraction with custom element handling
-- [LLM Image](llm-image.md): Vision-enabled LLM processing
-- [Data](data.md): Pre-processed data handling with standardized format support
-
-
-### Coming Soon
-- `Adobe PDF Services` <span class="coming-soon">Coming Soon</span>: Adobe's PDF extraction and analysis
-- `ABBYY FineReader` <span class="coming-soon">Coming Soon</span>: Enterprise-grade OCR solution
-- `PaddleOCR` <span class="coming-soon">Coming Soon</span>: High-performance multilingual OCR
-- `Unstructured` <span class="coming-soon">Coming Soon</span>: Open-source document preprocessing
-- `Mathpix` <span class="coming-soon">Coming Soon</span>: Math and scientific document processing
-- `EasyOCR` <span class="coming-soon">Coming Soon</span>: Ready-to-use OCR with multilingual support
-- `Nanonets` <span class="coming-soon">Coming Soon</span>: API-based document processing
-- `Mindee` <span class="coming-soon">Coming Soon</span>: Specialized document parsing APIs
-- `Rossum` <span class="coming-soon">Coming Soon</span>: AI-powered document understanding
-- `Kofax` <span class="coming-soon">Coming Soon</span>: Intelligent document processing
-## Select document pages
-
-All standard loaders expose `load_pages(source, pages)` for one-based page
-selection:
-
-```python
+from io import BytesIO
 from extract_thinker import DocumentLoaderPyPdf
 
 loader = DocumentLoaderPyPdf()
-selected = loader.load_pages("packet.pdf", [3, 1])
-# Returns source page 3 followed by source page 1.
+pages = loader.load("invoice.pdf")
+print(pages[0]["content"])
+
+with open("invoice.pdf", "rb") as source:
+    from_stream = loader.load(BytesIO(source.read()))
 ```
 
-The selection must contain unique positive integers. Out-of-range pages raise
-`ValueError`; an empty selection returns an empty list without loading.
-Each selected page carries its original `page_number`. Selection does not mutate
-the cached page dictionaries. It happens **after** normal loading, so it reduces
-the content passed to extraction but does not reduce parser/OCR service work.
+A scanned PDF can have no useful text layer. Use OCR or vision when text extraction alone cannot read the source. Vision rendering does not itself recognize text; it supplies images for the selected model.
 
-To extract those preloaded pages:
+## Select source pages
+
+On the updated `main` branch, loaders expose one-based page selection:
 
 ```python
-from extract_thinker import Extractor, DocumentLoaderData
-
-extractor = Extractor(DocumentLoaderData())
-extractor.load_llm("your-provider/your-model")
-result = extractor.extract(selected, YourContract)
+pages = loader.load_pages("invoice.pdf", [1, 3])
+assert [page["page_number"] for page in pages] == [1, 3]
 ```
+
+The generic selection API may load the document before filtering. It is not a guarantee of partial parsing. The MCP PDF service selects pages before rendering. See [retrieval](../extractors/retrieval.md) when you want to rank pages by a text query before model calls.
+
+## Compose additional behavior
+
+- [DocumentLoaderRAG](../extractors/retrieval.md) selects pages using SQLite text retrieval.
+- [DocumentLoaderMasked](../extractors/masking.md) masks configured entities and patterns in text.
+- [DocumentLoaderEvents](events.md) detects page signals or evaluates local rules before invoking callbacks.
+
+Configuration and caching vary by loader. Reusing an instance may reuse cached parsing results; configure its documented cache options when source files change. Consult the individual reference rather than assuming every parser exposes the same options.

@@ -4,7 +4,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 
 | Issue | Requirement | State | Evidence |
 | --- | --- | --- | --- |
-| [#357](https://github.com/enoch3712/ExtractThinker/issues/357) | Large-document contract failures with Ollama | Implemented; delivery pending | Native JSON Schema mode, seven-page Instructor regression, actual LiteLLM Ollama format mapping, context/pagination recipe; private original reproduction unavailable |
+| [#357](https://github.com/enoch3712/ExtractThinker/issues/357) | Large-document contract failures with Ollama | Closed; merged in [#376](https://github.com/enoch3712/ExtractThinker/pull/376) | Native JSON Schema mode, seven-page Instructor regression, actual LiteLLM Ollama format mapping, context/pagination recipe; private original reproduction unavailable |
 | [#356](https://github.com/enoch3712/ExtractThinker/issues/356) | Optional argument "token_limit" in class LLM in llm.py not used. | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Explicit completion and page-budget regression tests |
 | [#352](https://github.com/enoch3712/ExtractThinker/issues/352) | How to add logprobs and top_logprobs params? | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Provider option forwarding and metadata tests |
 | [#351](https://github.com/enoch3712/ExtractThinker/issues/351) | Question about the Concatenate completion strategy for multi-page document | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Seven-page vision extraction uses one page per request and merges in order; file lists loaded correctly; docs distinguish input limits from continuation |
@@ -131,3 +131,9 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - Native structured output is an explicit LLM option, with provider-schema forwarding and guards against dynamic/raw-router bypasses. Ollama recipe distinguishes input context from output limits.
 - GitHub confirms #375 merged (28 issues closed; one remaining). Final Docker image passed HTTP health, tool discovery and structured document-listing checks.
 - 231 core tests passed; three new structured-output regressions also passed on Python 3.9 and 3.13. Strict docs build passed. No live Ollama accuracy claim: original private documents/server were unavailable.
+
+## Backlog completion and documentation refresh
+
+- GitHub reports zero open issues after #376: all 29 baseline issues are closed. Five pre-existing contributor PRs remain separate review work.
+- README, documentation homepage, installation/quickstart, loader selection guide and 2026 compatibility notes refreshed. Removed redirect-only landing page and unsupported blanket PII/accuracy claims.
+- CI workflow changes are prepared locally but cannot be pushed with the current OAuth token: GitHub requires the `workflow` scope. Existing GitHub checks passed before each source merge; offline tests and strict docs were run locally.
