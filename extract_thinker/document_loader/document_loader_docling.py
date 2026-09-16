@@ -1,12 +1,41 @@
 from io import BytesIO
 from typing import Any, Dict, List, Union, Optional
-from dataclasses import dataclass, field
-from urllib.parse import urlparse
+from dataclasses import dataclass
+from importlib import import_module
+from importlib.metadata import version, PackageNotFoundError
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
+
+
+def _check_docling_dependencies():
+    """Distinguish an absent optional SDK from an inconsistent SDK installation."""
+    try:
+        for module in ("docling", "docling.document_converter",
+                       "docling.datamodel.document", "docling.datamodel.pipeline_options",
+                       "docling_core.types.doc"):
+            import_module(module)
+    except ImportError as exc:
+        if isinstance(exc, ModuleNotFoundError) and exc.name == "docling":
+            raise ImportError(
+                "Docling is optional. Install it with `python -m pip install docling`."
+            ) from exc
+        installed = []
+        for package in ("docling", "docling-slim", "docling-core"):
+            try:
+                installed.append(f"{package}={version(package)}")
+            except PackageNotFoundError:
+                installed.append(f"{package}=not installed")
+        raise ImportError(
+            "Docling or a transitive dependency could not be imported ("
+            + ", ".join(installed) + f"). Original error: {exc}. "
+            "Repair the dependency set with `python -m pip install --upgrade "
+            "--upgrade-strategy eager docling` and run `python -m pip check`. "
+            "If it persists, install Docling in a fresh virtual environment; "
+            "do not upgrade docling-core independently of Docling."
+        ) from exc
 
 
 @dataclass
@@ -64,6 +93,8 @@ class DoclingConfig:
         if self.format_options is not None:
             return
 
+        _check_docling_dependencies()
+
         # Simple configuration: create default format options based on parameters
         from docling.datamodel.pipeline_options import (
             PdfPipelineOptions,
@@ -72,19 +103,14 @@ class DoclingConfig:
         from docling.datamodel.base_models import InputFormat
         from docling.document_converter import PdfFormatOption
 
-        # Set up table options
-        table_options = None
-        if self.table_structure_enabled:
-            table_options = TableStructureOptions(
-                do_cell_matching=self.do_cell_matching
-            )
-
-        # Create pipeline options
         pipeline_options = PdfPipelineOptions(
             do_table_structure=self.table_structure_enabled,
             do_ocr=self.ocr_enabled,
-            table_structure_options=table_options
+            table_structure_options=TableStructureOptions(
+                do_cell_matching=self.do_cell_matching
+            ),
         )
+        pipeline_options.ocr_options.force_full_page_ocr = self.force_full_page_ocr
 
         # Create format options
         self.format_options = {
@@ -160,23 +186,12 @@ class DocumentLoaderDocling(CachedDocumentLoader):
 
     @staticmethod
     def _check_dependencies():
-        """Check if required dependencies are installed."""
-        try:
-            import docling
-            import docling.document_converter
-            import docling.datamodel.document
-            import docling.datamodel.pipeline_options
-            import docling_core.types.doc
-        except ImportError:
-            raise ImportError(
-                "Could not import docling python package. "
-                "Please install it with `pip install docling`."
-            )
+        _check_docling_dependencies()
 
     def _init_docling_converter(self):
         """Initialize the Docling document converter."""
         from docling.document_converter import DocumentConverter
-        return DocumentConverter()
+        return DocumentConverter(format_options=self.format_options or None)
 
     def _is_url(self, potential_url: str) -> bool:
         """
@@ -215,50 +230,30 @@ class DocumentLoaderDocling(CachedDocumentLoader):
                       self.vision_mode
                   ))
     def load(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
-        from docling.document_converter import ConversionResult
-        """
-        Load and parse the document using Docling.
-        
-        Returns:
-            A list of dictionaries, each representing a "page" with:
-              - "content": text from that page
-              - "image": optional image bytes if vision_mode is True
-        """
+        """Load ordered pages with Markdown content and optional page images."""
         if not self.can_handle(source):
             raise ValueError(f"Cannot handle source: {source}")
-
-        # Convert the source to a docling "ConversionResult"
-        conv_result: ConversionResult = self._docling_convert(source)
-        
-        # If the source is a URL, return a single page with all the content.
-        if isinstance(source, str) and self._is_url(source):
-            content = conv_result.document.export_to_markdown()
-
-            page_output = {"content": content, "image": None}
-            # Handle image extraction if vision_mode is enabled
-            if self.vision_mode:
-                images_dict = self.convert_to_images(source)
-                page_output["images"] = images_dict.get(0)
-            return [page_output]
-
-        # Build the output list of page data for non-URL sources
+        conv_result = self._docling_convert(source)
+        images = self.convert_to_images(source) if self.vision_mode else {}
         pages_output = []
-        for p in conv_result.pages:
-            page_dict = {
-                "content": conv_result.document.export_to_markdown(page_no=p.page_no+1),
-                "image": None
-            }
-            # Handle image extraction if vision_mode is enabled
-            if self.vision_mode:
-                images_dict = self.convert_to_images(source)
-                page_dict["image"] = images_dict.get(p.page_no)
-            pages_output.append(page_dict)
-
-        # Fallback for documents without explicit pages
+        for page in conv_result.pages:
+            # Docling page numbers and export filters are both one-based.
+            number = page.page_no
+            content = conv_result.document.export_to_markdown(page_no=number)
+            pages_output.append({
+                "content": content, "markdown": content, "page_number": number,
+                "image": images.get(number - 1),
+            })
         if not pages_output:
-            doc_text = conv_result.document.export_to_markdown()
-            pages_output = [{"content": doc_text, "image": None}]
-
+            content = conv_result.document.export_to_markdown()
+            page = {"content": content, "markdown": content, "page_number": 1,
+                    "image": None}
+            if self.vision_mode:
+                if isinstance(source, str) and self._is_url(source):
+                    page["images"] = images.get(0, [])
+                else:
+                    page["image"] = images.get(0)
+            pages_output.append(page)
         return pages_output
 
     def _docling_convert(self, source: Union[str, BytesIO]) -> Any:
@@ -266,24 +261,18 @@ class DocumentLoaderDocling(CachedDocumentLoader):
         Internal method that runs the docling convert pipeline.
         Uses format_options if provided during initialization, otherwise uses default settings.
         """
-        from docling.document_converter import DocumentConverter
         from docling_core.types.io import DocumentStream
         import uuid
         
-        # Create converter with optional format options from initialization
-        docling_converter = DocumentConverter(
-            format_options=self.format_options if self.format_options else None
-        )
-
         # Handle different input types
         if isinstance(source, BytesIO):
             # Generate a unique filename using UUID
             unique_filename = f"{uuid.uuid4()}.pdf"
-            doc_stream = DocumentStream(name=unique_filename, stream=source)
-            conv_result = docling_converter.convert(doc_stream, raises_on_error=True)
+            doc_stream = DocumentStream(name=unique_filename, stream=BytesIO(source.getvalue()))
+            conv_result = self.converter.convert(doc_stream, raises_on_error=True)
         elif isinstance(source, str):
             # Handle string paths or URLs directly
-            conv_result = docling_converter.convert(source, raises_on_error=True)
+            conv_result = self.converter.convert(source, raises_on_error=True)
         else:
             raise ValueError(f"Unsupported source type: {type(source)}")
 

@@ -4,9 +4,9 @@ from typing import List, Any
 from extract_thinker.models.classification import Classification
 from extract_thinker.models.doc_group import DocGroups
 from extract_thinker.models.doc_groups2 import DocGroups2
-from extract_thinker.models.eager_doc_group import DocGroupsEager, EagerDocGroup
 from extract_thinker.splitter import Splitter
 from extract_thinker.llm import LLM
+from extract_thinker.models.split_classification import NumericPagePair, NumericDocumentGroups
 
 class ImageSplitter(Splitter):
 
@@ -24,15 +24,15 @@ class ImageSplitter(Splitter):
         Returns:
             str: Base64 encoded image string
         """
-        if isinstance(image, bytes):
-            # If already bytes, encode directly
-            return base64.b64encode(image).decode("utf-8")
-        else:
-            # If PIL Image, convert to bytes first
-            buffered = BytesIO()
-            image.save(buffered, format=image.format or 'JPEG')
-            img_byte = buffered.getvalue()
-            return base64.b64encode(img_byte).decode("utf-8")
+        from extract_thinker.utils import encode_image
+        return encode_image(image)
+
+    @staticmethod
+    def _data_url(encoded):
+        from PIL import Image
+        with Image.open(BytesIO(base64.b64decode(encoded))) as image:
+            mime = Image.MIME.get(image.format, "image/png")
+        return f"data:{mime};base64,{encoded}"
 
     def belongs_to_same_document(self,
                              obj1: Any,
@@ -70,11 +70,13 @@ class ImageSplitter(Splitter):
 
     {self._classifications_to_text(classifications)}
 
-    Return your analysis in the following JSON format:
+    Use the numeric classification IDs from the list, never names.
+Include every source page exactly once, in original order.
+Return your analysis in the following JSON format:
     {{
         "belongs_to_same_document": true/false,
-        "classification_page1": "classification name from the list above",
-        "classification_page2": "classification name from the list above",
+        "classification_page1": 1,
+        "classification_page2": 1,
         "reasoning": "explanation of your decision"
     }}"""
 
@@ -83,47 +85,38 @@ class ImageSplitter(Splitter):
         messages.append({
             "type": "image_url",
             "image_url": {
-                "url": f"data:image/jpeg;base64,{base64_image1}"
+                "url": self._data_url(base64_image1)
             }
         })
         messages.append({
             "type": "image_url",
             "image_url": {
-                "url": f"data:image/jpeg;base64,{base64_image2}"
+                "url": self._data_url(base64_image2)
             }
         })
 
-        try:
-            response = self.llm.request(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": messages
-                    }
-                ],
-                response_model=DocGroups2
-            )
-            return response
-        except Exception as e:
-            # Fallback response if analysis fails
-            return DocGroups2(
-                    belongs_to_same_document=True,  # Conservative approach: keep pages together
-                    classification_page1=classifications[0].name,  # Default to first classification
-                    classification_page2=classifications[0].name
-                )
-        
+        response = self.llm.request(
+            messages=[
+                {
+                    "role": "user",
+                    "content": messages
+                }
+            ],
+            response_model=NumericPagePair
+        )
+        return self._resolve_pair(response, classifications)
+
     def split_lazy_doc_group(self, document: List[dict], classifications: List[Classification]) -> DocGroups:
         """
         Process a document lazily by comparing consecutive pages to determine document boundaries.
         Returns a list of DocGroups2 objects representing the document groupings.
         """
         if len(document) < 2:
-            # Handle single-page documents
-            return [DocGroups2(
-                belongs_to_same_document=True,
-                classification_page1=classifications[0].name,  # Default to first classification
-                classification_page2=None
-            )]
+            from extract_thinker.models.doc_group import DocGroup
+            result = DocGroups()
+            result.doc_groups = [DocGroup(group.pages, group.classification, group.classification_id)
+                                 for group in self.split_eager_doc_group(document, classifications)]
+            return result
 
         # Create and process page pairs
         page_pairs = self.split_document_into_groups(document)
@@ -145,6 +138,8 @@ class ImageSplitter(Splitter):
         """
         Process entire document of images at once using eager strategy
         """
+        if not document:
+            return []
         # Encode all images
         base64_images = [self.encode_image(page['image']) for page in document]
                 
@@ -153,82 +148,66 @@ Consider visual consistency, layout, content flow, and any header/footer pattern
 
 {self._classifications_to_text(classifications)}
 
+Use the numeric classification IDs from the list, never names.
+Include every source page exactly once, in original order.
 Return your analysis in the following JSON format:
     {{
         "reasoning": "detailed explanation of your analysis",
         "groupOfDocuments": [
             {{
-                "classification": "Invoice",
+                "classification": 1,
                 "pages": [1, 2]
             }}
         ]
     }}"""
         
-        # messages = [{"type": "text", "text": content}]
+        messages = [{"type": "text", "text": content}]
 
         # Add classification example images if they exist
-        for classification in classifications:
+        for identifier, classification in enumerate(classifications, 1):
             if classification.image:
                 messages.append({
                     "type": "text",
-                    "text": f"## {classification.name} Classification\n"
+                    "text": f"Example for classification ID {identifier}: {classification.name}\n"
                 })
                 messages.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/jpeg;base64,{self.encode_image(classification.image)}"
+                        "url": self._data_url(self.encode_image(classification.image))
                     }
                 })
             
         # Add all images to the content
-        messages = [{"type": "text", "text": content}]
         for base64_image in base64_images:
             messages.append({
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}"
+                    "url": self._data_url(base64_image)
                 }
             })
         
-        try:
-            response = self.llm.request(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": messages
-                    }
-                ],
-                response_model=DocGroupsEager
-            )
+        response = self.llm.request(
+            messages=[
+                {
+                    "role": "user",
+                    "content": messages
+                }
+            ],
+            response_model=NumericDocumentGroups
+        )
 
-            # Convert DocGroupsEager into List[EagerDocGroup]
-            eager_groups = []
-            for group in response.groupOfDocuments:
-                eager_group = EagerDocGroup(
-                    pages=group.pages,
-                    classification=group.classification
-                )
-                eager_groups.append(eager_group)
-                
-            return eager_groups
-            
-        except Exception as e:
-            #TODO
-            # Fallback: treat all images as one group
-            eager_group = EagerDocGroup(
-                pages=list(range(1, len(document) + 1)),
-                classification="unknown"  # Add a default classification
-            )
-            return [eager_group]
-        
+        return self._resolve_eager(response, classifications, len(document))
+
     def _classifications_to_text(self, classifications: List[Classification]) -> str:
         """
         Converts a list of Classification objects into a formatted text string
         including their names, descriptions, contract structures, and images.
         """
-        classifications_text = "##Classifications\n"
-        for classification in classifications:
-            classifications_text += f"### {classification.name}\n"
+        if not classifications:
+            raise ValueError("At least one classification is required")
+        classifications_text = "##Classifications (numeric IDs)\n"
+        for identifier, classification in enumerate(classifications, 1):
+            classifications_text += f"### ID {identifier}: {classification.name}\n"
             classifications_text += f"**Description:** {classification.description}\n\n"
             
             if classification.contract:

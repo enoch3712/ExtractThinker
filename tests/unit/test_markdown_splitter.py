@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 import pytest
 from extract_thinker import MarkdownSplitter, Classification
-from extract_thinker.models.eager_doc_group import DocGroupsEager, DocGroup
+from extract_thinker.models.split_classification import NumericDocumentGroups as DocGroupsEager, NumericDocumentGroup as DocGroup
 
 
 def test_sections_preserve_text_and_ignore_fenced_headings():
@@ -31,7 +31,7 @@ def test_page_strategy_prefers_markdown_without_mutating_input():
     splitter = MarkdownSplitter()
     splitter.llm = Mock()
     splitter.llm.request.return_value = DocGroupsEager(reasoning='same invoice', groupOfDocuments=[
-        DocGroup(pages=[1, 2], classification='Invoice')])
+        DocGroup(pages=[1, 2], classification=1)])
     pages = [{'content': 'plain text', 'markdown': '# Invoice\n| Item | Price |'},
              {'content': 'plain continuation', 'markdown': '## Continued'}]
     groups = splitter.split_eager_doc_group(pages, [Classification(name='Invoice', description='Invoice')])

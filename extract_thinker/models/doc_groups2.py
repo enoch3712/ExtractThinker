@@ -6,3 +6,5 @@ class DocGroups2(BaseModel):
     belongs_to_same_document: bool
     classification_page1: str
     classification_page2: str
+    classification_id_page1: Optional[int] = None
+    classification_id_page2: Optional[int] = None

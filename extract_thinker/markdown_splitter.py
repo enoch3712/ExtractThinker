@@ -65,6 +65,6 @@ class MarkdownSplitter(TextSplitter):
             result = DocGroups()
             if pages:
                 groups = super().split_eager_doc_group(pages, classifications)
-                result.doc_groups = [DocGroup(group.pages, group.classification) for group in groups]
+                result.doc_groups = [DocGroup(group.pages, group.classification, group.classification_id) for group in groups]
             return result
         return super().split_lazy_doc_group(pages, classifications)
