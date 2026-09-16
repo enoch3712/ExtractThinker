@@ -8,6 +8,9 @@ from extract_thinker.llm import LLM
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extract_thinker.utils import encode_image, json_to_formatted_string, extract_thinking_json
 import re
+from io import BytesIO
+from uuid import uuid4
+from PIL import Image
 
 class ContentItem(BaseModel):
     """Represents a single piece of extracted content with certainty."""
@@ -159,6 +162,8 @@ Your response should ONLY include the formatted Markdown content without any add
             ValueError: If any specified page number is invalid.
         """
         self._validate_dependencies(require_llm=True) # LLM is mandatory here
+        if pages == []:
+            return []
 
         if isinstance(source, list):
             # TODO: Implement handling for multiple sources if needed
@@ -187,15 +192,7 @@ Your response should ONLY include the formatted Markdown content without any add
             if not has_images:
                 raise ValueError("to_markdown_structured requires a document containing images, but none were found by the loader.")
 
-            # Validate page numbers if specified
-            if pages is not None:
-                if not all(isinstance(p, int) and p > 0 for p in pages):
-                    raise ValueError("Page numbers must be positive integers")
-                if max(pages) > len(pages_data):
-                    raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
-                # Convert to 0-based indices
-                page_indices = [p - 1 for p in pages]
-                pages_data = [pages_data[i] for i in page_indices]
+            pages_data = self._select_pages(pages_data, pages)
 
             result_strings = [None] * len(pages_data) # Pre-allocate list
 
@@ -208,8 +205,7 @@ Your response should ONLY include the formatted Markdown content without any add
                     try:
                         result_strings[index] = future.result()
                     except Exception as exc:
-                        print(f'Page {index + 1} processing failed: {exc}')
-                        result_strings[index] = f"<!-- Error processing page {index + 1}: {exc} -->"
+                        raise ValueError(f"Structured Markdown conversion failed for page {index + 1}") from exc
 
             return result_strings
         
@@ -354,8 +350,7 @@ Your response should ONLY include the formatted Markdown content without any add
             raise ValueError("LLM is required for structured extraction but not configured.")
 
         if not isinstance(page_data, dict):
-            print(f"Warning: Unexpected page data type: {type(page_data)}. Skipping LLM processing for this page.")
-            return f"<!-- Error: Unexpected page data type: {type(page_data)} -->"
+            raise ValueError("Expected a page dictionary for structured Markdown conversion")
 
         messages = self._build_messages(self._build_message_content(page_data, vision=True))
 
@@ -528,155 +523,147 @@ Your response should ONLY include the formatted Markdown content without any add
 
     # --- Copied Methods from Extractor --- END ---
 
-    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> List[str]:
-         """
-         Converts the source document(s) to Markdown.
-         This method requires an LLM to be configured.
-         If vision is True, it uses vision capabilities for processing images.
-         
-         Args:
-             source: A single file path/stream or a list of them.
-             vision: If True, enables image processing.
-             pages: Optional list of page numbers to process (1-indexed). If None, all pages are processed.
+    @staticmethod
+    def _select_pages(pages_data: List[Any], pages: Optional[List[int]]) -> List[Any]:
+        if pages is None:
+            return pages_data
+        if any(isinstance(number, bool) or not isinstance(number, int) or number < 1 for number in pages):
+            raise ValueError("Page numbers must be positive integers")
+        if len(set(pages)) != len(pages):
+            raise ValueError("Page numbers must not contain duplicates")
+        if pages and max(pages) > len(pages_data):
+            raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
+        return [pages_data[number - 1] for number in pages]
 
-         Returns:
-             A list of strings, each containing the Markdown representation of a page.
-             
-         Raises:
-             ValueError: If LLM is not configured.
-             ValueError: If any specified page number is invalid.
-         """
-         # Always validate that LLM is present - it's required
-         if not self.llm:
-             raise ValueError("LLM is required for markdown conversion but not configured.")
-         
-         try:
-             # Check if we have a document loader
-             if self.document_loader:
-                 # We have both LLM and DocumentLoader
-                 
-                 # Configure document loader for vision if needed
-                 if hasattr(self.document_loader, 'set_vision_mode'):
-                     try:
-                         self.document_loader.set_vision_mode(vision)
-                     except Exception as e:
-                         print(f"Warning: Failed to set vision mode on document loader: {e}")
-                 
-                 # Load the document
-                 pages_data = self.document_loader.load(source)
-                 if not isinstance(pages_data, list):
-                     pages_data = [pages_data] if pages_data else []
+    def to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False,
+                    pages: Optional[List[int]] = None, *, preserve_tags: bool = False,
+                    include_images: bool = False) -> List[str]:
+        """Convert each page to Markdown, optionally retaining tags and page images.
 
-                 # Validate page numbers if specified
-                 if pages is not None:
-                     if not all(isinstance(p, int) and p > 0 for p in pages):
-                         raise ValueError("Page numbers must be positive integers")
-                     if max(pages) > len(pages_data):
-                         raise ValueError(f"Page number {max(pages)} exceeds total number of pages ({len(pages_data)})")
-                     # Convert to 0-based indices
-                     page_indices = [p - 1 for p in pages]
-                     pages_data = [pages_data[i] for i in page_indices]
-                 
-                 # If vision is True, check if we have any images
-                 if vision:
-                     has_images = any(isinstance(page, dict) and (page.get('image') or page.get('images')) for page in pages_data)
-                     if not has_images:
-                         print("Warning: Vision processing enabled but no images found. Will process as text-only.")
-                 
-                 # Process pages in parallel
-                 markdown_parts = [None] * len(pages_data)  # Pre-allocate list
-                 
-                 with ThreadPoolExecutor() as executor:
-                     future_to_index = {executor.submit(self._process_markdown_page, page_data): i
-                                       for i, page_data in enumerate(pages_data)}
-                     
-                     for future in as_completed(future_to_index):
-                         index = future_to_index[future]
-                         try:
-                             markdown_parts[index] = future.result()
-                         except Exception as exc:
-                             print(f'Page {index + 1} processing failed: {exc}')
-                             markdown_parts[index] = f"<!-- Error processing page {index + 1}: {exc} -->"
-                 
-                 # Return the list of markdown parts instead of joining them
-                 return [part for part in markdown_parts if part]
-             else:
-                 # We have LLM but no DocumentLoader
-                 # In this case, we need to handle the source directly
-                 
-                 if isinstance(source, list):
-                     raise ValueError("Processing multiple sources without a DocumentLoader is not supported.")
-                 
-                 # For text files, we can read them directly
-                 content = None
-                 if isinstance(source, str):
-                     # Assume it's a file path
-                     try:
-                         with open(source, 'r') as f:
-                             content = f.read()
-                     except Exception as e:
-                         raise ValueError(f"Failed to read source file: {e}")
-                 elif hasattr(source, 'read'):
-                     # Assume it's a file-like object
-                     content = source.read()
-                     
-                 if not content:
-                     raise ValueError("No content could be extracted from the source without a DocumentLoader.")
-                 
-                 # Create a simple message for the LLM
-                 messages = [
-                     {"role": "system", "content": self.DEFAULT_MARKDOWN_PROMPT},
-                     {"role": "user", "content": content}
-                 ]
-                 
-                 # Get markdown from LLM and return as a single-element list
-                 try:
-                     markdown_content = self.llm.request(messages=messages)
-                     return [markdown_content]
-                 except Exception as e:
-                     print(f"LLM request failed: {e}")
-                     raise
-                 
-         except Exception as e:
-             print(f"Error in markdown conversion: {e}")
-             if self.document_loader:
-                 print("Falling back to basic conversion.")
-                 # Call basic conversion but convert its result to a list too
-                 basic_result = self._basic_to_markdown(source, vision=vision, pages=pages)
-                 return [basic_result]
-             else:
-                 raise
-
-    def _process_markdown_page(self, page_data: Any) -> str:
+        `vision` controls sending images to the model. `include_images` embeds
+        original images in the returned Markdown independently of model vision.
+        With `preserve_tags`, source HTML/XML tags are protected during conversion;
+        missing or reordered markers cause an error instead of losing the tags.
         """
-        Uses the LLM to process a single page's data and return only the markdown content.
-        Always processes images if they are present in page_data.
-
-        Args:
-            page_data: The data for a single page (expected dict with 'content', 'images').
-
-        Returns:
-            A string containing only the Markdown content without JSON.
-        """
-        self.allow_vision = True
-
         if not self.llm:
-            raise ValueError("LLM is required for markdown extraction but not configured.")
+            raise ValueError("LLM is required for markdown conversion but not configured.")
+        if pages == []:
+            return []
+        if self.document_loader:
+            self.document_loader.set_vision_mode(vision or include_images)
+            pages_data = []
+            sources = source if isinstance(source, list) else [source]
+            for item in sources:
+                loaded = self.document_loader.load(item)
+                pages_data.extend(loaded if isinstance(loaded, list) else [loaded])
+        else:
+            if isinstance(source, list) or vision or include_images:
+                raise ValueError("A document loader is required for multiple sources or images")
+            if isinstance(source, str):
+                with open(source, encoding="utf-8") as file:
+                    text = file.read()
+            elif hasattr(source, "read"):
+                text = source.read()
+                if isinstance(text, bytes):
+                    text = text.decode("utf-8")
+            else:
+                raise ValueError("Source must be a file path or readable stream")
+            pages_data = [{"content": text}]
+        # Use the original page index in embedded image labels, even after selection.
+        indexed = list(enumerate(pages_data, start=1))
+        indexed = self._select_pages(indexed, pages)
+        if not indexed:
+            return []
+        output = [""] * len(indexed)
+        with ThreadPoolExecutor(max_workers=min(8, len(indexed))) as executor:
+            pending = {
+                executor.submit(self._process_markdown_page, page, vision, preserve_tags,
+                                include_images, number): index
+                for index, (number, page) in enumerate(indexed)
+            }
+            for future in as_completed(pending):
+                index = pending[future]
+                try:
+                    output[index] = future.result()
+                except Exception as exc:
+                    for task in pending:
+                        task.cancel()
+                    raise ValueError(f"Markdown conversion failed for page {indexed[index][0]}") from exc
+        return output
 
+    def _process_markdown_page(self, page_data: Any, vision: bool = True,
+                               preserve_tags: bool = False, include_images: bool = False,
+                               page_number: int = 1) -> str:
+        if not self.llm:
+            raise ValueError("LLM is required for markdown conversion")
         if not isinstance(page_data, dict):
-            print(f"Warning: Unexpected page data type: {type(page_data)}. Skipping LLM processing for this page.")
-            return f"<!-- Error: Unexpected page data type: {type(page_data)} -->"
+            raise ValueError("Expected a page dictionary")
+        working_page = dict(page_data)
+        tags = {}
+        if preserve_tags:
+            text = working_page.pop("markdown", None)
+            if text is None:
+                text = working_page.get("content", "")
+            prefix = "ET_TAG_" + uuid4().hex + "_"
+            def protect(match):
+                marker = prefix + str(len(tags)) + "_END"
+                tags[marker] = match.group(0)
+                return marker
+            tag_pattern = r'''<!--.*?-->|<\?.*?\?>|<![A-Za-z][^>]*>|</?[A-Za-z](?:[^>"']|"[^"]*"|'[^']*')*>'''
+            working_page["content"] = re.sub(tag_pattern, protect, text, flags=re.DOTALL)
+        parts = self._build_message_content(working_page, vision=vision)
+        prompt = self.DEFAULT_MARKDOWN_PROMPT
+        if preserve_tags:
+            prompt += "\nKeep every ET_TAG marker exactly once and in its original order. Do not modify or interpret markers."
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": parts if vision else "".join(parts)},
+        ]
+        result = self.llm.raw_completion(messages=messages)
+        if not isinstance(result, str):
+            raise ValueError("Markdown completion must return text")
+        positions = []
+        for marker in tags:
+            if result.count(marker) != 1:
+                raise ValueError("Model did not preserve all source tags")
+            positions.append(result.index(marker))
+        if positions != sorted(positions):
+            raise ValueError("Model reordered source tags")
+        for marker, tag in tags.items():
+            result = result.replace(marker, tag)
+        if include_images:
+            image_markdown = self._page_images_markdown(page_data, page_number)
+            if image_markdown:
+                result += "\n\n" + "\n\n".join(image_markdown)
+        return result
 
-        # Use structured=False to get only Markdown content without JSON
-        messages = self._build_messages(self._build_message_content(page_data, vision=True), structured=False)
-
-        try:
-            # Call request without response_model to get the raw markdown content
-            markdown_content = self.llm.request(messages=messages)
-            return markdown_content.choices[0].message.content
-        except Exception as e:
-            print(f"LLM request failed for page: {e}")
-            raise
+    @staticmethod
+    def _page_images_markdown(page: Dict[str, Any], page_number: int) -> List[str]:
+        images = page.get("images") or []
+        images = list(images) if isinstance(images, list) else [images]
+        if page.get("image") is not None:
+            images.append(page["image"])
+        output = []
+        seen = set()
+        for source in images:
+            if isinstance(source, dict):
+                encoded = source.get("base64")
+                if not isinstance(encoded, str):
+                    raise ValueError("Image dictionary must contain a base64 string")
+                encoded = encoded.split(",", 1)[-1] if encoded.startswith("data:") else encoded
+                data = base64.b64decode(encoded, validate=True)
+            else:
+                data = base64.b64decode(encode_image(source), validate=True)
+            if data in seen:
+                continue
+            seen.add(data)
+            with Image.open(BytesIO(data)) as image:
+                mime = Image.MIME.get(image.format)
+                if mime is None:
+                    raise ValueError("Unsupported embedded image format")
+            encoded = base64.b64encode(data).decode("ascii")
+            output.append(f"![Page {page_number} image {len(output) + 1}](data:{mime};base64,{encoded})")
+        return output
 
     def _basic_to_markdown(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> str:
          """
@@ -776,8 +763,9 @@ Your response should ONLY include the formatted Markdown content without any add
          # No vision flag needed for the sync method call
          return await asyncio.to_thread(self.to_markdown_structured, source, pages=pages)
 
-    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False, pages: Optional[List[int]] = None) -> List[str]:
-        """ Asynchronously converts to Markdown. """
-        # The decision logic is handled by the synchronous to_markdown method
-        # We just need to pass the arguments along.
-        return await asyncio.to_thread(self.to_markdown, source, vision=vision, pages=pages) 
+    async def to_markdown_async(self, source: Union[str, IO, List[Union[str, IO]]], vision: bool = False,
+                                pages: Optional[List[int]] = None, *, preserve_tags: bool = False,
+                                include_images: bool = False) -> List[str]:
+        """Asynchronously convert Markdown with the same options as to_markdown."""
+        return await asyncio.to_thread(self.to_markdown, source, vision=vision, pages=pages,
+                                       preserve_tags=preserve_tags, include_images=include_images)

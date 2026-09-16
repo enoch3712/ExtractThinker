@@ -69,6 +69,7 @@ nav:
       - Splitters: 
           - Overview: core-concepts/splitters/index.md
           - Text Splitter: core-concepts/splitters/text.md
+          - Markdown Splitter: core-concepts/splitters/markdown.md
           - Image Splitter: core-concepts/splitters/image.md
       - Completions:
           - Overview: core-concepts/completion-strategies/index.md

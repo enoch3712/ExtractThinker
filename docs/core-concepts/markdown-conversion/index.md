@@ -120,3 +120,39 @@ The converter uses specific system prompts depending on the method called:
 - `MARKDOWN_VERIFICATION_PROMPT`: Potentially used for refining existing text (internal flag `allow_verification`).
 
 These prompts guide the LLM's output format.
+## Preserve HTML/XML tags and embed page images
+
+Available on `main` after release 0.1.14:
+
+```python
+markdown_pages = markdown_converter.to_markdown(
+    "document.pdf",
+    vision=False,
+    pages=[3, 1],
+    preserve_tags=True,
+    include_images=True,
+)
+```
+
+`preserve_tags=True` protects tags already present in the loader's Markdown or
+text. Their original spelling and attributes are restored after conversion.
+If the model drops, duplicates or reorders a protected tag, conversion raises
+an error instead of silently returning altered markup. It cannot recover tags
+that the loader has already removed.
+
+`include_images=True` appends the source page's images as Markdown data URLs with
+their correct media types. Both a single `image` and an `images` list are
+supported; duplicates on the same page are removed. Image labels retain original
+page numbers when selecting or reordering pages. Embedded images can make the
+returned strings large, and the target Markdown renderer must support data URLs.
+
+`vision` independently controls whether images are sent to the LLM. For example,
+`vision=False, include_images=True` asks the model to convert text while attaching
+the original images locally afterward. The loader must support obtaining images.
+Both new options default to `False` and are also accepted by `to_markdown_async`.
+
+Conversion retains one result per selected page, including empty output. Invalid
+page selections and failed page/model calls raise errors rather than returning
+error comments or silently falling back to a different conversion mode. The
+structured conversion API continues to return `PageContent` objects and does
+not expose these two plain-Markdown options.
