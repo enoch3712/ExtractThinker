@@ -50,9 +50,15 @@ from .model_router import ComplexityRouter, ModelRoute, RequestComplexity, Routi
 
 from .field_extraction import FieldExtraction
 
+from .masking import EntityMasker, MaskingSession, MaskedContent, DocumentLoaderMasked
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'EntityMasker',
+    'MaskingSession',
+    'MaskedContent',
+    'DocumentLoaderMasked',
     'FieldExtraction',
     'ComplexityRouter',
     'ModelRoute',
