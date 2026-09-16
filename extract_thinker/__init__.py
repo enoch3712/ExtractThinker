@@ -17,6 +17,7 @@ from .process import Process
 from .splitter import Splitter
 from .image_splitter import ImageSplitter
 from .text_splitter import TextSplitter
+from .markdown_splitter import MarkdownSplitter
 from .models.contract import Contract
 from .models.splitting_strategy import SplittingStrategy
 from .models.completion_strategy import CompletionStrategy
@@ -86,6 +87,7 @@ __all__ = [
     'Splitter',
     'ImageSplitter',
     'TextSplitter',
+    'MarkdownSplitter',
     'Contract',
     'SplittingStrategy',
     'BatchJob',
