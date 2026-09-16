@@ -30,9 +30,9 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#46](https://github.com/enoch3712/ExtractThinker/issues/46) | validator call after the llm call | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Real Instructor adapter with offline transport exercises Pydantic post-validation; enrichment recipe added |
 | [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Pending | — |
 | [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Pending | — |
-| [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Pending | — |
-| [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Implemented; delivery pending | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
-| [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Implemented; delivery pending | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
+| [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Implemented; delivery pending | Adobe SDK job integration, CSV tables, source page mapping and normalized regions; offline SDK tests |
+| [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
+| [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Closed; merged in [#368](https://github.com/enoch3712/ExtractThinker/pull/368) | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
 
 ## Delivery gates
 
@@ -80,3 +80,10 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - GitHub confirms #367 merged and two more issues closed (17 total; 12 remaining).
 - Real Camelot and Tabula SDK tests both passed on a generated ruled table plus blank page. Tabula used a portable Java runtime in the test environment.
 - Ten new offline tests passed on Python 3.9, 3.12 and 3.13; strict docs build passed.
+
+## Sixth batch
+
+- Adobe PDF loader implemented with optional SDK, environment/injected credentials, normalized regions and CSV tables.
+- Live Adobe service calls were not made; tests intercept the service while using real SDK job objects.
+- GitHub confirms #368 merged (19 issues closed; 10 remaining).
+- 166 offline tests passed on Python 3.12; eight Adobe regressions also passed on Python 3.9 and 3.13. Two real PDF Services SDK 4.3.0 compatibility checks passed using an offline service; strict docs build passed.

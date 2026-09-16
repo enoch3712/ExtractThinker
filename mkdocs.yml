@@ -36,6 +36,7 @@ nav:
           - Google Document AI: core-concepts/document-loaders/google-document-ai.md
           - PDF Plumber: core-concepts/document-loaders/pdf-plumber.md
           - PyPDF: core-concepts/document-loaders/pypdf.md
+          - Adobe PDF: core-concepts/document-loaders/adobe-pdf.md
           - Camelot & Tabula: core-concepts/document-loaders/pdf-tables.md
           - PyMuPDF: core-concepts/document-loaders/pymupdf.md
           - Spreadsheet: core-concepts/document-loaders/spreadsheet.md

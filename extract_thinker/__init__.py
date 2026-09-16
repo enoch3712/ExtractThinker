@@ -42,9 +42,13 @@ from .document_loader.document_loader_pymupdf import DocumentLoaderPyMuPDF, PyMu
 from .document_loader.document_loader_camelot import DocumentLoaderCamelot, CamelotConfig
 from .document_loader.document_loader_tabula import DocumentLoaderTabula, TabulaConfig
 
+from .document_loader.document_loader_adobe import DocumentLoaderAdobePDF, AdobePDFConfig
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'DocumentLoaderAdobePDF',
+    'AdobePDFConfig',
     'DocumentLoaderCamelot',
     'CamelotConfig',
     'DocumentLoaderTabula',
