@@ -59,3 +59,28 @@ contains the enrichment. Validators may run more than once during validation
 or retries: keep them idempotent and avoid writes or other irreversible side
 effects. For expensive or asynchronous database work, perform the lookup after
 `extract()` returns and assign the result explicitly in your application.
+
+## Bounding boxes and signatures
+
+`BoundingBox`, `DocumentRegion` and `Signature` are reusable Pydantic types:
+
+```python
+from extract_thinker import Contract, Signature
+
+class SignedAgreement(Contract):
+    signature: Signature
+```
+
+`Signature` contains `present`, optional `signer`, optional `bounding_box` and
+optional `confidence` (0–1). It describes a signature mark; it does not verify
+a person's identity or validate a digital signature.
+
+`BoundingBox` contains a one-based `page` and normalized `x0`, `y0`, `x1`, `y1`
+coordinates from the top-left of the rendered page. Inverted or out-of-range
+rectangles fail validation. `DocumentRegion` pairs source text with a bounding
+box and optional provider confidence.
+
+The [PyMuPDF loader](../document-loaders/pymupdf.md) can supply actual text-region
+coordinates with `include_bbox=True`. Typed fields alone do not make every
+loader capable of supplying coordinates, and any coordinates inferred by an
+LLM should be checked against the source.

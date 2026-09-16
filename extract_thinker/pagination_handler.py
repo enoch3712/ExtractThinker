@@ -33,11 +33,13 @@ class PaginationHandler(CompletionHandler):
         # Make fields optional to allow partial results
         response_model_optional = make_all_fields_optional(response_model)
         
-        # Process pages in parallel
-        results = []
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for page in content:
+        if not content:
+            raise ValueError("No pages to extract")
+        # Keep page/result associations stable even when requests finish out of order.
+        results = [None] * len(content)
+        with ThreadPoolExecutor(max_workers=min(8, len(content))) as executor:
+            futures = {}
+            for index, page in enumerate(content):
                 # Build messages for each page
                 messages = self._build_messages(page, vision)
                 if extra_content:
@@ -49,16 +51,16 @@ class PaginationHandler(CompletionHandler):
                     messages,
                     response_model_optional
                 )
-                futures.append(future)
+                futures[future] = index
             
             # Collect results as they complete
             for future in as_completed(futures):
                 try:
-                    result = future.result()
-                    results.append(result)
+                    results[futures[future]] = future.result()
                 except Exception as e:
-                    # Log error but continue processing other pages
-                    print(f"Error processing page: {str(e)}")
+                    for pending in futures:
+                        pending.cancel()
+                    raise ValueError(f"Failed to extract page {futures[future] + 1}; no partial document returned") from e
                     
         if not results:
             raise ValueError("No valid results obtained from any page")
@@ -105,11 +107,12 @@ class PaginationHandler(CompletionHandler):
             else:
                 # Scalar field handling
                 if len(non_null_values) == 0:
-                    # If the field is expected to be a string, default to an empty string.
-                    if field_type == str or (get_origin(field_type) is Union and str in get_args(field_type)):
-                        merged[field_name] = ""
-                    else:
-                        continue
+                    # Let the original contract decide whether absence is valid.
+                    # Never fabricate an empty string for a required field.
+                    field = response_model.model_fields.get(field_name)
+                    if field is not None and field.is_required():
+                        merged[field_name] = None
+                    continue
                 else:
                     # Build a mapping from the hashable version of each candidate to the original candidate.
                     distinct_map = {}
@@ -135,11 +138,7 @@ class PaginationHandler(CompletionHandler):
         # Clean merged dictionary to ensure it's compatible with the response model
         merged = self._clean_merged_dict(merged, response_model)
         
-        # Filter out any keys with a None value,
-        # now every required field (e.g., a string like "thinking") will be non-null.
-        merged = {k: v for k, v in merged.items() if v is not None}
-        
-        return response_model(**merged)
+        return response_model.model_validate(merged, by_name=True)
 
     def _merge_list_field(self, field_name: str, values: List[Any], field_type: Any) -> List[Any]:
         """
@@ -229,9 +228,7 @@ class PaginationHandler(CompletionHandler):
         for field_name, field_value in merged.items():
             # If there's still a conflict structure, remove it or handle it
             if isinstance(field_value, dict) and field_value.get("_conflict"):
-                # If somehow unresolved (shouldn't happen), just pick one candidate or None
-                candidates = field_value.get("candidates", [])
-                cleaned[field_name] = candidates[0] if candidates else None
+                raise ValueError(f"Unresolved extraction conflict for field '{field_name}'")
             else:
                 cleaned[field_name] = field_value
         

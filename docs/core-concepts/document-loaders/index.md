@@ -167,3 +167,31 @@ ExtractThinker provides several specialized Document Loaders:
 - `Mindee` <span class="coming-soon">Coming Soon</span>: Specialized document parsing APIs
 - `Rossum` <span class="coming-soon">Coming Soon</span>: AI-powered document understanding
 - `Kofax` <span class="coming-soon">Coming Soon</span>: Intelligent document processing
+## Select document pages
+
+All standard loaders expose `load_pages(source, pages)` for one-based page
+selection:
+
+```python
+from extract_thinker import DocumentLoaderPyPdf
+
+loader = DocumentLoaderPyPdf()
+selected = loader.load_pages("packet.pdf", [3, 1])
+# Returns source page 3 followed by source page 1.
+```
+
+The selection must contain unique positive integers. Out-of-range pages raise
+`ValueError`; an empty selection returns an empty list without loading.
+Each selected page carries its original `page_number`. Selection does not mutate
+the cached page dictionaries. It happens **after** normal loading, so it reduces
+the content passed to extraction but does not reduce parser/OCR service work.
+
+To extract those preloaded pages:
+
+```python
+from extract_thinker import Extractor, DocumentLoaderData
+
+extractor = Extractor(DocumentLoaderData())
+extractor.load_llm("your-provider/your-model")
+result = extractor.extract(selected, YourContract)
+```

@@ -3,7 +3,7 @@ import io
 from io import BytesIO
 from PIL import Image
 import pypdfium2 as pdfium
-from typing import Any, Dict, Union, List
+from typing import Any, Dict, Union, List, Sequence
 from cachetools import TTLCache
 import os
 import magic
@@ -85,6 +85,27 @@ class DocumentLoader(ABC):
     def load(self, source: Union[str, BytesIO]) -> Any:
         """Enhanced load method that handles vision mode."""
         pass
+
+    def load_pages(self, source: Any, pages: Sequence[int]) -> List[Dict[str, Any]]:
+        """Load selected, one-based pages in the requested order.
+
+        Selection happens after the loader's normal load operation. This works
+        across loaders but does not reduce upstream OCR requests or parsing work.
+        Returned dictionaries are copies so page metadata does not mutate cache.
+        """
+        selected = list(pages)
+        if any(isinstance(page, bool) or not isinstance(page, int) or page < 1 for page in selected):
+            raise ValueError("pages must contain positive, one-based integer page numbers")
+        if len(set(selected)) != len(selected):
+            raise ValueError("pages must not contain duplicates")
+        if not selected:
+            return []
+        loaded = self.load(source)
+        if not isinstance(loaded, list) or not all(isinstance(page, dict) for page in loaded):
+            raise ValueError("Page selection requires a loader returning a list of page dictionaries")
+        if max(selected) > len(loaded):
+            raise ValueError(f"Requested page {max(selected)} but document contains {len(loaded)} pages")
+        return [dict(loaded[number - 1], page_number=number) for number in selected]
 
     def getContent(self) -> Any:
         return self.content
