@@ -1,0 +1,5 @@
+# Optional service runtime: Python 3.10+ (container uses Python 3.12).
+mcp>=2.2,<3
+jsonschema>=4.26,<5
+pypdf>=6.19,<7
+uvicorn>=0.35,<1

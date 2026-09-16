@@ -1,0 +1,4 @@
+Invoice INV-2026-001
+Customer: Example Company
+Description: Document processing
+Total: 120.00 EUR

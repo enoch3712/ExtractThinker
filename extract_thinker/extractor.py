@@ -21,6 +21,7 @@ from extract_thinker.models.completion_strategy import CompletionStrategy
 from extract_thinker.utils import (
     add_classification_structure,
     encode_image,
+    image_to_data_url,
     json_to_formatted_string,
     num_tokens_from_string,
 )
@@ -1368,11 +1369,11 @@ class Extractor:
         # Process all collected images
         for img in images_list:
             if img is not None:  # Skip None values
-                base64_image = encode_image(img)
+                image_url = image_to_data_url(img)
                 message_content.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
+                        "url": image_url
                     }
                 })
 
