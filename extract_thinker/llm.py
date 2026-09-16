@@ -56,17 +56,28 @@ class LLM:
         self,
         model: str,
         token_limit: int = None,
-        backend: LLMEngine = LLMEngine.DEFAULT
+        backend: LLMEngine = LLMEngine.DEFAULT,
+        completion_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """Initialize LLM with specified backend.
         
         Args:
             model: The model name (e.g. "gpt-4", "claude-3")
-            token_limit: Optional maximum tokens
+            token_limit: Optional maximum output tokens, overriding the default
             backend: LLMBackend enum (default: LITELLM)
+            completion_kwargs: Provider options such as logprobs and top_logprobs
         """
         self.model = model
+        if token_limit is not None and (isinstance(token_limit, bool) or not isinstance(token_limit, int) or token_limit <= 0):
+            raise ValueError("token_limit must be a positive integer")
         self.token_limit = token_limit
+        self.completion_kwargs = dict(completion_kwargs or {})
+        reserved = {"model", "messages", "response_model", "max_tokens", "max_completion_tokens", "stream"}
+        if reserved.intersection(self.completion_kwargs):
+            raise ValueError(f"completion_kwargs cannot override: {sorted(reserved.intersection(self.completion_kwargs))}")
+        if backend != LLMEngine.DEFAULT and self.completion_kwargs:
+            raise ValueError("completion_kwargs are supported only by the default LiteLLM backend")
+        self.last_completion = None
         self.router = None
         self.is_dynamic = False
         self.backend = backend
@@ -161,13 +172,14 @@ class LLM:
         Args:
             page_count (int): Number of pages in the document
         """
-        if page_count <= 0:
+        if isinstance(page_count, bool) or not isinstance(page_count, int) or page_count <= 0:
             raise ValueError("Page count must be a positive integer")
             
         self.page_count = page_count
         
         # Calculate content tokens
-        content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, self.MAX_TOKEN_LIMIT)
+        limit = self.token_limit if self.token_limit is not None else self.MAX_TOKEN_LIMIT
+        content_tokens = min(page_count * self.DEFAULT_PAGE_TOKENS, limit)
         
         # Calculate thinking budget (1/3 of content tokens)
         thinking_tokens = int(page_count * self.DEFAULT_PAGE_TOKENS * self.DEFAULT_THINKING_RATIO)
@@ -175,6 +187,9 @@ class LLM:
         # Apply min/max constraints
         thinking_tokens = max(thinking_tokens, self.MIN_THINKING_BUDGET)
         thinking_tokens = min(thinking_tokens, self.MAX_THINKING_BUDGET)
+        # A reasoning budget must fit inside the requested output budget.
+        output_limit = min(content_tokens, self._get_model_max_tokens())
+        thinking_tokens = min(thinking_tokens, max(0, output_limit - 1))
         
         # Update token limit and thinking budget
         self.thinking_token_limit = content_tokens
@@ -251,6 +266,7 @@ class LLM:
             "timeout": self.TIMEOUT,
             "max_completion_tokens": max_tokens,
         }
+        params.update(self.completion_kwargs)
         if self.is_thinking:
             if litellm.supports_reasoning(self.model):
                 # Add thinking parameter for supported models
@@ -281,6 +297,7 @@ class LLM:
             "max_completion_tokens": max_tokens,
             "timeout": self.TIMEOUT,
         }
+        base_params.update(self.completion_kwargs)
         
         if self.is_thinking:
             if litellm.supports_reasoning(self.model):
@@ -293,7 +310,9 @@ class LLM:
             else:
                 print(f"Warning: Model {self.model} doesn't support thinking parameter, proceeding without it.")
         
-        return self.client.chat.completions.create(**base_params)
+        response = self.client.chat.completions.create(**base_params)
+        self.last_completion = getattr(response, "_raw_response", None)
+        return response
 
     def raw_completion(self, messages: List[Dict[str, str]]) -> str:
         """Make raw completion request without response model."""
@@ -322,6 +341,7 @@ class LLM:
             "messages": messages,
             "max_completion_tokens": max_tokens,
         }
+        params.update(self.completion_kwargs)
 
         if self.is_thinking:
             if litellm.supports_reasoning(self.model):
@@ -339,6 +359,7 @@ class LLM:
         else:
             raw_response = litellm.completion(**params)
         
+        self.last_completion = raw_response
         return raw_response.choices[0].message.content
 
     def set_timeout(self, timeout_ms: int) -> None:
@@ -353,4 +374,4 @@ class LLM:
         creating the `LLM` instance.
         """
 
-        return self.DEFAULT_MAX_COMPLETION_TOKENS
+        return self.token_limit if self.token_limit is not None else self.DEFAULT_MAX_COMPLETION_TOKENS

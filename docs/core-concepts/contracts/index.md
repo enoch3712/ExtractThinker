@@ -30,3 +30,32 @@ class InvoiceContract(Contract):
     line_items: List[InvoiceLineItem] = Field(description="List of items in invoice")
     notes: Optional[str] = Field(description="Additional notes", default=None)
 ```
+## Enrich a contract after extraction
+
+Use Pydantic's `model_validator(mode="after")` to derive application-owned fields
+once the extracted fields have been parsed. This can map a tax identifier to an
+internal record, for example:
+
+```python
+from typing import Optional
+from pydantic import model_validator
+from extract_thinker import Contract
+
+# Replace this example mapping with your application's lookup.
+customer_ids = {"ACME-TAX-ID": 42}
+
+class InvoiceContract(Contract):
+    tax_id: str
+    internal_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def attach_internal_id(self):
+        self.internal_id = customer_ids.get(self.tax_id)
+        return self
+```
+
+Pass this contract to `extractor.extract(...)` as usual. The returned object
+contains the enrichment. Validators may run more than once during validation
+or retries: keep them idempotent and avoid writes or other irreversible side
+effects. For expensive or asynchronous database work, perform the lookup after
+`extract()` returns and assign the result explicitly in your application.

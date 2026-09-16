@@ -21,6 +21,7 @@ class TextractConfig:
         cache_ttl: Cache time-to-live in seconds (default: 300)
         feature_types: List of Textract feature types to analyze (default: ['TABLES'])
         max_retries: Maximum number of retries for failed requests (default: 3)
+        aws_session_token: Session token for temporary AWS credentials (optional)
     """
     # Class level constants for allowed feature types
     ALLOWED_FEATURE_TYPES: ClassVar[List[str]] = [
@@ -38,6 +39,7 @@ class TextractConfig:
     cache_ttl: int = 300
     feature_types: List[str] = field(default_factory=list)  # Empty list means "Raw Text" only
     max_retries: int = 3
+    aws_session_token: Optional[str] = None
 
     def __post_init__(self):
         """Validate feature types after initialization."""
@@ -70,7 +72,8 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
                  textract_client: Optional[Any] = None, 
                  content: Optional[Any] = None, 
                  cache_ttl: int = 300,
-                 feature_types: Optional[List[str]] = None):
+                 feature_types: Optional[List[str]] = None,
+                 aws_session_token: Optional[str] = None):
         """Initialize loader.
         
         Args:
@@ -81,6 +84,7 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
             content: Initial content (only used if aws_access_key_id is a string)
             cache_ttl: Cache time-to-live in seconds (default: 300, only used if aws_access_key_id is a string)
             feature_types: List of Textract feature types to analyze (only used if aws_access_key_id is a string)
+            aws_session_token: Session token for temporary AWS credentials
         """
         # Check required dependencies
         self._check_dependencies()
@@ -97,23 +101,25 @@ class DocumentLoaderAWSTextract(CachedDocumentLoader):
                 textract_client=textract_client,
                 content=content,
                 cache_ttl=cache_ttl,
-                feature_types=feature_types or []
+                feature_types=feature_types or [],
+                aws_session_token=aws_session_token,
             )
         
         super().__init__(self.config.content, self.config.cache_ttl)
         
-        if self.config.textract_client:
+        if self.config.textract_client is not None:
             self.textract_client = self.config.textract_client
-        elif self.config.aws_access_key_id and self.config.aws_secret_access_key and self.config.region_name:
-            boto3 = self._get_boto3()
-            self.textract_client = boto3.client(
-                'textract',
-                aws_access_key_id=self.config.aws_access_key_id,
-                aws_secret_access_key=self.config.aws_secret_access_key,
-                region_name=self.config.region_name
-            )
         else:
-            raise ValueError("Either provide a textract_client or aws credentials (access key, secret key, and region).")
+            if bool(self.config.aws_access_key_id) != bool(self.config.aws_secret_access_key):
+                raise ValueError("Provide both AWS access key and secret key, or neither to use the AWS credential chain.")
+            boto3 = self._get_boto3()
+            # Omit unset values so environment, profiles and role credentials work.
+            client_kwargs = {
+                name: getattr(self.config, name)
+                for name in ("aws_access_key_id", "aws_secret_access_key", "aws_session_token", "region_name")
+                if getattr(self.config, name) is not None
+            }
+            self.textract_client = boto3.client('textract', **client_kwargs)
 
     @staticmethod
     def _check_dependencies():

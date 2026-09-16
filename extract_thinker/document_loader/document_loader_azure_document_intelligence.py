@@ -28,6 +28,8 @@ class AzureConfig:
             - "keyValuePairs": Extract key-value pairs from forms
             - "queryFields": Enable custom field extraction
             - "searchablePDF": Convert scanned PDFs to searchable format
+        api_version: Service API version supported by the installed SDK (optional)
+        content_mode: "all" for text and tables, or "tables" for table-only content
     """
     # Class level constants for allowed model IDs
     # Primary general-purpose models
@@ -80,9 +82,15 @@ class AzureConfig:
     model_id: str = "prebuilt-layout"  # Default to layout as it's most versatile
     max_retries: int = 3
     features: Optional[List[str]] = None
+    api_version: Optional[str] = None
+    content_mode: str = "all"
 
     def __post_init__(self):
         """Validate model ID and features after initialization."""
+        if self.content_mode not in ("all", "tables"):
+            raise ValueError("content_mode must be 'all' or 'tables'")
+        if self.max_retries < 1:
+            raise ValueError("max_retries must be positive")
         allowed_models = self.GENERAL_MODELS + self.SPECIALIZED_MODELS
         if self.model_id not in allowed_models:
             raise ValueError(
@@ -138,7 +146,8 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
     
     def __init__(self, subscription_key: Union[str, AzureConfig], endpoint: Optional[str] = None, 
                  content: Optional[Any] = None, cache_ttl: int = 300, model_id: Optional[str] = None,
-                 features: Optional[List[str]] = None):
+                 features: Optional[List[str]] = None,
+                 api_version: Optional[str] = None, content_mode: str = "all"):
         """Initialize loader.
         
         Args:
@@ -148,6 +157,8 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
             cache_ttl: Cache time-to-live in seconds (default: 300, only used if subscription_key is a string)
             model_id: Azure model ID to use (optional, only used if subscription_key is a string)
             features: List of advanced features to enable (optional, only used if subscription_key is a string)
+            api_version: Service API version; omitted to use the SDK default
+            content_mode: "all" or "tables"
         """
         # Check required dependencies before any other initialization
         self._check_dependencies()
@@ -163,7 +174,9 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 content=content,
                 cache_ttl=cache_ttl,
                 model_id=model_id if model_id else "prebuilt-layout",
-                features=features
+                features=features,
+                api_version=api_version,
+                content_mode=content_mode,
             )
         
         super().__init__(self.config.content, self.config.cache_ttl)
@@ -178,9 +191,13 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
             from azure.core.credentials import AzureKeyCredential
             
             self.credential = AzureKeyCredential(self.config.subscription_key)
+            client_kwargs = {}
+            if self.config.api_version is not None:
+                client_kwargs["api_version"] = self.config.api_version
             self.client = DocumentAnalysisClient(
                 endpoint=self.config.endpoint, 
-                credential=self.credential
+                credential=self.credential,
+                **client_kwargs,
             )
         except ImportError:
             raise ImportError(
@@ -265,20 +282,23 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                     continue
 
             pages = []
+            page_tables = self.build_tables(result.tables or [])
 
             # Convert to our standard page-based format
             for page in result.pages:
                 # Extract text content (paragraphs)
-                paragraphs = [p.content for p in page.lines]
-                
-                # Get tables for this page
-                page_tables = self.build_tables(result.tables)
+                paragraphs = [p.content for p in (page.lines or [])]
                 
                 # Remove lines that are present in tables
                 paragraphs = self.remove_lines_present_in_tables(
                     paragraphs, 
                     page_tables.get(page.page_number, [])
                 )
+
+                if self.config.content_mode == "tables":
+                    # JSON retains empty columns and boundaries between tables.
+                    import json
+                    paragraphs = [json.dumps(page_tables.get(page.page_number, []), ensure_ascii=False)]
 
                 page_dict = {
                     "content": "\n".join(paragraphs),
@@ -289,7 +309,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 # Add form fields if available (for form-capable models)
                 if hasattr(result, 'key_value_pairs'):
                     page_forms = {}
-                    for kv in result.key_value_pairs:
+                    for kv in result.key_value_pairs or []:
                         # Get the key and value content
                         key_content = kv.key.content if kv.key else None
                         value_content = kv.value.content if kv.value else None
@@ -301,7 +321,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                         is_on_current_page = any(
                             region.page_number == page.page_number 
                             for region in key_regions
-                        ) if key_regions else True  # If no regions, include in first page
+                        ) if key_regions else page.page_number == result.pages[0].page_number
                         
                         if key_content and value_content and is_on_current_page:
                             page_forms[key_content] = value_content
@@ -313,7 +333,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 # Add formulas if formula extraction is enabled
                 if self.config.has_formula_extraction and hasattr(result, 'formulas'):
                     page_formulas = []
-                    for formula in result.formulas:
+                    for formula in result.formulas or []:
                         # Check if formula belongs to this page
                         formula_regions = getattr(formula, 'bounding_regions', [])
                         is_on_current_page = any(
@@ -332,7 +352,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 # Add font information if font extraction is enabled
                 if self.config.has_font_extraction and hasattr(result, 'styles'):
                     page_fonts = []
-                    for style in result.styles:
+                    for style in result.styles or []:
                         # Check if style belongs to this page
                         style_spans = getattr(style, 'spans', [])
                         if style_spans:
@@ -348,7 +368,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 # Add barcodes if barcode extraction is enabled
                 if self.config.has_barcode_extraction and hasattr(result, 'barcodes'):
                     page_barcodes = []
-                    for barcode in result.barcodes:
+                    for barcode in result.barcodes or []:
                         # Check if barcode belongs to this page
                         barcode_regions = getattr(barcode, 'bounding_regions', [])
                         is_on_current_page = any(
@@ -367,7 +387,7 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
                 # Add languages if language detection is enabled
                 if hasattr(result, 'languages'):
                     page_languages = []
-                    for language in result.languages:
+                    for language in result.languages or []:
                         # Check if language detection belongs to this page
                         language_spans = getattr(language, 'spans', [])
                         if language_spans:
@@ -390,28 +410,21 @@ class DocumentLoaderAzureForm(CachedDocumentLoader):
         except Exception as e:
             raise ValueError(f"Error processing document: {str(e)}")
 
-    def remove_lines_present_in_tables(self, paragraphs: List[str], tables: List[List[str]]) -> List[str]:
+    def remove_lines_present_in_tables(self, paragraphs: List[str], tables: List[List[List[str]]]) -> List[str]:
         """Remove any paragraph that appears in a table cell."""
-        for table in tables:
-            for row in table:
-                for cell in row:
-                    if cell in paragraphs:
-                        paragraphs.remove(cell)
-        return paragraphs
+        cells = {cell for table in tables for row in table for cell in row if cell}
+        return [paragraph for paragraph in paragraphs if paragraph not in cells]
 
-    def build_tables(self, tables: List[Any]) -> Dict[int, List[List[str]]]:
+    def build_tables(self, tables: List[Any]) -> Dict[int, List[List[List[str]]]]:
         """Build a dictionary of page number to tables mapping."""
         table_data = {}
         for table in tables:
-            rows = []
-            for row_idx in range(table.row_count):
-                row = []
-                for cell in table.cells:
-                    if cell.row_index == row_idx:
-                        row.append(cell.content)
-                rows.append(row)
-            # Use the page number as the key for the dictionary
-            table_data[table.bounding_regions[0].page_number] = rows
+            rows = [["" for _ in range(table.column_count)] for _ in range(table.row_count)]
+            for cell in table.cells:
+                rows[cell.row_index][cell.column_index] = cell.content or ""
+            # Keep separate tables on each page instead of overwriting the previous one.
+            for page_number in dict.fromkeys(region.page_number for region in (table.bounding_regions or [])):
+                table_data.setdefault(page_number, []).append(rows)
         return table_data
 
     def can_handle_vision(self, source: Union[str, BytesIO]) -> bool:

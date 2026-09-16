@@ -195,3 +195,54 @@ The loader supports advanced extraction features that can be enabled via the `fe
 - Vision mode is supported for image formats
 - High resolution OCR is recommended for documents with small text
 - Formula extraction works best with clear mathematical notation
+
+## Select an API version
+
+Set `api_version` to use a service version supported by the installed
+`azure-ai-formrecognizer` SDK. Omitting it preserves the SDK's default:
+
+```python
+from extract_thinker import AzureConfig, DocumentLoaderAzureForm
+
+config = AzureConfig(
+    subscription_key="your_subscription_key",
+    endpoint="https://your-resource.cognitiveservices.azure.com/",
+    api_version="2022-08-31",
+    model_id="prebuilt-layout",
+)
+loader = DocumentLoaderAzureForm(config)
+```
+
+The same option is accepted by the loader constructor and `from_credentials`.
+Models and advanced features must be compatible with the selected version.
+This loader uses `azure-ai-formrecognizer`; newer service APIs that require
+`azure-ai-documentintelligence` are not enabled simply by changing this string.
+See the [Azure SDK version guidance](https://learn.microsoft.com/en-us/python/api/overview/azure/ai-formrecognizer-readme?view=azure-python).
+
+## Tables and empty cells
+
+Each page's `tables` value is a list of tables; each table is a list of rows;
+each row is a list of cell strings. Missing cells retain an empty string in
+their original column. Multiple tables on a page are preserved separately.
+Merged-cell text is placed at its starting row/column; covered positions stay
+empty. A table spanning pages is associated with each page Azure reports.
+
+```python
+config = AzureConfig(
+    subscription_key="your_subscription_key",
+    endpoint="https://your-resource.cognitiveservices.azure.com/",
+    content_mode="tables",
+)
+loader = DocumentLoaderAzureForm(config)
+pages = loader.load("invoice.pdf")
+```
+
+With `content_mode="tables"`, `content` contains a JSON representation of the
+page's tables instead of surrounding OCR prose. The `tables` field remains
+available. Other metadata and explicitly enabled vision images remain available;
+use a text-only extraction if you do not want the original page image sent.
+The default `"all"` mode retains non-table text and removes exact duplicate
+cell lines from that text.
+
+**Migration:** earlier versions flattened or overwrote tables on a page. Code
+that treated `page["tables"]` as rows should now iterate over tables first.

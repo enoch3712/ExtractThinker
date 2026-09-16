@@ -129,7 +129,8 @@ class DocumentLoader(ABC):
             with open(file_path, "rb") as f:
                 return {0: f.read()}
 
-        return self._convert_pdf_to_images(pdfium.PdfDocument(file_path), scale)
+        with pdfium.PdfDocument(file_path) as document:
+            return self._convert_pdf_to_images(document, scale)
 
     def _convert_stream_to_images(self, file_stream: io.BytesIO, scale: float) -> Dict[int, bytes]:
         # Check if the stream is already an image
@@ -147,7 +148,8 @@ class DocumentLoader(ABC):
             return {0: file_stream.read()}
 
         # If it's not an image, proceed with the conversion
-        return self._convert_pdf_to_images(pdfium.PdfDocument(file_stream), scale)
+        with pdfium.PdfDocument(file_stream) as document:
+            return self._convert_pdf_to_images(document, scale)
 
     def _resize_if_needed(self, image: Image.Image) -> Image.Image:
         """Resize image if it exceeds maximum dimensions while maintaining aspect ratio.
@@ -171,21 +173,27 @@ class DocumentLoader(ABC):
         return image
 
     def _convert_pdf_to_images(self, pdf_file, scale: float) -> Dict[int, bytes]:
-        # Get all pages at once
-        renderer = pdf_file.render(
-            pdfium.PdfBitmap.to_pil,
-            page_indices=list(range(len(pdf_file))),
-            scale=scale,
-        )
-        
-        # Convert all images to bytes and store in dictionary
+        # Page.render is supported by both pypdfium2 4.x and 5.x. The former
+        # PdfDocument.render API was removed in 5.x.
         final_images = {}
-        for page_index, image in enumerate(renderer):
-            # Resize image if needed
-            image = self._resize_if_needed(image)
-            image_byte_array = BytesIO()
-            image.save(image_byte_array, format="jpeg", optimize=True)
-            final_images[page_index] = image_byte_array.getvalue()
+        for page_index in range(len(pdf_file)):
+            page = pdf_file[page_index]
+            try:
+                bitmap = page.render(scale=scale)
+                try:
+                    with bitmap.to_pil() as image:
+                        resized = self._resize_if_needed(image)
+                        try:
+                            image_byte_array = BytesIO()
+                            resized.save(image_byte_array, format="jpeg", optimize=True)
+                            final_images[page_index] = image_byte_array.getvalue()
+                        finally:
+                            if resized is not image:
+                                resized.close()
+                finally:
+                    bitmap.close()
+            finally:
+                page.close()
             
         return final_images
 

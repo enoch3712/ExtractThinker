@@ -1,6 +1,7 @@
 import copy
 import yaml
 import json
+import re
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from extract_thinker.completion_handler import CompletionHandler
@@ -11,91 +12,59 @@ class ConcatenationHandler(CompletionHandler):
         super().__init__(llm)
         self.json_parts = []
         
+    @staticmethod
+    def _clean_fragment(response: str) -> str:
+        """Remove surrounding Markdown fences without altering JSON string values."""
+        response = re.sub(r"\A\s*```(?:json)?[ \t]*\r?\n?", "", response)
+        return re.sub(r"\r?\n?```\s*\Z", "", response)
+
     def _is_valid_json_continuation(self, response: str) -> bool:
-        """Check if the response is a valid JSON continuation."""
-        if not response:
-            return False
-        
-        cleaned_response = response.strip()
-        
-        # Check if response contains JSON markers
-        has_json_markers = (
-            "```json" in cleaned_response or 
-            "{" in cleaned_response or 
-            "[" in cleaned_response
-        )
-        
-        return has_json_markers
+        # A continuation can start inside a string, number, or closing bracket.
+        return isinstance(response, str) and bool(response.strip())
 
     def handle(self, content: Any, response_model: type[BaseModel], vision: bool = False, extra_content: Optional[str] = None) -> Any:
         self.json_parts = []
         messages = self._build_messages(content, vision, response_model)
-        
         if extra_content:
             self._add_extra_content(messages, extra_content)
-            
-        retry_count = 0
-        max_retries = 3
-        while True:
+        initial_messages = copy.deepcopy(messages)
+        last_error = None
+        for attempt in range(4):
+            # Provider failures are not JSON continuations: preserve their cause.
+            response = self.llm.raw_completion(messages)
+            if not self._is_valid_json_continuation(response):
+                last_error = ValueError("Empty JSON continuation")
+                continue
+            self.json_parts.append(self._clean_fragment(response))
             try:
-                response = self.llm.raw_completion(messages)
-                
-                # Validate if it's a proper JSON continuation
-                if not self._is_valid_json_continuation(response):
-                    retry_count += 1
-                    if retry_count >= max_retries:
-                        raise ValueError("Maximum retries reached with invalid JSON continuations")
-                    continue
-                
-                self.json_parts.append(response)
-                
-                # Try to process and validate the JSON
-                result = self._process_json_parts(response_model)
-                return result
-                
-            except ValueError as e:
-                if retry_count >= max_retries:
-                    raise ValueError(f"Maximum retries reached: {str(e)}")
-                retry_count += 1
+                parsed = json.loads("".join(self.json_parts))
+            except json.JSONDecodeError as exc:
+                last_error = exc
                 messages = self._build_continuation_messages(messages, response)
-    
+                continue
+            try:
+                return response_model.model_validate(parsed)
+            except ValueError as exc:
+                # Complete JSON with the wrong schema needs replacement, not a suffix.
+                last_error = exc
+                self.json_parts = []
+                messages = copy.deepcopy(initial_messages)
+                messages.append({
+                    "role": "user",
+                    "content": "The previous output did not match the required schema. "
+                               "Return a complete JSON object matching the schema, including all required fields.",
+                })
+        raise ValueError("Maximum retries reached while completing JSON. "
+                         "If the input exceeds the model context, use PAGINATE; "
+                         "CONCATENATE only continues truncated output.") from last_error
+
     def _process_json_parts(self, response_model: type[BaseModel]) -> Any:
-        """Process collected JSON parts into a complete response."""
+        """Validate collected JSON; do not change whitespace inside string values."""
         if not self.json_parts:
             raise ValueError("No JSON content collected")
-        
-        processed_parts = []
-        for content in self.json_parts:
-            # Remove code fences and extraneous formatting artifacts
-            cleaned = (content
-                       .replace('```json', '')
-                       .replace('```', '')
-                       .replace('\njson', '')
-                       .replace('\n', ' ')
-                       .strip())
+        combined = "".join(self._clean_fragment(part) for part in self.json_parts)
+        return response_model.model_validate_json(combined)
 
-            # If there's still something left after cleaning, keep it
-            if cleaned:
-                processed_parts.append(cleaned)
-            
-        if not processed_parts:
-            raise ValueError("No valid JSON content found in the response")
-
-        # Combine all cleaned parts into one string
-        combined_json = "".join(processed_parts)
-
-        # Attempt to parse the combined JSON
-        try:
-            parsed = json.loads(combined_json)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse combined JSON: {str(e)}\nJSON: {combined_json}")
-
-        # Validate the parsed JSON against the Pydantic model
-        try:
-            return response_model.model_validate(parsed)
-        except Exception as e:
-            raise ValueError(f"Failed to validate parsed JSON: {str(e)}\nJSON: {combined_json}")
-		
     def _build_continuation_messages(
         self,
         messages: List[Dict[str, Any]],
@@ -113,7 +82,8 @@ class ConcatenationHandler(CompletionHandler):
         # Add continuation prompt
         continuation_messages.append({
             "role": "user", 
-            "content": "## CONTINUE JSON"
+            "content": "Continue the JSON exactly where it stopped. Return only the remaining "
+                       "characters, without repeating the prefix or adding Markdown fences."
         })
         
         return continuation_messages

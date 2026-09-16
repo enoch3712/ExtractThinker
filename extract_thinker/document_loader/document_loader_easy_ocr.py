@@ -1,8 +1,9 @@
-from typing import Any, Dict, List, Union
+from __future__ import annotations
+
+from typing import Any, Dict, List, Union, TYPE_CHECKING
 import os
 from io import BytesIO
 from PIL import Image
-import numpy as np
 import threading
 from queue import Queue
 from dataclasses import dataclass, field
@@ -12,6 +13,9 @@ from operator import attrgetter
 
 from extract_thinker.document_loader.cached_document_loader import CachedDocumentLoader
 from extract_thinker.utils import is_pdf_stream
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass
@@ -131,6 +135,7 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
 
     def _process_single_image(self, source: Union[str, BytesIO]) -> List[Dict[str, Any]]:
         """Process a single image file."""
+        import numpy as np
         if isinstance(source, str):
             with Image.open(source).convert("RGB") as img:
                 image_array = np.array(img)
@@ -202,6 +207,7 @@ class DocumentLoaderEasyOCR(CachedDocumentLoader):
 
     def _worker(self, input_queue: Queue, output_queue: Queue) -> None:
         """Worker thread for parallel image processing."""
+        import numpy as np
         while True:
             item = input_queue.get()
             if item is None:

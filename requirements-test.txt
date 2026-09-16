@@ -1,0 +1,5 @@
+# Offline regression suite and local PDF fixtures; no provider credentials needed.
+pytest>=8.2,<10
+pypdf>=5.1,<7
+boto3>=1.34,<2
+azure-ai-formrecognizer==3.3.3

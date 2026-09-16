@@ -91,3 +91,31 @@ result = extractor.extract(
 	content=job_description # Add extra context
 )
 ```
+
+## Input context versus output continuation
+
+`CompletionStrategy.CONCATENATE` continues a truncated **output** JSON object.
+It accepts fragments that start inside strings, numbers or closing brackets and
+preserves whitespace within field values. A complete object with the wrong
+schema triggers a fresh attempt; provider errors retain their original cause.
+Continuation attempts are bounded to four calls in total.
+
+Concatenation resends the document context. It cannot fit a seven-page vision
+document into a model that only accepts one page at a time. For that case, use
+`CompletionStrategy.PAGINATE`, which extracts pages separately and merges the
+results into the requested contract:
+
+```python
+from extract_thinker import CompletionStrategy
+
+result = extractor.extract(
+    "multi-page.pdf",
+    InvoiceContract,
+    vision=True,
+    completion_strategy=CompletionStrategy.PAGINATE,
+)
+```
+
+Each individual page must still fit the model's context. Use an appropriate
+model, image size, and provider context configuration. Schema validation does
+not establish factual accuracy: verify critical fields against the source.

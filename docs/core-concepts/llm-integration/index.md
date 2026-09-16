@@ -103,3 +103,32 @@ llm.load_router(router)
 ```
 
 This enables seamless fallbacks between different providers if a request fails.
+## Output limits and provider options
+
+`token_limit` overrides the default completion budget (8,000 output tokens).
+It also bounds the page-based reasoning estimate. It does **not** enlarge a
+model's input context window; choose a compatible output budget and use
+pagination for input documents that exceed the provider's context limit.
+
+```python
+from extract_thinker import LLM
+
+llm = LLM(
+    "your-provider/your-model",
+    token_limit=4000,
+    completion_kwargs={"logprobs": True, "top_logprobs": 3},
+)
+```
+
+`completion_kwargs` forwards provider options through the default LiteLLM backend
+for structured, routed and raw calls. Support for these options depends on the
+selected provider/model. The mapping cannot replace the model, messages,
+response schema, streaming mode or token budget; use the corresponding public
+configuration instead.
+
+After a direct structured request, `llm.last_completion` exposes the provider
+response attached by Instructor, if available. Raw completion also stores its
+provider response there. For providers exposing log probabilities, inspect
+`llm.last_completion.choices[0].logprobs`. This metadata is optional, describes
+the latest call, and should not be used to associate results across concurrent
+calls on the same LLM instance. Extraction still returns the validated contract.
