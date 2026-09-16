@@ -39,9 +39,16 @@ from .markdown.markdown_converter import MarkdownConverter, PageContent
 from .models.document_evidence import BoundingBox, DocumentRegion, Signature
 from .document_loader.document_loader_pymupdf import DocumentLoaderPyMuPDF, PyMuPDFConfig
 
+from .document_loader.document_loader_camelot import DocumentLoaderCamelot, CamelotConfig
+from .document_loader.document_loader_tabula import DocumentLoaderTabula, TabulaConfig
+
 filter_pydantic_v2_warnings()
 
 __all__ = [
+    'DocumentLoaderCamelot',
+    'CamelotConfig',
+    'DocumentLoaderTabula',
+    'TabulaConfig',
     'BoundingBox',
     'DocumentRegion',
     'Signature',

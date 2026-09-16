@@ -14,7 +14,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#312](https://github.com/enoch3712/ExtractThinker/issues/312) | [Feature] RAG for Extraction (SQLite). | Pending | — |
 | [#311](https://github.com/enoch3712/ExtractThinker/issues/311) | [Feature] Add images, per page, to markdown | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | All source page images embedded with media types and original page labels; separate from model vision |
 | [#310](https://github.com/enoch3712/ExtractThinker/issues/310) | [Feature] Page selection for DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Common load_pages API; real PDF and cached-data selection tests |
-| [#309](https://github.com/enoch3712/ExtractThinker/issues/309) | No module named 'docling_core.types.doc.page' | Implemented; delivery pending | Reproducible import diagnostics, dependency repair guide, fresh SDK conversion and page/configuration regressions |
+| [#309](https://github.com/enoch3712/ExtractThinker/issues/309) | No module named 'docling_core.types.doc.page' | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Reproducible import diagnostics, dependency repair guide, fresh SDK conversion and page/configuration regressions |
 | [#287](https://github.com/enoch3712/ExtractThinker/issues/287) | [Feature] Bounding Box Capabilities | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Source-backed normalized regions with extraction metadata propagation; PyMuPDF adapter |
 | [#281](https://github.com/enoch3712/ExtractThinker/issues/281) | Add intelligent router to ExtractThinker | Pending | — |
 | [#280](https://github.com/enoch3712/ExtractThinker/issues/280) | PyMuPDF DocumentLoader | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Optional PyMuPDF loader; real text, tables, encrypted files, vision and rotation tests |
@@ -23,7 +23,7 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#247](https://github.com/enoch3712/ExtractThinker/issues/247) | The security token included in the request is invalid | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | AWS temporary credentials and credential-chain tests |
 | [#235](https://github.com/enoch3712/ExtractThinker/issues/235) | Markdown Splitter Strategy | Closed; merged in [#366](https://github.com/enoch3712/ExtractThinker/pull/366) | MarkdownSplitter supports deterministic heading sections and semantic page grouping |
 | [#150](https://github.com/enoch3712/ExtractThinker/issues/150) | bad content | Closed; merged in [#364](https://github.com/enoch3712/ExtractThinker/pull/364) | Azure blank-cell/multiple-table/table-only regressions |
-| [#141](https://github.com/enoch3712/ExtractThinker/issues/141) | Make sure classification is right after split | Implemented; delivery pending | Numeric classification IDs propagate through text/image/Markdown splitting and Process extraction; ambiguous names and invalid groups rejected |
+| [#141](https://github.com/enoch3712/ExtractThinker/issues/141) | Make sure classification is right after split | Closed; merged in [#367](https://github.com/enoch3712/ExtractThinker/pull/367) | Numeric classification IDs propagate through text/image/Markdown splitting and Process extraction; ambiguous names and invalid groups rejected |
 | [#121](https://github.com/enoch3712/ExtractThinker/issues/121) | Parallel extraction of images (and more) | Pending | — |
 | [#79](https://github.com/enoch3712/ExtractThinker/issues/79) | Object types - Signatures, BoundingBoxes | Closed; merged in [#365](https://github.com/enoch3712/ExtractThinker/pull/365) | Exported BoundingBox, DocumentRegion and Signature contract types; validation/round-trip tests |
 | [#48](https://github.com/enoch3712/ExtractThinker/issues/48) | Events: Add IDP events  | Pending | — |
@@ -31,8 +31,8 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 | [#37](https://github.com/enoch3712/ExtractThinker/issues/37) | Entity Masking - Mask private information | Pending | — |
 | [#21](https://github.com/enoch3712/ExtractThinker/issues/21) | ExtractThinker hub - A container with a solution ready to go | Pending | — |
 | [#10](https://github.com/enoch3712/ExtractThinker/issues/10) | Add Adobe PDF as a DocumentLoader | Pending | — |
-| [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Pending | — |
-| [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Pending | — |
+| [#9](https://github.com/enoch3712/ExtractThinker/issues/9) | Add Tabula as a DocumentLoader | Implemented; delivery pending | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
+| [#8](https://github.com/enoch3712/ExtractThinker/issues/8) | Add Camelot as a DocumentLoader | Implemented; delivery pending | Optional adapters; real Camelot 2.0.0 and Tabula 2.10.0 table extraction; blank pages/cells, stream cleanup, passwords and images covered |
 
 ## Delivery gates
 
@@ -73,3 +73,10 @@ Delivery note: GitHub rejected workflow writes because the OAuth token lacks the
 - GitHub confirms #366 merged and three more issues closed (15 total; 14 remaining).
 - Numeric classification IDs preserve identity through splitting and extraction, including duplicate display names. Failed calls and invalid page coverage now raise.
 - 148 offline tests passed on Python 3.9, 3.12 and 3.13; strict documentation build passed.
+
+## Fifth batch
+
+- Camelot and Tabula PDF table loaders implemented with optional imports, table/page preservation, stream cleanup, image support, tests and documentation.
+- GitHub confirms #367 merged and two more issues closed (17 total; 12 remaining).
+- Real Camelot and Tabula SDK tests both passed on a generated ruled table plus blank page. Tabula used a portable Java runtime in the test environment.
+- Ten new offline tests passed on Python 3.9, 3.12 and 3.13; strict docs build passed.
