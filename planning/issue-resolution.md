@@ -49,3 +49,5 @@ Baseline: 29 open issues on 2026-09-16. Close only after implementation, relevan
 - Wheel and sdist built successfully; strict MkDocs build passed after removing placeholder navigation and linking existing EasyOCR docs.
 - Cloud adapters were verified offline with SDK call interception; no paid provider calls were made.
 - #351 still needs the pagination/input-budget follow-up before closure. Other untouched feature requests remain pending.
+
+Delivery note: GitHub rejected workflow writes because the OAuth token lacks the `workflow` scope. CI edits are preserved locally and on local branch `codex/2026-ci-preparation`; source/docs fixes are published separately. Workflow authorization is requested; do not claim the new CI matrix is deployed yet.

@@ -14,7 +14,7 @@ On Windows, activate with `.venv\Scripts\activate`. MIME detection requires the
 system libmagic library (`brew install libmagic` on macOS,
 `sudo apt-get install libmagic1` on Debian/Ubuntu).
 
-The required CI suite exercises local loaders and provider adapters without
+The offline suite exercises local loaders and provider adapters without
 API credentials. Add deterministic regressions under `tests/unit` for bugs.
 Keep original provider responses and document fixtures free of private data.
 Assert behavior rather than exact LLM wording or elapsed-time improvements.
@@ -22,8 +22,8 @@ Assert behavior rather than exact LLM wording or elapsed-time improvements.
 The remaining tests include optional integrations, OCR model downloads,
 local model servers and cloud API calls. Install the loader's optional packages
 and configure credentials only for the integration you intend to exercise.
-The **Python package workflow** has an explicit `run_provider_tests` dispatch
-option for the existing critical Groq tests. A passing offline suite does not
+Run `python -m pytest tests/critical/ -v` explicitly with `GROQ_API_KEY` configured
+for the existing critical Groq tests. A passing offline suite does not
 claim live-provider compatibility.
 
 For documentation:
